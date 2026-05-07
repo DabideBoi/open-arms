@@ -1,0 +1,476 @@
+/* Disaster Modal Overlay */
+.disaster-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  animation: disasterFadeIn 0.3s ease-out;
+}
+
+@keyframes disasterFadeIn {
+  from {
+    opacity: 0;
+    background: rgba(139, 0, 0, 0);
+  }
+  to {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* Main Modal Container */
+.disaster-modal {
+  background: linear-gradient(135deg, #3a1a1a 0%, #1a0a0a 100%);
+  border-radius: 16px;
+  padding: 0;
+  max-width: 550px;
+  width: 95%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 
+    0 0 40px rgba(255, 0, 0, 0.4),
+    0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: disasterSlideIn 0.4s ease-out;
+}
+
+@keyframes disasterSlideIn {
+  from {
+    transform: translateY(-30px) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Urgency-based border colors */
+.disaster-modal.urgency-immediate {
+  border: 3px solid #ff3333;
+  box-shadow: 
+    0 0 60px rgba(255, 0, 0, 0.5),
+    0 0 100px rgba(255, 0, 0, 0.3),
+    inset 0 0 30px rgba(255, 0, 0, 0.1);
+}
+
+.disaster-modal.urgency-24hours {
+  border: 3px solid #ff8800;
+  box-shadow: 
+    0 0 40px rgba(255, 136, 0, 0.4),
+    inset 0 0 20px rgba(255, 136, 0, 0.1);
+}
+
+.disaster-modal.urgency-week {
+  border: 3px solid #44cc44;
+  box-shadow: 
+    0 0 30px rgba(68, 204, 68, 0.3),
+    inset 0 0 15px rgba(68, 204, 68, 0.1);
+}
+
+/* Pulsing animation for urgent state */
+.disaster-modal.pulse {
+  animation: urgentPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes urgentPulse {
+  from {
+    box-shadow: 
+      0 0 40px rgba(255, 0, 0, 0.4),
+      0 0 80px rgba(255, 0, 0, 0.2);
+    border-color: #ff3333;
+  }
+  to {
+    box-shadow: 
+      0 0 80px rgba(255, 0, 0, 0.7),
+      0 0 120px rgba(255, 0, 0, 0.4);
+    border-color: #ff6666;
+  }
+}
+
+/* Header Section */
+.disaster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.disaster-urgency {
+  font-weight: bold;
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.urgency-immediate .disaster-urgency {
+  background: rgba(255, 0, 0, 0.3);
+  color: #ff6666;
+  border: 1px solid rgba(255, 0, 0, 0.5);
+}
+
+.urgency-24hours .disaster-urgency {
+  background: rgba(255, 136, 0, 0.3);
+  color: #ffaa44;
+  border: 1px solid rgba(255, 136, 0, 0.5);
+}
+
+.urgency-week .disaster-urgency {
+  background: rgba(68, 204, 68, 0.3);
+  color: #88ee88;
+  border: 1px solid rgba(68, 204, 68, 0.5);
+}
+
+.disaster-timer {
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffffff;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.disaster-timer.urgent {
+  color: #ff4444;
+  animation: timerBlink 0.5s ease-in-out infinite alternate;
+  border-color: #ff4444;
+}
+
+@keyframes timerBlink {
+  from { opacity: 1; }
+  to { opacity: 0.5; }
+}
+
+/* Title */
+.disaster-title {
+  margin: 0;
+  padding: 20px 24px;
+  color: #ffffff;
+  font-size: 26px;
+  text-shadow: 2px 2px 8px rgba(255, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(90deg, rgba(255, 0, 0, 0.1) 0%, transparent 100%);
+}
+
+/* Description */
+.disaster-description {
+  padding: 20px 24px;
+  color: #e0e0e0;
+  font-size: 16px;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.disaster-description p {
+  margin: 0;
+}
+
+/* Stats Section */
+.disaster-stats {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.stat-item.positive {
+  background: rgba(76, 175, 80, 0.15);
+  border-left: 3px solid #4caf50;
+}
+
+.stat-item.warning {
+  background: rgba(255, 152, 0, 0.15);
+  border-left: 3px solid #ff9800;
+}
+
+.stat-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.stat-label {
+  flex: 1;
+  color: #aaaaaa;
+  font-size: 14px;
+}
+
+.stat-value {
+  font-weight: bold;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.stat-value.warning {
+  color: #ffaa00;
+}
+
+/* Warning Box */
+.disaster-warning {
+  margin: 16px 24px;
+  padding: 14px 18px;
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 152, 0, 0.5);
+  border-radius: 8px;
+  color: #ffcc66;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Partial Accept Panel */
+.partial-accept-panel {
+  margin: 16px 24px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.partial-accept-panel h3 {
+  margin: 0 0 16px 0;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.partial-slider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.partial-slider input[type="range"] {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.partial-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #4a9eff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+.partial-count {
+  color: #ffffff;
+  font-weight: bold;
+  min-width: 80px;
+  text-align: center;
+}
+
+.partial-preview {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 16px;
+  color: #88ee88;
+  font-size: 14px;
+}
+
+.partial-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Action Buttons */
+.disaster-actions {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-accept {
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+
+.btn-accept:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.5);
+}
+
+.btn-accept:disabled {
+  background: #555;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-partial {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 12px rgba(33, 150, 243, 0.3);
+}
+
+.btn-partial:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 16px rgba(33, 150, 243, 0.4);
+}
+
+.btn-partial-confirm {
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-partial-confirm:hover {
+  transform: translateY(-1px);
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #aaaaaa;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.btn-decline {
+  background: transparent;
+  color: #ff6666;
+  border: 2px solid rgba(255, 0, 0, 0.4);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-decline:hover {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: rgba(255, 0, 0, 0.6);
+}
+
+/* Consequence Text */
+.disaster-consequence {
+  padding: 12px 24px 20px;
+  text-align: center;
+}
+
+.disaster-consequence small {
+  color: #888888;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Scrollbar styling */
+.disaster-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.disaster-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.disaster-modal::-webkit-scrollbar-thumb {
+  background: rgba(255, 0, 0, 0.4);
+  border-radius: 4px;
+}
+
+.disaster-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 0, 0, 0.6);
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .disaster-modal {
+    width: 98%;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+  
+  .disaster-title {
+    font-size: 22px;
+    padding: 16px 20px;
+  }
+  
+  .disaster-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .disaster-timer {
+    font-size: 16px;
+  }
+  
+  .disaster-description {
+    padding: 16px 20px;
+    font-size: 14px;
+  }
+  
+  .disaster-stats {
+    padding: 12px 20px;
+  }
+  
+  .disaster-actions {
+    padding: 16px 20px;
+  }
+  
+  .btn-accept {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+}

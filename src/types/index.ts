@@ -4,18 +4,35 @@
 // Enums
 // ============================================================================
 
-export type ResidentProfile = 
+export type ShelterTier = 1 | 2 | 3 | 4;
+
+export type DisasterUrgency = "immediate" | "24hours" | "week";
+
+export type DisasterEventType =
+  | "house_fire"
+  | "winter_storm"
+  | "factory_closure"
+  | "domestic_violence"
+  | "hospital_discharge"
+  | "eviction_wave";
+
+export type ResidentProfile =
   | "young_adult"
   | "veteran"
   | "elderly";
 
-export type ResidentState = 
+export type ResidentState =
   | "idle"
   | "seeking_need"
   | "pathfinding"
   | "in_use"
   | "satisfied"
-  | "sleeping";
+  | "sleeping"
+  | "leaving";
+
+export type DepartureReason = 'unhappy' | 'hopeless';
+
+export type GameOverReason = 'bankruptcy' | 'reputation' | 'exodus' | null;
 
 export type Need = 
   | "food"
@@ -41,9 +58,64 @@ export type TileType =
   | "room"
   | "entrance";
 
-export type FoodPortionSetting = "large" | "standard" | "small" | "none";
+// Legacy FoodPortionSetting (for backward compatibility)
+export type FoodPortionSetting = "minimal" | "small" | "standard" | "generous" | "premium" | "large" | "none";
+
+// New food portion tier type (matches FOOD_PORTIONS constant)
+export type FoodPortionTier = "minimal" | "small" | "standard" | "generous" | "premium";
 
 export type DayPhase = "day" | "night";
+
+// ============================================================================
+// Warning System Types
+// ============================================================================
+
+export type WarningSeverity = 'info' | 'warning' | 'critical';
+
+export type WarningType =
+  // Financial Warnings
+  | 'low_funds'
+  | 'in_debt'
+  | 'near_bankruptcy'
+  | 'maintenance_due'
+  | 'operating_costs_due'
+  // Resident Warnings
+  | 'unhappy_resident'
+  | 'at_risk_resident'
+  | 'overcrowded'
+  | 'hungry_residents'
+  // Operational Warnings
+  | 'low_reputation'
+  | 'reputation_dropping'
+  | 'maintenance_overdue'
+  | 'capacity_warning'
+  // Progression Warnings
+  | 'ready_to_upgrade'
+  | 'stalled_progress'
+  | 'life_meters_stalled';
+
+export interface Warning {
+  id: string;
+  type: WarningType;
+  severity: WarningSeverity;
+  message: string;
+  detail?: string;
+  actionLabel?: string;
+  actionCallback?: () => void;
+  timestamp: number;
+  dismissable: boolean;
+  // For tracking escalation
+  originalSeverity?: WarningSeverity;
+  escalatedAt?: number;
+  // For duration display
+  activeSince: number;
+}
+
+export interface WarningCooldown {
+  type: WarningType;
+  dismissedAt: number;
+  cooldownUntil: number;
+}
 
 // ============================================================================
 // Grid & Tile Structures
@@ -118,6 +190,33 @@ export interface Resident {
   lastNeedCheck: number;
   lastLifeUpdate: number;
   lastMealTime: number;        // Timestamp of last meal
+  
+  // Departure tracking
+  unhappyDuration: number;     // Time spent below happiness threshold (ms)
+  isAtRisk: boolean;           // True if at risk of leaving
+  departureReason?: DepartureReason; // Why they're leaving (if leaving)
+  
+  // Fundraiser fatigue tracking (NEW)
+  fundraiserFatigueUntil: number | null;  // Timestamp when fatigue expires (null = not fatigued)
+}
+
+// ============================================================================
+// Adjacency Bonus Types
+// ============================================================================
+
+export interface AdjacencyBonusConfig {
+  happiness: number;           // Flat happiness bonus/penalty
+  lifeFillModifier: number;    // Percentage modifier (0.1 = +10%)
+  maintenanceReduction: number; // Percentage reduction (0.1 = -10% cost, negative = more cost)
+  description: string;         // Tooltip description
+}
+
+export interface RoomAdjacencyBonuses {
+  happiness: number;
+  lifeFillModifier: number;
+  maintenanceReduction: number;
+  adjacentRoomIds: string[];   // IDs of rooms providing bonuses
+  bonusDescriptions: string[]; // Descriptions of active bonuses
 }
 
 // ============================================================================
@@ -142,6 +241,9 @@ export interface Room {
   buildCost: number;
   maintenanceCost: number;
   lastMaintenancePaid: number;
+  
+  // Adjacency bonuses (calculated dynamically)
+  adjacencyBonuses: RoomAdjacencyBonuses;
   
   // Visual
   image?: string;  // Optional image path/key for room tile
@@ -171,7 +273,64 @@ export interface Fundraiser {
   completesAt: number;            // Timestamp
   assignedResidents: string[];    // Resident IDs
   expectedPayout: number;         // Calculated payout
+  successChance: number;          // Success probability (0-1) based on avg happiness (NEW)
+  successRoll?: number;           // The random roll used to determine success (NEW)
 }
+
+// ============================================================================
+// Disaster Event Types
+// ============================================================================
+
+export interface DisasterEventConfig {
+  type: DisasterEventType;
+  title: string;
+  description: string;
+  residentSurge: number;
+  urgency: DisasterUrgency;
+  reputationGainAccept: number;
+  reputationLossDecline: number;
+  donationBonus: number;
+  happinessImpact: number;
+  maintenanceSurge?: number;      // Multiplier for maintenance during event
+  lifeBoost?: boolean;            // These residents are motivated
+  securityRequired?: boolean;     // Extra security costs
+  medicalCosts?: number;          // Per resident medical supply costs
+}
+
+export interface ActiveDisasterEvent {
+  id: string;
+  config: DisasterEventConfig;
+  triggeredAt: number;
+  expiresAt: number;
+  resolved: boolean;
+  acceptedCount?: number;         // For partial accepts
+}
+
+// ============================================================================
+// Financial Tracking Types
+// ============================================================================
+
+export interface DonationRecord {
+  timestamp: number;
+  amount: number;
+  source: 'passive' | 'fundraiser' | 'disaster_bonus' | 'offline';
+}
+
+export interface ExpenseRecord {
+  timestamp: number;
+  amount: number;
+  type: 'food' | 'maintenance' | 'operating' | 'random' | 'expansion' | 'building';
+  description?: string;
+}
+
+export interface FinancialHistory {
+  donations: DonationRecord[];
+  expenses: ExpenseRecord[];
+  lastDayNetIncome: number;
+  lastCalculatedDay: number;
+}
+
+export type FinancialHealthStatus = 'healthy' | 'stable' | 'warning' | 'critical';
 
 // ============================================================================
 // Game State
@@ -189,6 +348,12 @@ export interface GameState {
   currentDay: number;
   food: number;  // Food resource generated by cafeterias
   
+  // Shelter Tier Progression
+  currentTier: ShelterTier;
+  tierUnlockProgress: {
+    graduationsTowardNext: number; // Track graduations for upgrade
+  };
+  
   // Residents
   residents: Resident[];
   graduatedCount: number;
@@ -199,6 +364,7 @@ export interface GameState {
   
   // Fundraisers
   activeFundraisers: Fundraiser[];
+  lastFundraiserEndTime: number | null;  // Timestamp when last fundraiser ended (NEW - for cooldown)
   
   // Timers
   nextDonationCheck: number;
@@ -209,6 +375,36 @@ export interface GameState {
   
   // Settings
   foodPortionSetting: FoodPortionSetting;
+  statusBarSettings: StatusBarSettings;
+  
+  // Bankruptcy & Game Over
+  isBankrupt: boolean;
+  bankruptcyStartTime: number | null;  // When bankruptcy started (timestamp)
+  bankruptcyCountdown: number;          // Remaining ms until game over
+  isGameOver: boolean;
+  gameOverReason: GameOverReason;
+  totalResidentsHelped: number;         // Track total residents ever helped (for stats)
+  totalMoneyEarned: number;             // Track total money earned (for stats)
+  
+  // Disaster Events Tracking
+  disasterResidentCount: number;        // Current overflow residents from disasters
+  lastDisasterTime: number | null;      // For cooldown
+  totalDisastersHandled: number;        // For statistics
+  activeDisasterEvent: ActiveDisasterEvent | null; // Currently active disaster
+  
+  // Reputation Decay Tracking
+  lastDecayTime: number;                // When decay was last applied (timestamp)
+  recentGraduations: { timestamp: number; day: number }[]; // Track for mitigation calc
+  reputationDecayApplied: number;       // How much decay was applied this day
+  
+  // Financial History Tracking
+  financialHistory: FinancialHistory;   // Track donations and expenses for economic dashboard
+  
+  // Warning System Tracking
+  activeWarnings: Warning[];            // Currently active warnings
+  warningCooldowns: WarningCooldown[];  // Cooldowns for dismissed warnings
+  lastWarningCheck: number;             // When warnings were last checked
+  lastGraduationTime: number | null;    // For stalled progress detection
 }
 
 // ============================================================================
@@ -226,10 +422,53 @@ export interface ResidentProfileSpec {
 }
 
 // ============================================================================
+// Shelter Tier Configuration Types
+// ============================================================================
+
+export interface ShelterTierConfig {
+  name: string;
+  maxResidents: number;
+  gridSize: number;
+  upgradeCost: number;
+  availableRooms: RoomType[] | 'all';
+  donationMultiplier: number;
+  description: string;
+  graduationsRequired: number;
+  reputationRequired: number;
+}
+
+export interface TierUpgradeRequirements {
+  canUpgrade: boolean;
+  hasMoney: boolean;
+  hasReputation: boolean;
+  hasGraduations: boolean;
+  hasGridUtilization: boolean;
+  moneyNeeded: number;
+  reputationNeeded: number;
+  graduationsNeeded: number;
+  utilizationNeeded: number;
+  currentMoney: number;
+  currentReputation: number;
+  currentGraduations: number;
+  currentUtilization: number;
+}
+
+// ============================================================================
 // Utility Types
 // ============================================================================
 
 export interface PlacementResult {
   success: boolean;
   error?: string;
+}
+
+// ============================================================================
+// Status Bar Settings Types
+// ============================================================================
+
+export type StatusBarVisibilityMode = 'always' | 'hover' | 'at-risk';
+
+export interface StatusBarSettings {
+  enabled: boolean;
+  visibilityMode: StatusBarVisibilityMode;
 }

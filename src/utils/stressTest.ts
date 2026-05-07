@@ -1,6 +1,19 @@
-import { GameState, Resident, Room } from '../types';
+import { GameState, Resident, Room, RoomAdjacencyBonuses } from '../types';
 import { PROFILE_SPECS, ROOM_SPECS, NAME_LISTS } from '../constants';
 import { generateRandomName } from './helpers';
+
+/**
+ * Create default adjacency bonuses for stress test rooms
+ */
+function createDefaultAdjacencyBonuses(): RoomAdjacencyBonuses {
+  return {
+    happiness: 0,
+    lifeFillModifier: 0,
+    maintenanceReduction: 0,
+    adjacentRoomIds: [],
+    bonusDescriptions: []
+  };
+}
 
 /**
  * Stress Testing Utilities for Performance Testing
@@ -46,7 +59,13 @@ export function spawnStressTestResidents(
       lastNeedCheck: Date.now(),
       lastHappinessUpdate: Date.now(),
       lastLifeUpdate: Date.now(),
-      lastMealTime: Date.now()
+      lastMealTime: Date.now(),
+      // Departure tracking
+      unhappyDuration: 0,
+      isAtRisk: false,
+      departureReason: undefined,
+      // Fundraiser fatigue tracking (NEW)
+      fundraiserFatigueUntil: null
     };
     
     gameState.residents.push(resident);
@@ -112,7 +131,8 @@ export function buildStressTestRooms(
         maintenanceCost: spec.maintenanceCost,
         isOpen: true,
         currentOccupancy: 0,
-        lastMaintenancePaid: Date.now()
+        lastMaintenancePaid: Date.now(),
+        adjacencyBonuses: createDefaultAdjacencyBonuses()
       };
       
       gameState.rooms.push(room);

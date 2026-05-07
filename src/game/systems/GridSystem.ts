@@ -1,11 +1,13 @@
-import { Grid, Tile, Room, RoomType, PlacementResult } from '../../types';
-import { GRID_CONFIG, ROOM_SPECS, EXPANSION_CONFIG } from '../../constants';
+import { Grid, Tile, Room, RoomType, PlacementResult, ShelterTier } from '../../types';
+import { GRID_CONFIG, ROOM_SPECS, EXPANSION_CONFIG, SHELTER_TIERS } from '../../constants';
 import { generateUUID } from '../../utils/helpers';
+import { createDefaultAdjacencyBonuses, recalculateAllAdjacencies } from './AdjacencySystem';
 
 /**
- * Initialize a new grid with starter area unlocked
+ * Initialize a new grid with starter area unlocked based on tier
+ * @param tier - Optional tier to initialize with (defaults to 1)
  */
-export function initializeGrid(): Grid {
+export function initializeGrid(tier: ShelterTier = 1): Grid {
   const tiles: Tile[][] = [];
   
   // Create empty grid (all locked)
@@ -22,21 +24,24 @@ export function initializeGrid(): Grid {
     }
   }
   
-  // Calculate starter area (centered)
-  const startX = Math.floor(GRID_CONFIG.TOTAL_WIDTH / 2) - Math.floor(GRID_CONFIG.STARTER_SIZE / 2);
-  const startY = Math.floor(GRID_CONFIG.TOTAL_HEIGHT / 2) - Math.floor(GRID_CONFIG.STARTER_SIZE / 2);
+  // Get grid size for the specified tier
+  const tierGridSize = SHELTER_TIERS[tier].gridSize;
   
-  // Unlock starter area
-  for (let y = startY; y < startY + GRID_CONFIG.STARTER_SIZE; y++) {
-    for (let x = startX; x < startX + GRID_CONFIG.STARTER_SIZE; x++) {
+  // Calculate starter area (centered)
+  const startX = Math.floor(GRID_CONFIG.TOTAL_WIDTH / 2) - Math.floor(tierGridSize / 2);
+  const startY = Math.floor(GRID_CONFIG.TOTAL_HEIGHT / 2) - Math.floor(tierGridSize / 2);
+  
+  // Unlock starter area based on tier
+  for (let y = startY; y < startY + tierGridSize; y++) {
+    for (let x = startX; x < startX + tierGridSize; x++) {
       tiles[y][x].type = "empty";
       tiles[y][x].walkable = true;
     }
   }
   
   // Set entrance tile (bottom center of starter area)
-  const entranceX = startX + Math.floor(GRID_CONFIG.STARTER_SIZE / 2);
-  const entranceY = startY + GRID_CONFIG.STARTER_SIZE - 1;
+  const entranceX = startX + Math.floor(tierGridSize / 2);
+  const entranceY = startY + tierGridSize - 1;
   tiles[entranceY][entranceX].type = "entrance";
   
   return {
@@ -46,8 +51,8 @@ export function initializeGrid(): Grid {
     unlockedArea: {
       minX: startX,
       minY: startY,
-      maxX: startX + GRID_CONFIG.STARTER_SIZE,
-      maxY: startY + GRID_CONFIG.STARTER_SIZE
+      maxX: startX + tierGridSize,
+      maxY: startY + tierGridSize
     }
   };
 }
@@ -130,6 +135,7 @@ export function placeRoom(
     buildCost: roomSpec.buildCost,
     maintenanceCost: roomSpec.maintenanceCost,
     lastMaintenancePaid: Date.now(),
+    adjacencyBonuses: createDefaultAdjacencyBonuses(),
     image: roomSpec.image  // Copy image property from spec
   };
   
@@ -145,8 +151,11 @@ export function placeRoom(
   // Add room to list
   rooms.push(room);
   
-  return { 
-    success: true, 
+  // Recalculate adjacency bonuses for all rooms
+  recalculateAllAdjacencies(rooms);
+  
+  return {
+    success: true,
     room,
     newMoney: money - roomSpec.buildCost
   };
@@ -308,4 +317,123 @@ export function canExpandInDirection(
 export function getAvailableExpansions(grid: Grid): Array<"north" | "south" | "east" | "west"> {
   const directions: Array<"north" | "south" | "east" | "west"> = ["north", "south", "east", "west"];
   return directions.filter(dir => canExpandInDirection(grid, dir));
+}
+
+/**
+ * Demolish a room from the grid
+ */
+export function demolishRoom(
+  grid: Grid,
+  rooms: Room[],
+  roomId: string
+): { success: boolean; error?: string; refund?: number } {
+  const roomIndex = rooms.findIndex(r => r.id === roomId);
+  
+  if (roomIndex === -1) {
+    return { success: false, error: "Room not found" };
+  }
+  
+  const room = rooms[roomIndex];
+  
+  // Calculate refund (50% of build cost)
+  const refund = Math.floor(room.buildCost * 0.5);
+  
+  // Clear grid tiles
+  for (let y = room.gridY; y < room.gridY + room.height; y++) {
+    for (let x = room.gridX; x < room.gridX + room.width; x++) {
+      grid.tiles[y][x].type = "empty";
+      grid.tiles[y][x].occupiedBy = null;
+      grid.tiles[y][x].walkable = true;
+    }
+  }
+  
+  // Remove room from list
+  rooms.splice(roomIndex, 1);
+  
+  // Recalculate adjacency bonuses for remaining rooms
+  recalculateAllAdjacencies(rooms);
+  
+  console.log(`🏚️ Demolished ${room.type} at (${room.gridX}, ${room.gridY}), refund: $${refund}`);
+  
+  return {
+    success: true,
+    refund
+  };
+}
+
+/**
+ * Get the current unlocked area size
+ */
+export function getUnlockedAreaSize(grid: Grid): { width: number; height: number; totalTiles: number } {
+  const { unlockedArea } = grid;
+  const width = unlockedArea.maxX - unlockedArea.minX;
+  const height = unlockedArea.maxY - unlockedArea.minY;
+  return {
+    width,
+    height,
+    totalTiles: width * height
+  };
+}
+
+/**
+ * Calculate grid utilization percentage
+ */
+export function calculateGridUtilization(grid: Grid, rooms: Room[]): number {
+  const { totalTiles } = getUnlockedAreaSize(grid);
+  if (totalTiles === 0) return 0;
+  
+  // Count tiles occupied by rooms
+  let occupiedTiles = 0;
+  for (const room of rooms) {
+    occupiedTiles += room.width * room.height;
+  }
+  
+  return occupiedTiles / totalTiles;
+}
+
+/**
+ * Expand grid to a specific size (for tier upgrades)
+ * This expands symmetrically from the center
+ */
+export function expandGridToSize(grid: Grid, targetSize: number): void {
+  // Calculate center of the grid
+  const centerX = Math.floor(grid.width / 2);
+  const centerY = Math.floor(grid.height / 2);
+  
+  // Calculate new unlocked area centered on grid
+  const halfSize = Math.floor(targetSize / 2);
+  const newMinX = Math.max(0, centerX - halfSize);
+  const newMinY = Math.max(0, centerY - halfSize);
+  const newMaxX = Math.min(grid.width, centerX + halfSize + (targetSize % 2));
+  const newMaxY = Math.min(grid.height, centerY + halfSize + (targetSize % 2));
+  
+  // Update unlocked area (only expand, never shrink)
+  grid.unlockedArea = {
+    minX: Math.min(grid.unlockedArea.minX, newMinX),
+    minY: Math.min(grid.unlockedArea.minY, newMinY),
+    maxX: Math.max(grid.unlockedArea.maxX, newMaxX),
+    maxY: Math.max(grid.unlockedArea.maxY, newMaxY)
+  };
+  
+  // Unlock tiles in the new area
+  for (let y = grid.unlockedArea.minY; y < grid.unlockedArea.maxY; y++) {
+    for (let x = grid.unlockedArea.minX; x < grid.unlockedArea.maxX; x++) {
+      if (grid.tiles[y] && grid.tiles[y][x]) {
+        const tile = grid.tiles[y][x];
+        if (tile.type === 'locked') {
+          tile.type = 'empty';
+          tile.walkable = true;
+        }
+      }
+    }
+  }
+  
+  console.log(`🏗️ Grid expanded to ${targetSize}x${targetSize}`);
+}
+
+/**
+ * Get the expected grid size for a given tier
+ */
+export function getTierGridSize(tier: ShelterTier): number {
+  return SHELTER_TIERS[tier].gridSize;
 }

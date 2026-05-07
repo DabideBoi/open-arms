@@ -8,14 +8,15 @@ Technical documentation for developers working on the Open Arms shelter manageme
 2. [Technology Stack](#technology-stack)
 3. [Project Structure](#project-structure)
 4. [Core Systems](#core-systems)
-5. [Data Models](#data-models)
-6. [Game Loop & Timing](#game-loop--timing)
-7. [State Management](#state-management)
-8. [Adding New Features](#adding-new-features)
-9. [Performance Considerations](#performance-considerations)
-10. [Testing](#testing)
-11. [Build & Deployment](#build--deployment)
-12. [Contributing Guidelines](#contributing-guidelines)
+5. [New Systems (Phase 8)](#new-systems-phase-8)
+6. [Data Models](#data-models)
+7. [Game Loop & Timing](#game-loop--timing)
+8. [State Management](#state-management)
+9. [Adding New Features](#adding-new-features)
+10. [Performance Considerations](#performance-considerations)
+11. [Testing](#testing)
+12. [Build & Deployment](#build--deployment)
+13. [Contributing Guidelines](#contributing-guidelines)
 
 ---
 
@@ -26,55 +27,55 @@ Technical documentation for developers working on the Open Arms shelter manageme
 Open Arms follows a **centralized state management** pattern with **system-based architecture**:
 
 - **Single Source of Truth**: [`GameStateManager`](src/game/systems/GameStateManager.ts) holds all game state
-- **System Separation**: Each game aspect is handled by a dedicated system
+- **System Separation**: Each game aspect is handled by a dedicated system (20 total)
 - **Event-Driven**: Systems communicate through events and callbacks
 - **React + Phaser Hybrid**: React for UI, Phaser for game rendering
 
 ### Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     React Layer (UI)                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
-│  │   HUD    │  │BuildMenu │  │Management│  │ Modals  │ │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘ │
-│       │             │              │             │       │
-│       └─────────────┴──────────────┴─────────────┘       │
-│                          │                               │
-└──────────────────────────┼───────────────────────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │   App.tsx   │
-                    └──────┬──────┘
-                           │
-┌──────────────────────────┼───────────────────────────────┐
-│                   Phaser Layer (Game)                     │
-│                    ┌─────▼─────┐                          │
-│                    │ MainScene │                          │
-│                    └─────┬─────┘                          │
-│                          │                                │
-│              ┌───────────┴───────────┐                    │
-│              │  GameStateManager     │                    │
-│              │  (Central Hub)        │                    │
-│              └───────────┬───────────┘                    │
-│                          │                                │
-│     ┌────────────────────┼────────────────────┐           │
-│     │                    │                    │           │
-│ ┌───▼────┐  ┌───────────▼──┐  ┌──────────────▼─┐        │
-│ │  Grid  │  │   Resident   │  │   Day/Night    │        │
-│ │ System │  │   System     │  │    System      │        │
-│ └────────┘  └──────────────┘  └────────────────┘        │
-│                                                           │
-│ ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
-│ │Pathfind  │  │Donation  │  │  Food    │  │  Event   │ │
-│ │ System   │  │ System   │  │ System   │  │ System   │ │
-│ └──────────┘  └──────────┘  └──────────┘  └──────────┘ │
-│                                                           │
-│ ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
-│ │Reputation│  │   LIFE   │  │Fundraiser│  │Maintenance│ │
-│ │ System   │  │  Meter   │  │ System   │  │  System  │ │
-│ └──────────┘  └──────────┘  └──────────┘  └──────────┘ │
-└───────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      React Layer (UI)                            │
+│  ┌────────┐ ┌──────────┐ ┌──────────────┐ ┌───────────────┐    │
+│  │  HUD   │ │BuildMenu │ │EconomicDash  │ │ WarningPanel  │    │
+│  └───┬────┘ └────┬─────┘ └──────┬───────┘ └───────┬───────┘    │
+│      └───────────┴──────────────┴─────────────────┘             │
+│                            │                                     │
+└────────────────────────────┼─────────────────────────────────────┘
+                             │
+                      ┌──────▼──────┐
+                      │   App.tsx   │
+                      └──────┬──────┘
+                             │
+┌────────────────────────────┼─────────────────────────────────────┐
+│                     Phaser Layer (Game)                          │
+│                      ┌─────▼─────┐                               │
+│                      │ MainScene │                               │
+│                      └─────┬─────┘                               │
+│                            │                                     │
+│              ┌─────────────┴─────────────┐                      │
+│              │   GameStateManager        │                      │
+│              │   (Central Hub)           │                      │
+│              └─────────────┬─────────────┘                      │
+│                            │                                     │
+│  ┌─────────────────────────┼─────────────────────────┐          │
+│  │                         │                         │          │
+│  ▼                         ▼                         ▼          │
+│ ┌──────────┐  ┌───────────────────┐  ┌────────────────────┐    │
+│ │  Core    │  │   Economic        │  │   Progression      │    │
+│ │ Systems  │  │   Systems         │  │   Systems          │    │
+│ ├──────────┤  ├───────────────────┤  ├────────────────────┤    │
+│ │Grid      │  │Donation           │  │LIFE Meter          │    │
+│ │Pathfind  │  │Food               │  │Reputation          │    │
+│ │Resident  │  │Maintenance        │  │Tier ✨             │    │
+│ │ResidentAI│  │Fundraiser         │  │Warning ✨          │    │
+│ │DayNight  │  │Event              │  │Adjacency ✨        │    │
+│ │SaveLoad  │  │                   │  │                    │    │
+│ └──────────┘  └───────────────────┘  └────────────────────┘    │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+
+✨ = New in Phase 8
 ```
 
 ---
@@ -83,26 +84,18 @@ Open Arms follows a **centralized state management** pattern with **system-based
 
 ### Core Technologies
 
-- **[React 18.3.1](https://react.dev/)** - UI framework
-  - Functional components with hooks
-  - TypeScript for type safety
-  - CSS modules for styling
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| [React](https://react.dev/) | 18.3.1 | UI framework |
+| [TypeScript](https://www.typescriptlang.org/) | 5.5.3 | Type-safe development |
+| [Phaser](https://phaser.io/) | 3.80.1 | Game engine |
+| [Vite](https://vitejs.dev/) | 5.3.4 | Build tool |
 
-- **[Phaser 3.80.1](https://phaser.io/)** - Game engine
-  - Canvas rendering
-  - Scene management
-  - Input handling
-  - Asset loading
+### Development Tools
 
-- **[TypeScript 5.5.3](https://www.typescriptlang.org/)** - Language
-  - Strict mode enabled
-  - Full type coverage
-  - Interface-driven design
-
-- **[Vite 5.3.4](https://vitejs.dev/)** - Build tool
-  - Fast HMR in development
-  - Optimized production builds
-  - Code splitting
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **TypeScript Strict Mode** - Enhanced type checking
 
 ---
 
@@ -111,41 +104,69 @@ Open Arms follows a **centralized state management** pattern with **system-based
 ```
 open-arms/
 ├── src/
-│   ├── components/              # React UI components
+│   ├── components/              # React UI components (14 files)
 │   │   ├── HUD.tsx             # Main heads-up display
 │   │   ├── BuildMenu.tsx       # Room building interface
 │   │   ├── ManagementPanel.tsx # Detailed management view
-│   │   ├── EventModal.tsx      # Event display and choices
+│   │   ├── EconomicDashboard.tsx # Financial projections ✨
+│   │   ├── WarningPanel.tsx    # Warning display ✨
+│   │   ├── DisasterModal.tsx   # Disaster event UI ✨
+│   │   ├── MoneyAnimations.tsx # Floating money text ✨
+│   │   ├── EventModal.tsx      # Random event handling
+│   │   ├── GameOverModal.tsx   # Bankruptcy screen
 │   │   ├── TutorialModal.tsx   # Tutorial system
 │   │   ├── SettingsModal.tsx   # Game settings
-│   │   ├── GameOverModal.tsx   # Game over screen
 │   │   ├── NotificationToast.tsx # Toast notifications
-│   │   └── PerformanceMonitor.tsx # Performance tracking
+│   │   ├── PerformanceMonitor.tsx # FPS tracking
+│   │   └── DevModeMenu.tsx     # Developer tools
 │   │
 │   ├── game/                   # Phaser game logic
 │   │   ├── PhaserGame.ts      # Phaser initialization
-│   │   ├── scenes/            # Phaser scenes
+│   │   ├── scenes/
 │   │   │   └── MainScene.ts   # Main game scene
-│   │   └── systems/           # Game systems
+│   │   └── systems/           # Game systems (20 files)
 │   │       ├── GameStateManager.ts    # Central state
 │   │       ├── GridSystem.ts          # Grid & building
 │   │       ├── ResidentSystem.ts      # Resident management
-│   │       ├── ResidentAISystem.ts    # Resident AI
-│   │       ├── PathfindingSystem.ts   # A* pathfinding
+│   │       ├── ResidentAISystem.ts    # AI behavior
+│   │       ├── ResidentSpawningSystem.ts # Spawning
+│   │       ├── PathfindingSystem.ts   # A* movement
 │   │       ├── DayNightSystem.ts      # Time management
-│   │       └── ... (12 more systems)
+│   │       ├── DonationSystem.ts      # Donations
+│   │       ├── FoodSystem.ts          # Food management
+│   │       ├── MaintenanceSystem.ts   # Facility upkeep
+│   │       ├── FundraiserSystem.ts    # Fundraising
+│   │       ├── EventSystem.ts         # Random events
+│   │       ├── ReputationSystem.ts    # Reputation
+│   │       ├── LIFEMeterSystem.ts     # LIFE progression
+│   │       ├── SaveLoadSystem.ts      # Persistence
+│   │       ├── TierSystem.ts          # Tier progression ✨
+│   │       ├── AdjacencySystem.ts     # Room bonuses ✨
+│   │       ├── WarningSystem.ts       # Warning generation ✨
+│   │       ├── TimerManager.ts        # Timer coordination
+│   │       ├── AudioSystem.ts         # Sound management
+│   │       └── CollisionDetectionSystem.ts
 │   │
-│   ├── types/                 # TypeScript definitions
-│   ├── constants/            # Game configuration
-│   ├── utils/               # Utility functions
-│   └── App.tsx              # Main React app
+│   ├── types/
+│   │   └── index.ts            # TypeScript definitions
+│   ├── constants/
+│   │   └── index.ts            # Game configuration (~1000 lines)
+│   ├── utils/
+│   │   ├── helpers.ts          # Utility functions
+│   │   └── stressTest.ts       # Performance testing
+│   ├── App.tsx                 # Main React app
+│   ├── App.css                 # App styles
+│   ├── main.tsx                # Entry point
+│   └── index.css               # Global styles
 │
-├── plans/                   # Design documents (19 files)
-├── public/                  # Static assets
-├── index.html              # HTML entry point
-├── vite.config.ts          # Vite configuration
-├── vercel.json             # Vercel deployment config
-└── ... (documentation files)
+├── plans/                      # Design documents (21 files)
+├── public/assets/              # Game assets
+├── index.html                  # HTML entry point
+├── vite.config.ts              # Vite configuration
+├── vercel.json                 # Vercel deployment config
+└── [documentation files]
+
+✨ = New in Phase 8
 ```
 
 ---
@@ -159,7 +180,7 @@ open-arms/
 **Purpose**: Central hub for all game state and system coordination.
 
 **Key Responsibilities**:
-- Maintains game state (money, reputation, day, etc.)
+- Maintains game state (money, reputation, day, residents, rooms, etc.)
 - Coordinates all other systems
 - Provides state access to React components
 - Handles game initialization and updates
@@ -174,6 +195,9 @@ class GameStateManager {
   advancePhase(): void
   advanceDay(): void
   update(time: number, delta: number): void
+  
+  // State change notification
+  setOnStateChange(callback: (state: GameState) => void): void
 }
 ```
 
@@ -183,7 +207,7 @@ class GameStateManager {
 
 **Location**: [`src/game/systems/GridSystem.ts`](src/game/systems/GridSystem.ts)
 
-**Purpose**: Manages the 20×20 tile grid and room placement.
+**Purpose**: Manages the tile grid and room placement.
 
 **Key Methods**:
 ```typescript
@@ -193,15 +217,19 @@ class GridSystem {
   removeRoom(roomId: string): void
   getTileAt(x: number, y: number): Tile | null
   getRoomAt(x: number, y: number): Room | null
+  isWithinUnlockedArea(x: number, y: number): boolean
 }
 ```
 
 **Room Placement Logic**:
-1. Check if tiles are within grid bounds
+1. Check if tiles are within unlocked grid bounds
 2. Verify tiles are unoccupied
-3. Deduct money from budget
-4. Mark tiles as occupied
-5. Create room object and render visually
+3. Check affordability
+4. Deduct money from budget
+5. Mark tiles as occupied
+6. Create room object
+7. **Calculate adjacency bonuses** ✨
+8. Render visually
 
 ---
 
@@ -215,6 +243,7 @@ class GridSystem {
 - Resident creation and removal
 - Need updates (hunger, sleep, hygiene, etc.)
 - Capacity management
+- **Departure tracking** ✨
 
 **ResidentAISystem** handles:
 - Pathfinding to facilities
@@ -231,6 +260,7 @@ class GridSystem {
 5. Move toward destination
 6. Perform activity when reached
 7. Update needs and satisfaction
+8. Check departure conditions ✨
 ```
 
 ---
@@ -242,10 +272,10 @@ class GridSystem {
 **Algorithm**: A* with Manhattan distance heuristic
 
 **Performance Optimizations**:
-- Path caching for common routes
+- Path caching (100 cached paths)
 - Early termination if no path exists
 - 4-directional movement only
-- Maximum search iterations limit
+- Maximum 1000 search iterations
 
 ---
 
@@ -253,48 +283,243 @@ class GridSystem {
 
 **Location**: [`src/game/systems/DayNightSystem.ts`](src/game/systems/DayNightSystem.ts)
 
-**Phase Cycle**:
-1. Morning (6 AM - 12 PM) - 30 seconds
-2. Afternoon (12 PM - 6 PM) - 30 seconds
-3. Evening (6 PM - 12 AM) - 30 seconds
-4. Night (12 AM - 6 AM) - 30 seconds
+**Phase Cycle** (6 minutes total):
+1. Day Phase (4 minutes) - Full activity
+2. Night Phase (2 minutes) - Reduced activity, residents sleep
+
+**Visual Effects**:
+- Ambient lighting changes
+- Color tinting
+- Some rooms close at night
 
 ---
 
-### Economic Systems
+## 🆕 New Systems (Phase 8)
 
-#### DonationSystem
-**Formula**: `baseDonation * reputationMultiplier`
-- Base: $200/day
-- Multiplier: 0.5x to 2.0x based on reputation
+### TierSystem
 
-#### FoodSystem
-- 1 day of food consumed per resident per day
-- Purchase at $10 per day of food
-- Warning at 7 days, critical at 3 days
+**Location**: [`src/game/systems/TierSystem.ts`](src/game/systems/TierSystem.ts)
 
-#### MaintenanceSystem
-- -1 condition per day (normal use)
-- Repair costs scale with damage severity
+**Purpose**: Manages shelter tier progression, room availability, and capacity limits.
+
+**Exported Functions**:
+```typescript
+// Tier information
+function getCurrentTier(gameState: GameState): ShelterTier
+function getTierConfig(tier: ShelterTier): ShelterTierConfig
+function getNextTier(currentTier: ShelterTier): ShelterTier | null
+
+// Room availability
+function isRoomAvailable(gameState: GameState, roomType: RoomType): boolean
+function getAvailableRooms(gameState: GameState): RoomType[]
+function getLockedRooms(gameState: GameState): Array<{ roomType: RoomType; unlocksAtTier: ShelterTier }>
+
+// Capacity
+function getResidentCap(gameState: GameState): number
+function isAtResidentCap(gameState: GameState): boolean
+function isApproachingCapacity(gameState: GameState): boolean
+
+// Upgrades
+function checkUpgradeRequirements(gameState: GameState): TierUpgradeRequirements
+function canUpgrade(gameState: GameState): boolean
+function performUpgrade(gameState: GameState): { success: boolean; error?: string; newRooms?: RoomType[] }
+
+// Progress tracking
+function getTierProgress(gameState: GameState): TierProgressInfo
+function trackGraduation(gameState: GameState): void
+```
+
+**Tier Configuration**:
+```typescript
+const SHELTER_TIERS: Record<ShelterTier, ShelterTierConfig> = {
+  1: {
+    name: "Starter Shelter",
+    maxResidents: 10,
+    gridSize: 10,
+    upgradeCost: 0,
+    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room'],
+    donationMultiplier: 1.0,
+    graduationsRequired: 0,
+    reputationRequired: 0
+  },
+  2: {
+    name: "Community Hub",
+    maxResidents: 25,
+    gridSize: 15,
+    upgradeCost: 3000,
+    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'learning_center', 'admin_office'],
+    donationMultiplier: 1.2,
+    graduationsRequired: 5,
+    reputationRequired: 60
+  },
+  // ... tiers 3-4
+};
+```
 
 ---
 
-### Progression Systems
+### AdjacencySystem
 
-#### LIFEMeterSystem
-**Progression Rate**:
-- Base: +1% per day
-- Learning Center bonus: +0.5% per visit
-- Satisfaction modifiers: ±0.2-0.3% per day
+**Location**: [`src/game/systems/AdjacencySystem.ts`](src/game/systems/AdjacencySystem.ts)
 
-**Stages**: Survival (0-25%) → Stability (25-50%) → Growth (50-75%) → Independence (75-100%)
+**Purpose**: Calculates bonuses and penalties when rooms share edges.
 
-#### ReputationSystem
-**Factors**:
-- Resident satisfaction: ±1-3 per day
-- Graduations: +10 per graduation
-- Facility condition: ±1-2 per day
-- Event outcomes: ±5-15 per event
+**Exported Functions**:
+```typescript
+// Adjacency detection
+function areRoomsAdjacent(room1: Room, room2: Room): boolean
+function getAdjacentRooms(room: Room, allRooms: Room[]): Room[]
+
+// Bonus calculation
+function calculateRoomBonuses(room: Room, allRooms: Room[]): RoomAdjacencyBonuses
+function recalculateAllAdjacencies(rooms: Room[]): void
+
+// Placement preview
+function getPlacementPreview(
+  gridX: number, gridY: number, roomType: RoomType,
+  width: number, height: number, existingRooms: Room[]
+): PlacementPreview
+
+// Effective values
+function getEffectiveMaintenanceCost(room: Room): number
+function getEffectiveLifeFillModifier(room: Room): number
+function getRoomHappinessBonus(room: Room): number
+```
+
+**Adjacency Bonus Interface**:
+```typescript
+interface RoomAdjacencyBonuses {
+  happiness: number;           // Flat happiness modifier
+  lifeFillModifier: number;    // Percentage LIFE fill bonus (0.15 = +15%)
+  maintenanceReduction: number; // Percentage reduction (0.1 = -10%)
+  adjacentRoomIds: string[];   // IDs of adjacent rooms with bonuses
+  bonusDescriptions: string[]; // Human-readable descriptions
+}
+```
+
+**13 Adjacency Rules**:
+```typescript
+const ADJACENCY_BONUSES = {
+  // Positive
+  bathroom_dormitory: { happiness: 5, maintenanceReduction: 0.1 },
+  common_room_dormitory: { happiness: 3, lifeFillModifier: 0.05 },
+  cafeteria_common_room: { happiness: 5 },
+  admin_office_learning_center: { lifeFillModifier: 0.1 },
+  learning_center_vocational_room: { lifeFillModifier: 0.15 },
+  // ... 8 more rules
+  
+  // Negative
+  cafeteria_dormitory: { happiness: -5, maintenanceReduction: -0.1 },
+  bathroom_cafeteria: { happiness: -8, maintenanceReduction: -0.15 },
+  // ... more penalties
+};
+```
+
+---
+
+### WarningSystem
+
+**Location**: [`src/game/systems/WarningSystem.ts`](src/game/systems/WarningSystem.ts)
+
+**Purpose**: Generates and manages warnings for various game conditions.
+
+**Singleton Access**:
+```typescript
+function getWarningSystem(): WarningSystem
+function resetWarningSystem(): void
+```
+
+**Key Methods**:
+```typescript
+class WarningSystem {
+  // Main update (called every 5 seconds)
+  updateWarnings(state: GameState): void
+  
+  // Warning management
+  dismissWarning(state: GameState, warningId: string): void
+  getWarningCounts(state: GameState): { info: number; warning: number; critical: number; total: number }
+  getMostSevereWarning(state: GameState): Warning | null
+  formatWarningDuration(warning: Warning): string
+  
+  // Check functions (internal)
+  private checkFinancialWarnings(state: GameState): Warning[]
+  private checkResidentWarnings(state: GameState): Warning[]
+  private checkOperationalWarnings(state: GameState): Warning[]
+  private checkProgressionWarnings(state: GameState): Warning[]
+}
+```
+
+**16 Warning Types**:
+```typescript
+type WarningType =
+  // Financial
+  | 'low_funds'           // Below $500
+  | 'in_debt'             // Below $0
+  | 'near_bankruptcy'     // Below -$300
+  | 'maintenance_due'     // Due in 2 minutes
+  | 'operating_costs_due' // Day ending soon
+  // Resident
+  | 'unhappy_resident'    // Happiness < 30% for > 1 minute
+  | 'at_risk_resident'    // About to leave
+  | 'overcrowded'         // Over tier capacity
+  | 'hungry_residents'    // Low food supply
+  // Operational
+  | 'low_reputation'      // Below 40%
+  | 'reputation_dropping' // 3+ drops in 2 minutes
+  | 'maintenance_overdue' // Past maintenance window
+  | 'capacity_warning'    // At 90% capacity
+  // Progression
+  | 'ready_to_upgrade'    // All requirements met
+  | 'stalled_progress'    // No graduations in 5+ minutes
+  | 'life_meters_stalled' // LIFE not progressing
+```
+
+**Warning Severity & Escalation**:
+- **Info** → **Warning** → **Critical**
+- Escalation after 3 minutes if unresolved
+- Critical warnings have shorter cooldowns (30s vs 5min)
+
+---
+
+### EconomicDashboard Integration
+
+**Location**: [`src/components/EconomicDashboard.tsx`](src/components/EconomicDashboard.tsx)
+
+**Purpose**: Provides detailed financial projections and alerts.
+
+**Key Calculations**:
+```typescript
+// Average donations per day
+function calculateAverageDonationsPerDay(gameState: GameState): number
+
+// Daily expenses breakdown
+function calculateDailyExpenses(gameState: GameState): {
+  food: number;
+  maintenance: number;
+  operating: number;
+  random: number;
+  total: number;
+}
+
+// Financial health status
+function getFinancialHealthStatus(dailyNet: number, daysUntilBankrupt: number | null): FinancialHealthStatus
+
+// Bankruptcy projection
+function calculateDaysUntilBankrupt(money: number, dailyNet: number): number | null
+
+// Efficiency metrics
+function calculateEfficiencyMetrics(gameState: GameState, dailyIncome: number, dailyExpenses: number): {
+  costPerResident: number;
+  revenuePerResident: number;
+  efficiencyScore: number; // 100 = break-even
+}
+```
+
+**Health Status Levels**:
+- `healthy` - Daily net > $50
+- `stable` - Daily net >= -$20
+- `warning` - Daily net < -$20
+- `critical` - Bankruptcy imminent (≤5 days)
 
 ---
 
@@ -307,16 +532,46 @@ class GridSystem {
 #### GameState
 ```typescript
 interface GameState {
+  // Resources
   money: number;
   reputation: number;
+  food: number;
+  
+  // Time
   day: number;
-  phase: DayPhase;
+  currentPhase: 'day' | 'night';
+  
+  // Tier
+  currentTier: ShelterTier;
+  tierUnlockProgress: TierUnlockProgress;
+  
+  // Entities
   residents: Resident[];
   rooms: Room[];
-  grid: Tile[][];
-  foodSupply: number;
+  grid: Grid;
+  
+  // Settings
+  foodPortionSetting: FoodPortionTier;
   isPaused: boolean;
   gameSpeed: number;
+  
+  // Warnings
+  activeWarnings: Warning[];
+  warningCooldowns: WarningCooldown[];
+  
+  // History
+  financialHistory: FinancialHistory;
+  graduatedCount: number;
+  lastGraduationTime: number;
+  
+  // Timers
+  nextMaintenanceCheck: number;
+  nextDayNightTransition: number;
+  lastWarningCheck: number;
+  
+  // Active events
+  activeFundraisers: Fundraiser[];
+  activeDisaster: DisasterEvent | null;
 }
 ```
 
@@ -325,19 +580,28 @@ interface GameState {
 interface Resident {
   id: string;
   name: string;
-  age: number;
-  personality: PersonalityType;
-  needs: {
-    hunger: number;      // 0-100
-    sleep: number;       // 0-100
-    hygiene: number;     // 0-100
-    happiness: number;   // 0-100
-    health: number;      // 0-100
-  };
-  lifeMeter: number;     // 0-100
-  satisfaction: number;  // 0-100
-  position: Point;
+  profile: ResidentProfile; // 'young_adult' | 'veteran' | 'elderly'
+  
+  // Position
+  position: { x: number; y: number };
   currentActivity: string;
+  
+  // Stats
+  lifeMeter: number;      // 0-100
+  happiness: number;       // 0-100
+  needs: ResidentNeeds;
+  
+  // Departure tracking
+  unhappyDuration: number;
+  isAtRisk: boolean;
+  
+  // Fundraiser
+  isFatigued: boolean;
+  fatigueEndTime: number;
+  
+  // Visual
+  sprite?: Phaser.GameObjects.Sprite;
+  statusBars?: ResidentStatusBars;
 }
 ```
 
@@ -346,14 +610,46 @@ interface Resident {
 interface Room {
   id: string;
   type: RoomType;
-  x: number;
-  y: number;
+  gridX: number;
+  gridY: number;
   width: number;
   height: number;
-  capacity: number;
-  condition: number;     // 0-100
-  cost: number;
+  
+  // State
+  isOpen: boolean;
+  currentOccupancy: number;
+  
+  // Economics
+  buildCost: number;
   maintenanceCost: number;
+  lastMaintenancePaid: number;
+  
+  // Adjacency bonuses ✨
+  adjacencyBonuses: RoomAdjacencyBonuses;
+}
+```
+
+#### Warning
+```typescript
+interface Warning {
+  id: string;
+  type: WarningType;
+  severity: WarningSeverity; // 'info' | 'warning' | 'critical'
+  message: string;
+  detail?: string;
+  
+  // Actions
+  actionLabel?: string;
+  actionCallback?: () => void;
+  
+  // Timing
+  timestamp: number;
+  activeSince: number;
+  dismissable: boolean;
+  
+  // Escalation
+  originalSeverity: WarningSeverity;
+  escalatedAt?: number;
 }
 ```
 
@@ -374,18 +670,39 @@ System Updates (in order):
   3. FoodSystem
   4. MaintenanceSystem
   5. DonationSystem
-  6. ReputationSystem
+  6. ReputationSystem (with decay) ✨
   7. LIFEMeterSystem
   8. EventSystem
+  9. WarningSystem ✨
   ↓
 React Component Re-renders (as needed)
 ```
 
-### Time Scaling
-- 1x: Normal speed
-- 2x: Fast speed
-- 3x: Very fast speed
-- Pause: 0x
+### Timer Configuration
+
+**Location**: [`src/constants/index.ts`](src/constants/index.ts)
+
+```typescript
+// Production timers (faster paced)
+const TIMER_CONFIG = {
+  DONATION_CHECK_INTERVAL: 90 * 1000,    // 90 seconds
+  MAINTENANCE_CHECK_INTERVAL: 5 * 60 * 1000, // 5 minutes
+  DAY_DURATION: 4 * 60 * 1000,           // 4 minutes
+  NIGHT_DURATION: 2 * 60 * 1000,         // 2 minutes
+  FULL_DAY_CYCLE: 6 * 60 * 1000          // 6 minutes
+};
+
+// Dev mode timers (faster for testing)
+const DEV_TIMER_CONFIG = {
+  DONATION_CHECK_INTERVAL: 30 * 1000,    // 30 seconds
+  MAINTENANCE_CHECK_INTERVAL: 2 * 60 * 1000,
+  // ...
+};
+
+// Runtime switching
+function setDevTimersEnabled(enabled: boolean): void
+function getActiveTimerConfig(): typeof TIMER_CONFIG
+```
 
 ---
 
@@ -420,6 +737,31 @@ useEffect(() => {
 }, []);
 ```
 
+### Event Dispatching
+
+For complex events, use custom DOM events:
+
+```typescript
+// Dispatch event
+window.dispatchEvent(new CustomEvent('game:tier_upgraded', {
+  detail: {
+    previousTier: 1,
+    newTier: 2,
+    tierName: "Community Hub",
+    newRooms: ['learning_center', 'admin_office']
+  }
+}));
+
+// Listen in React
+useEffect(() => {
+  const handler = (e: CustomEvent) => {
+    showNotification(e.detail.message);
+  };
+  window.addEventListener('game:tier_upgraded', handler);
+  return () => window.removeEventListener('game:tier_upgraded', handler);
+}, []);
+```
+
 ---
 
 ## ➕ Adding New Features
@@ -431,27 +773,91 @@ useEffect(() => {
 export type RoomType = 
   | 'dormitory' 
   | 'cafeteria' 
-  | 'new_room_type';  // Add here
+  | 'new_room';  // Add here
 ```
 
-2. **Add room configuration** in [`src/constants/index.ts`](src/constants/index.ts):
+2. **Add room specs** in [`src/constants/index.ts`](src/constants/index.ts):
 ```typescript
-export const ROOM_TYPES = {
-  new_room_type: {
-    name: 'New Room',
+export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
+  new_room: {
+    type: "new_room",
     width: 3,
     height: 3,
-    cost: 750,
+    buildCost: 750,
+    maintenanceCost: 40,
     capacity: 6,
-    color: 0x9966ff,
-    description: 'Description',
+    closesAtNight: false,
+    needsSatisfied: ['social'],
+    description: 'Description here'
   },
 };
 ```
 
-3. **Update BuildMenu** to include the new room option
+3. **Add tier availability** in `SHELTER_TIERS`:
+```typescript
+2: {
+  availableRooms: ['dormitory', '...', 'new_room'],
+}
+```
 
-4. **Add room-specific logic** if needed in relevant systems
+4. **Add adjacency rules** (if any) in `ADJACENCY_BONUSES`:
+```typescript
+new_room_common_room: {
+  happiness: 3,
+  lifeFillModifier: 0.05,
+  description: "Synergy description"
+}
+```
+
+5. **Update BuildMenu** to include the new room
+6. **Add visual rendering** in MainScene
+
+---
+
+### Adding a New Warning Type
+
+1. **Add warning type** to types:
+```typescript
+type WarningType = 
+  | 'low_funds'
+  | 'new_warning_type';  // Add here
+```
+
+2. **Add check function** in WarningSystem:
+```typescript
+private checkNewCondition(state: GameState): Warning[] {
+  const warnings: Warning[] = [];
+  
+  if (/* condition */) {
+    if (!this.hasActiveWarning(state, 'new_warning_type')) {
+      warnings.push(this.createWarning(
+        'new_warning_type',
+        'warning', // severity
+        'Warning Title',
+        { detail: 'Warning detail text' }
+      ));
+    }
+  }
+  
+  return warnings;
+}
+```
+
+3. **Add to update loop**:
+```typescript
+updateWarnings(state: GameState): void {
+  const newWarnings: Warning[] = [
+    ...this.checkFinancialWarnings(state),
+    ...this.checkNewCondition(state),  // Add here
+  ];
+}
+```
+
+4. **Add resolution check** in `shouldKeepWarning`:
+```typescript
+case 'new_warning_type':
+  return /* condition still true */;
+```
 
 ---
 
@@ -459,21 +865,21 @@ export const ROOM_TYPES = {
 
 1. **Create system file** in `src/game/systems/`:
 ```typescript
+import { GameState } from '../../types';
+
 export class NewSystem {
   private scene: Phaser.Scene;
-  private gsm: GameStateManager;
-
-  constructor(scene: Phaser.Scene, gsm: GameStateManager) {
+  
+  constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.gsm = gsm;
     this.initialize();
   }
-
-  private initialize() {
+  
+  private initialize(): void {
     // Setup logic
   }
-
-  update(time: number, delta: number) {
+  
+  update(gameState: GameState, delta: number): void {
     // Update logic called every frame
   }
 }
@@ -483,16 +889,18 @@ export class NewSystem {
 ```typescript
 export class GameStateManager {
   public newSystem!: NewSystem;
-
-  initialize(scene: Phaser.Scene) {
-    this.newSystem = new NewSystem(scene, this);
+  
+  initialize(scene: Phaser.Scene): void {
+    this.newSystem = new NewSystem(scene);
   }
-
-  update(time: number, delta: number) {
-    this.newSystem.update(time, delta);
+  
+  update(time: number, delta: number): void {
+    this.newSystem.update(this.state, delta);
   }
 }
 ```
+
+3. **Export from systems** if needed externally
 
 ---
 
@@ -501,17 +909,36 @@ export class GameStateManager {
 ### Optimization Strategies
 
 #### 1. Object Pooling
-Reuse objects instead of creating/destroying frequently
+Reuse objects instead of creating/destroying:
+```typescript
+const residentPool: Resident[] = [];
+
+function getResident(): Resident {
+  return residentPool.pop() || createNewResident();
+}
+
+function returnResident(resident: Resident): void {
+  resetResident(resident);
+  residentPool.push(resident);
+}
+```
 
 #### 2. Spatial Partitioning
-Use grid-based lookups (O(1)) instead of iterating all objects (O(n))
+Use grid-based lookups (O(1)) instead of iterating:
+```typescript
+// Instead of
+rooms.find(r => isPointInRoom(x, y, r));
+
+// Use
+grid.tiles[y][x].roomId;
+```
 
 #### 3. Update Throttling
 Don't update every frame if not needed:
 ```typescript
 private updateCounter = 0;
 
-update(time: number, delta: number) {
+update(delta: number): void {
   this.updateCounter++;
   if (this.updateCounter % 10 === 0) {
     this.expensiveUpdate();
@@ -519,16 +946,24 @@ update(time: number, delta: number) {
 }
 ```
 
-#### 4. Memoization
-Cache expensive calculations like pathfinding results
+#### 4. Path Caching
+Cache pathfinding results:
+```typescript
+const pathCache = new Map<string, Point[]>();
+const cacheKey = `${startX},${startY}-${endX},${endY}`;
+
+if (pathCache.has(cacheKey)) {
+  return pathCache.get(cacheKey);
+}
+```
 
 ### Performance Monitoring
 
-Use the built-in PerformanceMonitor component to track:
+Use the built-in PerformanceMonitor component:
 - FPS (frames per second)
 - Frame time
 - Memory usage
-- Update time per system
+- System update times
 
 ---
 
@@ -537,25 +972,33 @@ Use the built-in PerformanceMonitor component to track:
 ### Manual Testing Checklist
 
 #### Core Functionality
-- [ ] Room placement works correctly
-- [ ] Residents spawn and move properly
+- [ ] Room placement validates correctly
+- [ ] Residents spawn based on reputation
+- [ ] Pathfinding works without getting stuck
 - [ ] Needs decrease and can be satisfied
 - [ ] Time progresses through phases
-- [ ] Money increases from donations
-- [ ] Food decreases with consumption
+- [ ] Donations arrive on schedule
 
-#### Edge Cases
-- [ ] Cannot place rooms out of bounds
-- [ ] Cannot place overlapping rooms
-- [ ] Cannot spend more money than available
-- [ ] Residents don't get stuck
-- [ ] Save/load preserves all state
+#### Economic Systems
+- [ ] Food costs calculated correctly per tier
+- [ ] Maintenance charged on schedule
+- [ ] Fundraisers have proper success rates
+- [ ] Bankruptcy countdown triggers correctly
+- [ ] Operating costs accumulate daily
+
+#### Progression Systems
+- [ ] LIFE meter fills based on profile
+- [ ] Graduation triggers at 100%
+- [ ] Reputation decay works correctly
+- [ ] Tier upgrades function properly
+- [ ] Adjacency bonuses apply
 
 #### UI/UX
-- [ ] All buttons are clickable
-- [ ] Modals open and close properly
-- [ ] Tooltips display correctly
-- [ ] Settings persist
+- [ ] All buttons responsive
+- [ ] Warnings display correctly
+- [ ] Economic dashboard shows accurate data
+- [ ] Status bars toggle with B key
+- [ ] Money animations work
 
 ### Browser Testing
 
@@ -583,27 +1026,27 @@ npm run dev
 ```bash
 npm run build
 # Output in dist/ directory
-```
 
-### Preview Production
-
-```bash
-npm run build
 npm run preview
-# Access at http://localhost:4173
+# Test production build at http://localhost:4173
 ```
 
 ### Deploy to Vercel
 
 ```bash
-# Install Vercel CLI
 npm install -g vercel
-
-# Deploy
 vercel
 ```
 
-Or connect GitHub repository to Vercel for automatic deployments.
+Or connect GitHub repository for automatic deployments.
+
+### Build Configuration
+
+**Vite Configuration** ([`vite.config.ts`](vite.config.ts)):
+- Code splitting for React and Phaser
+- Source maps for debugging
+- Asset optimization
+- SPA routing support
 
 ---
 
@@ -613,19 +1056,21 @@ Or connect GitHub repository to Vercel for automatic deployments.
 
 #### TypeScript
 - Use strict mode
-- Explicit return types for functions
-- Interfaces over types for objects
+- Explicit return types for public functions
+- Interfaces for object shapes
 - Descriptive variable names
 
 ```typescript
 // Good
-function calculateDonation(reputation: number): number {
-  return BASE_DONATION * getReputationMultiplier(reputation);
+function calculateDonation(reputation: number, residentCount: number): number {
+  const baseAmount = DONATION_CONFIG.BASE_AMOUNT_PER_RESIDENT;
+  const multiplier = getReputationMultiplier(reputation);
+  return Math.floor(baseAmount * residentCount * multiplier);
 }
 
 // Bad
-function calc(r: number) {
-  return 200 * (r / 50);
+function calc(r: number, n: number) {
+  return 25 * n * (r / 50);
 }
 ```
 
@@ -636,44 +1081,43 @@ function calc(r: number) {
 
 ```typescript
 interface HUDProps {
-  money: number;
-  reputation: number;
+  gameState: GameState;
   onPause: () => void;
 }
 
-export const HUD: React.FC<HUDProps> = ({ money, reputation, onPause }) => {
+export const HUD: React.FC<HUDProps> = ({ gameState, onPause }) => {
   // Component logic
 };
 ```
 
 ### Git Workflow
 
-1. **Create feature branch**: `git checkout -b feature/new-feature`
-2. **Make changes**: Commit with descriptive messages
-3. **Test thoroughly**: Ensure no regressions
-4. **Push and create PR**: Request review
-5. **Address feedback**: Make requested changes
-6. **Merge**: After approval
+1. Create feature branch: `git checkout -b feature/new-feature`
+2. Make changes with descriptive commits
+3. Test thoroughly
+4. Push and create PR
+5. Address review feedback
+6. Merge after approval
 
 ### Commit Messages
 
 Follow conventional commits:
 ```
 feat: Add new room type (Medical Center)
-fix: Resolve pathfinding bug with diagonal movement
-docs: Update developer guide with new system
-refactor: Optimize resident AI decision making
-perf: Improve grid lookup performance
+fix: Resolve pathfinding bug at room edges
+docs: Update developer guide with TierSystem
+refactor: Optimize adjacency calculation
+perf: Cache pathfinding results
 ```
 
 ---
 
 ## 📚 Additional Resources
 
-- **Planning Documents**: See `plans/` directory for detailed specifications
-- **Player Guide**: [`PLAYER_GUIDE.md`](PLAYER_GUIDE.md) for gameplay details
-- **README**: [`README.md`](README.md) for project overview
-- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md) for version history
+- **Planning Documents**: See `plans/` directory (21 design docs)
+- **Player Guide**: [`PLAYER_GUIDE.md`](PLAYER_GUIDE.md)
+- **Implementation Details**: [`IMPLEMENTATION.md`](IMPLEMENTATION.md)
+- **Changelog**: [`CHANGELOG.md`](CHANGELOG.md)
 
 ---
 
@@ -682,18 +1126,23 @@ perf: Improve grid lookup performance
 ### Common Issues
 
 **Residents not moving**:
-- Check pathfinding system is initialized
-- Verify tiles are marked as walkable
-- Ensure destination is valid
+- Check PathfindingSystem initialization
+- Verify tiles are marked walkable
+- Ensure destination room exists and is accessible
 
 **State not updating in React**:
 - Verify `onStateChange` callback is set
 - Check GameStateManager is notifying changes
 - Ensure React component is subscribed
 
+**Warnings not appearing**:
+- Check WarningSystem is being updated
+- Verify cooldowns aren't preventing display
+- Check threshold values in WARNING_CONFIG
+
 **Performance issues**:
 - Enable PerformanceMonitor
-- Check for memory leaks
+- Check for memory leaks (growing arrays)
 - Profile with browser DevTools
 - Reduce update frequency for expensive operations
 
@@ -710,21 +1159,16 @@ console.log(gsm.getState());
 // Manually trigger events
 gsm.addMoney(1000);
 gsm.addReputation(50);
+
+// Check adjacency bonuses
+console.log(gsm.getState().rooms.map(r => r.adjacencyBonuses));
 ```
 
-**Phaser Debug**:
-```typescript
-// In MainScene
-this.scene.scene.systems.displayList.list.length // Object count
-```
-
----
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/DabideBoi/open-arms/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/DabideBoi/open-arms/discussions)
-- **Documentation**: This guide and other docs in repository
+**Dev Mode (Press D)**:
+- Fast timers
+- Instant money/reputation
+- Spawn/remove residents
+- Skip days
 
 ---
 

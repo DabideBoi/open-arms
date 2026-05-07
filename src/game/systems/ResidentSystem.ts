@@ -48,7 +48,13 @@ export function createResident(
     lastHappinessUpdate: now - randomOffset,
     lastNeedCheck: now - randomOffset,
     lastLifeUpdate: now - randomOffset,
-    lastMealTime: now - randomOffset
+    lastMealTime: now - randomOffset,
+    // Departure tracking
+    unhappyDuration: 0,
+    isAtRisk: false,
+    departureReason: undefined,
+    // Fundraiser fatigue tracking (NEW)
+    fundraiserFatigueUntil: null
   };
   
   // Register in collision detection system

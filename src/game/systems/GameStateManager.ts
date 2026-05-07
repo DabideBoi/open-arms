@@ -1,5 +1,5 @@
-import { GameState } from '../../types';
-import { GAME_STATE_CONFIG, getActiveTimerConfig } from '../../constants';
+import { GameState, GameOverReason } from '../../types';
+import { GAME_STATE_CONFIG, getActiveTimerConfig, BANKRUPTCY_CONFIG, REPUTATION_CONFIG } from '../../constants';
 import { initializeGrid } from './GridSystem';
 import { createTestResidents } from './ResidentSystem';
 
@@ -34,6 +34,13 @@ export function createInitialGameState(): GameState {
     reputation: GAME_STATE_CONFIG.STARTING_REPUTATION,
     currentDay: GAME_STATE_CONFIG.STARTING_DAY,
     food: 0,
+    
+    // Shelter Tier Progression (start at Tier 1)
+    currentTier: 1,
+    tierUnlockProgress: {
+      graduationsTowardNext: 0
+    },
+    
     residents: createTestResidents(
       GAME_STATE_CONFIG.STARTING_RESIDENTS,
       GAME_STATE_CONFIG.STARTING_DAY,
@@ -45,12 +52,51 @@ export function createInitialGameState(): GameState {
     grid,
     rooms: [],
     activeFundraisers: [],
+    lastFundraiserEndTime: null,  // NEW: Track cooldown for fundraisers
     nextDonationCheck: now + TIMER_CONFIG.DONATION_CHECK_INTERVAL,
     nextMaintenanceCheck: now + TIMER_CONFIG.MAINTENANCE_CHECK_INTERVAL,
     nextDayNightTransition: now + TIMER_CONFIG.DAY_DURATION,
     currentPhase: GAME_STATE_CONFIG.STARTING_PHASE,
     nextResidentSpawn: now + TIMER_CONFIG.FULL_DAY_CYCLE,
-    foodPortionSetting: "standard"
+    foodPortionSetting: "standard",
+    statusBarSettings: {
+      enabled: true,
+      visibilityMode: 'always'
+    },
+    
+    // Bankruptcy & Game Over
+    isBankrupt: false,
+    bankruptcyStartTime: null,
+    bankruptcyCountdown: BANKRUPTCY_CONFIG.COUNTDOWN_DURATION,
+    isGameOver: false,
+    gameOverReason: null,
+    totalResidentsHelped: GAME_STATE_CONFIG.STARTING_RESIDENTS,
+    totalMoneyEarned: GAME_STATE_CONFIG.STARTING_MONEY,
+    
+    // Disaster Events Tracking
+    disasterResidentCount: 0,
+    lastDisasterTime: null,
+    totalDisastersHandled: 0,
+    activeDisasterEvent: null,
+    
+    // Reputation Decay Tracking
+    lastDecayTime: now,
+    recentGraduations: [],
+    reputationDecayApplied: 0,
+    
+    // Financial History Tracking
+    financialHistory: {
+      donations: [],
+      expenses: [],
+      lastDayNetIncome: 0,
+      lastCalculatedDay: 1
+    },
+    
+    // Warning System Tracking
+    activeWarnings: [],
+    warningCooldowns: [],
+    lastWarningCheck: now,
+    lastGraduationTime: null
   };
 }
 
@@ -89,10 +135,16 @@ export class GameStateManager {
   }
   
   /**
-   * Update money
+   * Update money (tracks total money earned for stats)
    */
   updateMoney(amount: number): void {
     this.state.money += amount;
+    
+    // Track total money earned for statistics
+    if (amount > 0) {
+      this.state.totalMoneyEarned += amount;
+    }
+    
     this.notifyListeners();
   }
   
@@ -113,10 +165,11 @@ export class GameStateManager {
   }
   
   /**
-   * Add a resident
+   * Add a resident (tracks total residents helped for stats)
    */
   addResident(resident: any): void {
     this.state.residents.push(resident);
+    this.state.totalResidentsHelped++;
     this.notifyListeners();
   }
   
@@ -159,5 +212,183 @@ export class GameStateManager {
    */
   getMutableState(): GameState {
     return this.state;
+  }
+  
+  /**
+   * Start bankruptcy countdown
+   */
+  startBankruptcy(): void {
+    if (!this.state.isBankrupt) {
+      this.state.isBankrupt = true;
+      this.state.bankruptcyStartTime = Date.now();
+      this.state.bankruptcyCountdown = BANKRUPTCY_CONFIG.COUNTDOWN_DURATION;
+      
+      console.log(`💀 BANKRUPTCY STARTED! Countdown: ${BANKRUPTCY_CONFIG.COUNTDOWN_DURATION / 60000} minutes`);
+      
+      // Dispatch warning event
+      window.dispatchEvent(new CustomEvent('game:show_notification', {
+        detail: {
+          message: `⚠️ CRITICAL: Shelter facing bankruptcy! Get above $0 within 3 days or close.`,
+          type: 'error'
+        }
+      }));
+      
+      this.notifyListeners();
+    }
+  }
+  
+  /**
+   * Cancel bankruptcy (when player recovers)
+   */
+  cancelBankruptcy(): void {
+    if (this.state.isBankrupt) {
+      this.state.isBankrupt = false;
+      this.state.bankruptcyStartTime = null;
+      this.state.bankruptcyCountdown = BANKRUPTCY_CONFIG.COUNTDOWN_DURATION;
+      
+      console.log(`✅ BANKRUPTCY CANCELLED! Player recovered.`);
+      
+      // Dispatch recovery event
+      window.dispatchEvent(new CustomEvent('game:show_notification', {
+        detail: {
+          message: `✅ Financial crisis averted! Your shelter is back in the positive.`,
+          type: 'success'
+        }
+      }));
+      
+      this.notifyListeners();
+    }
+  }
+  
+  /**
+   * Update bankruptcy countdown
+   */
+  updateBankruptcyCountdown(deltaMs: number): void {
+    if (this.state.isBankrupt && !this.state.isGameOver) {
+      this.state.bankruptcyCountdown -= deltaMs;
+      
+      if (this.state.bankruptcyCountdown <= 0) {
+        this.triggerGameOver('bankruptcy');
+      }
+    }
+  }
+  
+  /**
+   * Trigger game over with a specific reason
+   */
+  triggerGameOver(reason: GameOverReason): void {
+    if (this.state.isGameOver) return; // Prevent multiple triggers
+    
+    this.state.isGameOver = true;
+    this.state.gameOverReason = reason;
+    
+    let message = '';
+    switch (reason) {
+      case 'bankruptcy':
+        message = '💸 Your shelter has gone bankrupt and must close.';
+        break;
+      case 'reputation':
+        message = '😔 Your reputation has dropped to 0%. No one trusts your shelter anymore.';
+        break;
+      case 'exodus':
+        message = '🚪 All residents have left. Your shelter is empty.';
+        break;
+    }
+    
+    console.log(`🎮 GAME OVER: ${reason}`);
+    
+    // Dispatch game over event
+    window.dispatchEvent(new CustomEvent('game:game_over', {
+      detail: {
+        reason,
+        message,
+        stats: {
+          daysSurvived: this.state.currentDay,
+          residentsHelped: this.state.totalResidentsHelped,
+          graduatedCount: this.state.graduatedCount,
+          moneyEarned: this.state.totalMoneyEarned,
+          finalReputation: this.state.reputation,
+          finalMoney: this.state.money
+        }
+      }
+    }));
+    
+    this.notifyListeners();
+  }
+  
+  /**
+   * Check all financial status conditions
+   */
+  checkFinancialStatus(): void {
+    const money = this.state.money;
+    
+    // NOTE: Financial warnings (low funds, in debt) are handled by WarningSystem
+    // which runs every 5 seconds with proper deduplication and cooldowns.
+    // See src/game/systems/WarningSystem.ts - checkFinancialWarnings()
+    
+    // Start bankruptcy countdown at -$500
+    if (money < BANKRUPTCY_CONFIG.THRESHOLD) {
+      if (!this.state.isBankrupt) {
+        this.startBankruptcy();
+      }
+    } else if (this.state.isBankrupt && money >= BANKRUPTCY_CONFIG.RECOVERY_THRESHOLD) {
+      // Recovered - money above $0
+      this.cancelBankruptcy();
+    }
+  }
+  
+  /**
+   * Check reputation game over condition
+   */
+  checkReputationStatus(): void {
+    if (this.state.reputation <= REPUTATION_CONFIG.GAME_OVER_THRESHOLD && !this.state.isGameOver) {
+      this.triggerGameOver('reputation');
+    }
+  }
+  
+  /**
+   * Check exodus (all residents left) game over condition
+   */
+  checkExodusStatus(): void {
+    // Only trigger if we had residents at some point (totalResidentsHelped > STARTING_RESIDENTS)
+    // and now have none
+    if (this.state.residents.length === 0 &&
+        this.state.totalResidentsHelped > GAME_STATE_CONFIG.STARTING_RESIDENTS &&
+        !this.state.isGameOver) {
+      this.triggerGameOver('exodus');
+    }
+  }
+  
+  /**
+   * Check all game over conditions
+   */
+  checkAllGameOverConditions(): void {
+    if (this.state.isGameOver) return;
+    
+    this.checkFinancialStatus();
+    this.checkReputationStatus();
+    this.checkExodusStatus();
+  }
+  
+  /**
+   * Reset game to initial state
+   */
+  resetGame(): void {
+    this.state = createInitialGameState();
+    this.notifyListeners();
+  }
+  
+  /**
+   * Check if player can afford to build (prevented during bankruptcy)
+   */
+  canBuild(): boolean {
+    return !this.state.isBankrupt;
+  }
+  
+  /**
+   * Check if player can start fundraiser (prevented during bankruptcy)
+   */
+  canStartFundraiser(): boolean {
+    return !this.state.isBankrupt;
   }
 }

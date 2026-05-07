@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameStateManager } from '../systems/GameStateManager';
-import { GameState, Room, Resident, RoomType } from '../../types';
-import { GRID_CONFIG, COLORS, ROOM_SPECS, VISUAL_CONFIG } from '../../constants';
+import { GameState, Room, Resident, RoomType, StatusBarVisibilityMode } from '../../types';
+import { GRID_CONFIG, COLORS, ROOM_SPECS, VISUAL_CONFIG, STATUS_BAR_CONFIG, STATUS_ICONS } from '../../constants';
 import { GameClock, ThrottledUpdater, PauseManager } from '../systems/TimerManager';
 import { checkDayNightTransition } from '../systems/DayNightSystem';
 import { updateAllResidents, updateResidentMovement, updateAllResidentHappiness } from '../systems/ResidentAISystem';
@@ -18,12 +18,189 @@ import { updateFoodGeneration, initializeCafeteriaGeneration, removeCafeteriaGen
 /**
  * Main game scene with optimized rendering (culling, object pooling, dirty flags)
  */
+/**
+ * Resident Status UI - Manages LIFE and Happiness bars above residents
+ */
+class ResidentStatusUI {
+  private lifeBar: Phaser.GameObjects.Graphics;
+  private happinessBar: Phaser.GameObjects.Graphics;
+  private statusIcon: Phaser.GameObjects.Text;
+  private container: Phaser.GameObjects.Container;
+  private lastLifeValue: number = -1;
+  private lastHappinessValue: number = -1;
+  private lastState: string = '';
+  private pulseTime: number = 0;
+  
+  constructor(scene: Phaser.Scene) {
+    this.container = scene.add.container(0, 0);
+    this.lifeBar = scene.add.graphics();
+    this.happinessBar = scene.add.graphics();
+    this.statusIcon = scene.add.text(0, -18, '', {
+      fontSize: '10px',
+      resolution: 2
+    });
+    this.statusIcon.setOrigin(0.5, 0.5);
+    
+    this.container.add([this.lifeBar, this.happinessBar, this.statusIcon]);
+    this.container.setDepth(15); // Above residents (10) but below placement preview (100)
+  }
+  
+  update(resident: Resident, x: number, y: number, forceRedraw: boolean = false): void {
+    // Position container above resident
+    this.container.setPosition(x, y - STATUS_BAR_CONFIG.OFFSET_ABOVE_RESIDENT);
+    
+    // Only redraw if values changed
+    const needsRedraw = forceRedraw ||
+      this.lastLifeValue !== resident.lifeMeter ||
+      this.lastHappinessValue !== resident.happiness ||
+      this.lastState !== resident.currentState;
+    
+    if (needsRedraw) {
+      this.drawLifeBar(resident.lifeMeter);
+      this.drawHappinessBar(resident.happiness, resident.isAtRisk);
+      this.updateStatusIcon(resident);
+      
+      this.lastLifeValue = resident.lifeMeter;
+      this.lastHappinessValue = resident.happiness;
+      this.lastState = resident.currentState;
+    }
+    
+    // Update pulse animation for critical happiness
+    if (resident.happiness < STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD) {
+      this.pulseTime += 16; // Approximate frame time
+      const pulseAlpha = 0.7 + Math.sin(this.pulseTime / STATUS_BAR_CONFIG.PULSE_SPEED * Math.PI * 2) * 0.3;
+      this.happinessBar.setAlpha(pulseAlpha);
+    } else {
+      this.happinessBar.setAlpha(1);
+    }
+    
+    // Glow effect for near-graduation residents
+    if (resident.lifeMeter >= STATUS_BAR_CONFIG.NEAR_GRADUATION_THRESHOLD) {
+      const glowAlpha = 0.8 + Math.sin(Date.now() / 300) * 0.2;
+      this.lifeBar.setAlpha(glowAlpha);
+    } else {
+      this.lifeBar.setAlpha(1);
+    }
+  }
+  
+  private drawLifeBar(value: number): void {
+    this.lifeBar.clear();
+    
+    const halfWidth = STATUS_BAR_CONFIG.BAR_WIDTH / 2;
+    
+    // Background
+    this.lifeBar.fillStyle(STATUS_BAR_CONFIG.BACKGROUND_COLOR, STATUS_BAR_CONFIG.BACKGROUND_ALPHA);
+    this.lifeBar.fillRect(-halfWidth, 0, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.BAR_HEIGHT);
+    
+    // Determine color based on value
+    let color: number = STATUS_BAR_CONFIG.LIFE_COLOR_DEFAULT;
+    if (value >= STATUS_BAR_CONFIG.NEAR_GRADUATION_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.LIFE_COLOR_NEAR_GRADUATION;
+    }
+    
+    // Fill bar
+    const fillWidth = STATUS_BAR_CONFIG.BAR_WIDTH * (value / 100);
+    this.lifeBar.fillStyle(color, 1);
+    this.lifeBar.fillRect(-halfWidth, 0, fillWidth, STATUS_BAR_CONFIG.BAR_HEIGHT);
+    
+    // Border
+    this.lifeBar.lineStyle(1, 0x000000, 0.3);
+    this.lifeBar.strokeRect(-halfWidth, 0, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.BAR_HEIGHT);
+  }
+  
+  private drawHappinessBar(value: number, isAtRisk: boolean): void {
+    this.happinessBar.clear();
+    
+    const halfWidth = STATUS_BAR_CONFIG.BAR_WIDTH / 2;
+    const yOffset = STATUS_BAR_CONFIG.BAR_HEIGHT + STATUS_BAR_CONFIG.GAP_BETWEEN_BARS;
+    
+    // Background
+    this.happinessBar.fillStyle(STATUS_BAR_CONFIG.BACKGROUND_COLOR, STATUS_BAR_CONFIG.BACKGROUND_ALPHA);
+    this.happinessBar.fillRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+    
+    // Determine color based on value
+    let color: number;
+    if (value >= STATUS_BAR_CONFIG.HAPPINESS_HIGH_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_HIGH;
+    } else if (value >= STATUS_BAR_CONFIG.HAPPINESS_MEDIUM_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_MEDIUM;
+    } else if (value >= STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_LOW;
+    } else {
+      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_CRITICAL;
+    }
+    
+    // Fill bar
+    const fillWidth = STATUS_BAR_CONFIG.BAR_WIDTH * (value / 100);
+    this.happinessBar.fillStyle(color, 1);
+    this.happinessBar.fillRect(-halfWidth, yOffset, fillWidth, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+    
+    // Border
+    this.happinessBar.lineStyle(1, 0x000000, 0.3);
+    this.happinessBar.strokeRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+  }
+  
+  private updateStatusIcon(resident: Resident): void {
+    let icon = '';
+    
+    // Activity-based icons take priority
+    switch (resident.currentState) {
+      case 'sleeping':
+        icon = STATUS_ICONS.SLEEPING;
+        break;
+      case 'leaving':
+        icon = STATUS_ICONS.LEAVING;
+        break;
+      case 'pathfinding':
+        icon = STATUS_ICONS.WALKING;
+        break;
+      case 'in_use':
+        // Check what room they're in for activity icon
+        if (resident.targetRoomId) {
+          // We'd need room info here, but for now just show neutral
+          icon = STATUS_ICONS.NEUTRAL;
+        }
+        break;
+      default:
+        // Fall back to happiness-based icons
+        if (resident.isAtRisk) {
+          icon = STATUS_ICONS.AT_RISK;
+        } else if (resident.happiness > 80) {
+          icon = STATUS_ICONS.HAPPY;
+        } else if (resident.happiness >= 40) {
+          icon = STATUS_ICONS.NEUTRAL;
+        } else if (resident.happiness >= 20) {
+          icon = STATUS_ICONS.UNHAPPY;
+        } else {
+          icon = STATUS_ICONS.AT_RISK;
+        }
+    }
+    
+    this.statusIcon.setText(icon);
+  }
+  
+  setVisible(visible: boolean): void {
+    this.container.setVisible(visible);
+  }
+  
+  destroy(): void {
+    this.lifeBar.destroy();
+    this.happinessBar.destroy();
+    this.statusIcon.destroy();
+    this.container.destroy();
+  }
+}
+
 export class MainScene extends Phaser.Scene {
   private gameStateManager!: GameStateManager;
   private gridGraphics!: Phaser.GameObjects.Graphics;
   private roomGraphics!: Phaser.GameObjects.Graphics;
   private residentSprites: Map<string, Phaser.GameObjects.Arc> = new Map();
   private roomImages: Map<string, Phaser.GameObjects.Image> = new Map();
+  
+  // Resident Status UI
+  private residentStatusUIs: Map<string, ResidentStatusUI> = new Map();
+  private hoveredResidentId: string | null = null;
   
   // Game systems
   private gameClock!: GameClock;
@@ -251,6 +428,28 @@ export class MainScene extends Phaser.Scene {
         this.exitPlacementMode();
       }
     });
+    
+    // B key to toggle status bars
+    this.input.keyboard?.on('keydown-B', () => {
+      const gameState = this.gameStateManager.getMutableState();
+      gameState.statusBarSettings.enabled = !gameState.statusBarSettings.enabled;
+      this.gameStateManager.forceUpdate();
+      
+      // Dispatch notification
+      window.dispatchEvent(new CustomEvent('game:show_notification', {
+        detail: {
+          message: `Status bars ${gameState.statusBarSettings.enabled ? 'enabled' : 'disabled'}`,
+          type: 'info'
+        }
+      }));
+    });
+    
+    // Track hovered resident for hover mode
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.placementMode) {
+        this.updateHoveredResident(pointer);
+      }
+    });
   }
   
   /**
@@ -262,6 +461,11 @@ export class MainScene extends Phaser.Scene {
     }
     
     const gameState = this.gameStateManager.getMutableState();
+    
+    // Check if game is over - stop all updates
+    if (gameState.isGameOver) {
+      return;
+    }
     
     // Always update: Resident movement (60 FPS)
     for (const resident of gameState.residents) {
@@ -300,6 +504,14 @@ export class MainScene extends Phaser.Scene {
     
     // Check resident spawning
     checkResidentSpawning(gameState);
+    
+    // Update bankruptcy countdown (if active)
+    if (gameState.isBankrupt) {
+      this.gameStateManager.updateBankruptcyCountdown(deltaTime);
+    }
+    
+    // Check all game over conditions (bankruptcy, reputation, exodus)
+    this.gameStateManager.checkAllGameOverConditions();
     
     // Force render update
     this.gameStateManager.forceUpdate();
@@ -549,6 +761,8 @@ export class MainScene extends Phaser.Scene {
   private renderResidents(residents: Resident[]) {
     const tileSize = GRID_CONFIG.TILE_SIZE;
     const camera = this.cameras.main;
+    const gameState = this.gameStateManager.getState();
+    const statusBarSettings = gameState.statusBarSettings;
     
     // Calculate visible bounds with padding
     const padding = tileSize * 2;
@@ -559,12 +773,18 @@ export class MainScene extends Phaser.Scene {
       bottom: camera.scrollY + camera.height + padding
     };
     
-    // Remove sprites for residents that no longer exist
+    // Remove sprites and status UIs for residents that no longer exist
     const currentResidentIds = new Set(residents.map(r => r.id));
     for (const [id, sprite] of this.residentSprites.entries()) {
       if (!currentResidentIds.has(id)) {
         this.releaseSprite(sprite);
         this.residentSprites.delete(id);
+      }
+    }
+    for (const [id, statusUI] of this.residentStatusUIs.entries()) {
+      if (!currentResidentIds.has(id)) {
+        statusUI.destroy();
+        this.residentStatusUIs.delete(id);
       }
     }
     
@@ -582,11 +802,15 @@ export class MainScene extends Phaser.Scene {
                        pixelY <= visibleBounds.bottom;
       
       let sprite = this.residentSprites.get(resident.id);
+      let statusUI = this.residentStatusUIs.get(resident.id);
       
       if (!isVisible) {
-        // Hide sprite if not visible
+        // Hide sprite and status UI if not visible
         if (sprite) {
           sprite.setVisible(false);
+        }
+        if (statusUI) {
+          statusUI.setVisible(false);
         }
         continue;
       }
@@ -609,6 +833,12 @@ export class MainScene extends Phaser.Scene {
         this.residentSprites.set(resident.id, sprite);
       }
       
+      // Create status UI if needed
+      if (!statusUI && statusBarSettings.enabled) {
+        statusUI = new ResidentStatusUI(this);
+        this.residentStatusUIs.set(resident.id, statusUI);
+      }
+      
       // Update sprite
       sprite.setVisible(true);
       sprite.setPosition(pixelX, pixelY);
@@ -619,9 +849,76 @@ export class MainScene extends Phaser.Scene {
       } else {
         sprite.setAlpha(1.0);
       }
+      
+      // Update status UI visibility and position
+      if (statusUI) {
+        const shouldShowBar = this.shouldShowStatusBar(resident, statusBarSettings);
+        statusUI.setVisible(shouldShowBar);
+        if (shouldShowBar) {
+          statusUI.update(resident, pixelX, pixelY);
+        }
+      }
     }
     
     this.performanceStats.visibleResidents = visibleCount;
+  }
+  
+  /**
+   * Determine if status bar should be shown for a resident based on settings
+   */
+  private shouldShowStatusBar(resident: Resident, settings: { enabled: boolean; visibilityMode: StatusBarVisibilityMode }): boolean {
+    if (!settings.enabled) return false;
+    
+    switch (settings.visibilityMode) {
+      case 'always':
+        return true;
+      case 'hover':
+        return this.hoveredResidentId === resident.id;
+      case 'at-risk':
+        return resident.isAtRisk || resident.happiness < STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD;
+      default:
+        return true;
+    }
+  }
+  
+  /**
+   * Update hovered resident for hover visibility mode
+   */
+  private updateHoveredResident(pointer: Phaser.Input.Pointer): void {
+    const camera = this.cameras.main;
+    const worldX = pointer.x + camera.scrollX;
+    const worldY = pointer.y + camera.scrollY;
+    
+    const tileSize = GRID_CONFIG.TILE_SIZE;
+    const gameState = this.gameStateManager.getState();
+    
+    // Check each resident to see if pointer is over them
+    let foundResident: string | null = null;
+    const hoverRadius = tileSize / 2; // Radius around resident center
+    
+    for (const resident of gameState.residents) {
+      const residentX = resident.gridX * tileSize + tileSize / 2;
+      const residentY = resident.gridY * tileSize + tileSize / 2;
+      
+      const distance = Math.sqrt(
+        Math.pow(worldX - residentX, 2) +
+        Math.pow(worldY - residentY, 2)
+      );
+      
+      if (distance <= hoverRadius) {
+        foundResident = resident.id;
+        break;
+      }
+    }
+    
+    // Only trigger update if hovered resident changed
+    if (this.hoveredResidentId !== foundResident) {
+      this.hoveredResidentId = foundResident;
+      // Force re-render to update status bar visibility
+      if (gameState.statusBarSettings.visibilityMode === 'hover') {
+        this.gameStateManager.forceUpdate();
+      }
+    }
   }
   
   /**
@@ -675,6 +972,12 @@ export class MainScene extends Phaser.Scene {
       sprite.destroy();
     }
     this.residentSprites.clear();
+    
+    // Clean up status UIs
+    for (const statusUI of this.residentStatusUIs.values()) {
+      statusUI.destroy();
+    }
+    this.residentStatusUIs.clear();
     
     // Clean up room images
     for (const image of this.roomImages.values()) {

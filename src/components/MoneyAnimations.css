@@ -1,0 +1,432 @@
+/* ============================================================================
+   Money Animation Overlay
+   ============================================================================ */
+
+.money-animation-overlay {
+  position: fixed;
+  top: 90px; /* Below HUD */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ============================================================================
+   Individual Floating Money Change
+   ============================================================================ */
+
+.money-change-float {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  white-space: nowrap;
+  animation: moneyFloat 1.5s ease-out forwards;
+  opacity: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  
+  /* Stack offset based on index */
+  transform: translateY(calc(var(--stack-index, 0) * 4px));
+}
+
+/* Income (positive) styling */
+.money-change-float.income {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
+  border: 2px solid #4ade80;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.money-change-float.income .money-change-amount {
+  color: #bbf7d0;
+}
+
+/* Expense (negative) styling */
+.money-change-float.expense {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
+  border: 2px solid #f87171;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.money-change-float.expense .money-change-amount {
+  color: #fecaca;
+}
+
+/* Amount text */
+.money-change-amount {
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* Icon */
+.money-change-icon {
+  font-size: 18px;
+}
+
+/* Source label */
+.money-change-source {
+  font-size: 13px;
+  font-weight: normal;
+  opacity: 0.9;
+}
+
+/* Exit state */
+.money-change-float.exiting {
+  animation: moneyFloatExit 0.3s ease-in forwards;
+}
+
+/* ============================================================================
+   Float Animations
+   ============================================================================ */
+
+@keyframes moneyFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  25% {
+    transform: translateY(-5px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-30px) scale(1);
+  }
+}
+
+/* Income floats up */
+.money-change-float.income {
+  animation-name: moneyFloatUp;
+}
+
+@keyframes moneyFloatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  25% {
+    transform: translateY(-5px) scale(1);
+  }
+  100% {
+    opacity: 0.8;
+    transform: translateY(-30px) scale(1);
+  }
+}
+
+/* Expense floats down */
+.money-change-float.expense {
+  animation-name: moneyFloatDown;
+}
+
+@keyframes moneyFloatDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  25% {
+    transform: translateY(5px) scale(1);
+  }
+  100% {
+    opacity: 0.8;
+    transform: translateY(30px) scale(1);
+  }
+}
+
+/* Exit animation */
+@keyframes moneyFloatExit {
+  0% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+}
+
+/* ============================================================================
+   Animated Money Display (HUD counting effect)
+   ============================================================================ */
+
+.animated-money-display {
+  font-size: 18px;
+  font-weight: bold;
+  transition: color 0.3s ease;
+  display: inline-block;
+}
+
+/* Pulse effects for money changes */
+.animated-money-display.pulse-income {
+  animation: pulseIncome 0.5s ease-out;
+}
+
+.animated-money-display.pulse-income-large {
+  animation: pulseIncomeLarge 0.6s ease-out;
+}
+
+.animated-money-display.pulse-expense {
+  animation: pulseExpense 0.5s ease-out;
+}
+
+.animated-money-display.pulse-expense-large {
+  animation: pulseExpenseLarge 0.6s ease-out;
+}
+
+@keyframes pulseIncome {
+  0% {
+    text-shadow: 0 0 0 rgba(34, 197, 94, 0);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+    transform: scale(1.1);
+    color: #4ade80 !important;
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(34, 197, 94, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes pulseIncomeLarge {
+  0% {
+    text-shadow: 0 0 0 rgba(34, 197, 94, 0);
+    transform: scale(1);
+  }
+  30% {
+    text-shadow: 0 0 30px rgba(34, 197, 94, 1);
+    transform: scale(1.2);
+    color: #22c55e !important;
+  }
+  60% {
+    text-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+    transform: scale(1.1);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(34, 197, 94, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes pulseExpense {
+  0% {
+    text-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+    transform: scale(1.1);
+    color: #f87171 !important;
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes pulseExpenseLarge {
+  0% {
+    text-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+  30% {
+    text-shadow: 0 0 30px rgba(239, 68, 68, 1);
+    transform: scale(1.2);
+    color: #ef4444 !important;
+  }
+  60% {
+    text-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+    transform: scale(1.1);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================
+   Warning States
+   ============================================================================ */
+
+/* Low money warning - yellow flash */
+.money-warning-low {
+  animation: warningLow 2s ease-in-out infinite;
+}
+
+@keyframes warningLow {
+  0%, 100% {
+    text-shadow: 0 0 0 rgba(250, 204, 21, 0);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(250, 204, 21, 0.6);
+  }
+}
+
+/* Debt warning - orange flash */
+.money-warning-debt {
+  animation: warningDebt 1.5s ease-in-out infinite;
+}
+
+@keyframes warningDebt {
+  0%, 100% {
+    text-shadow: 0 0 5px rgba(251, 146, 60, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(251, 146, 60, 0.8);
+  }
+}
+
+/* Critical warning - red flash + shake */
+.money-warning-critical {
+  animation: warningCritical 0.8s ease-in-out infinite;
+}
+
+@keyframes warningCritical {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  50% {
+    text-shadow: 0 0 25px rgba(239, 68, 68, 1);
+    transform: translateX(2px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+/* ============================================================================
+   HUD Money Item Pulse Effects
+   ============================================================================ */
+
+.hud-item.money-pulse-income {
+  animation: hudPulseIncome 0.5s ease-out;
+}
+
+.hud-item.money-pulse-income-large {
+  animation: hudPulseIncomeLarge 0.6s ease-out;
+}
+
+.hud-item.money-pulse-expense {
+  animation: hudPulseExpense 0.5s ease-out;
+}
+
+.hud-item.money-pulse-expense-large {
+  animation: hudPulseExpenseLarge 0.6s ease-out;
+}
+
+@keyframes hudPulseIncome {
+  0% {
+    background: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background: rgba(34, 197, 94, 0.2);
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes hudPulseIncomeLarge {
+  0% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+  30% {
+    background: rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+    transform: scale(1.05);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+@keyframes hudPulseExpense {
+  0% {
+    background: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background: rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes hudPulseExpenseLarge {
+  0% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+  30% {
+    background: rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
+    transform: scale(1.05);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .money-animation-overlay {
+    top: 140px; /* Account for stacked HUD on mobile */
+  }
+  
+  .money-change-float {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+  
+  .money-change-amount {
+    font-size: 16px;
+  }
+  
+  .money-change-icon {
+    font-size: 16px;
+  }
+  
+  .money-change-source {
+    font-size: 11px;
+  }
+}

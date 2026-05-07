@@ -1,8 +1,28 @@
 import { Grid, Resident } from '../../types';
+import { isWalkable } from './GridSystem';
 
 /**
  * CollisionDetectionSystem - Manages spatial occupancy and prevents NPCs from overlapping
+ *
+ * Enhanced with "Social Distancing" system:
+ * - Gradual separation forces instead of instant teleportation
+ * - Soft boundary constraints to keep residents inside walkable areas
+ * - Personal space zones for natural crowd behavior
  */
+
+// ============================================================================
+// Social Distancing Configuration
+// ============================================================================
+
+const SOCIAL_DISTANCING_CONFIG = {
+  PERSONAL_SPACE_RADIUS: 0.8,    // Minimum comfortable distance between residents
+  SEPARATION_STRENGTH: 2.0,      // How strongly residents push apart
+  BOUNDARY_FORCE_STRENGTH: 3.0,  // How strongly boundaries push back
+  BOUNDARY_CHECK_RADIUS: 0.5,    // Distance from edge to start applying boundary force
+  MAX_SEPARATION_FORCE: 1.5,     // Cap on separation velocity
+  CROWD_DENSITY_RADIUS: 2,       // Radius to check for crowd density
+  MAX_RESIDENTS_NEARBY: 3,       // Start applying extra separation if more than this
+};
 
 // ============================================================================
 // Spatial Occupancy Tracking
@@ -468,4 +488,347 @@ export function getWaitQueueStats(): {
     waitingCount: waitingResidents.size,
     averageWaitTime: waitingResidents.size > 0 ? totalWaitTime / waitingResidents.size : 0
   };
+}
+
+// ============================================================================
+// Social Distancing System - Gradual Separation Forces
+// ============================================================================
+
+/**
+ * Vector2D helper type
+ */
+interface Vector2D {
+  x: number;
+  y: number;
+}
+
+/**
+ * Calculate separation force from nearby residents
+ * Uses inverse-square law for natural feeling repulsion
+ */
+export function calculateSeparationForce(
+  resident: Resident,
+  allResidents: Resident[]
+): Vector2D {
+  const force: Vector2D = { x: 0, y: 0 };
+  const { PERSONAL_SPACE_RADIUS, SEPARATION_STRENGTH, MAX_RESIDENTS_NEARBY, CROWD_DENSITY_RADIUS } = SOCIAL_DISTANCING_CONFIG;
+  
+  let nearbyCount = 0;
+  
+  for (const other of allResidents) {
+    if (other.id === resident.id) continue;
+    
+    const dx = resident.gridX - other.gridX;
+    const dy = resident.gridY - other.gridY;
+    const distanceSquared = dx * dx + dy * dy;
+    const distance = Math.sqrt(distanceSquared);
+    
+    // Count nearby residents for density calculation
+    if (distance < CROWD_DENSITY_RADIUS) {
+      nearbyCount++;
+    }
+    
+    // Apply separation force if within personal space
+    if (distance < PERSONAL_SPACE_RADIUS && distance > 0.01) {
+      // Inverse-square repulsion: stronger when closer
+      const strength = SEPARATION_STRENGTH * (1 - distance / PERSONAL_SPACE_RADIUS);
+      
+      // Normalize direction and apply force
+      const normalizedDx = dx / distance;
+      const normalizedDy = dy / distance;
+      
+      force.x += normalizedDx * strength;
+      force.y += normalizedDy * strength;
+    } else if (distance <= 0.01) {
+      // Nearly on top of each other - apply random separation
+      const angle = Math.random() * Math.PI * 2;
+      force.x += Math.cos(angle) * SEPARATION_STRENGTH;
+      force.y += Math.sin(angle) * SEPARATION_STRENGTH;
+    }
+  }
+  
+  // Apply extra separation in crowded areas
+  if (nearbyCount > MAX_RESIDENTS_NEARBY) {
+    const crowdMultiplier = 1 + (nearbyCount - MAX_RESIDENTS_NEARBY) * 0.3;
+    force.x *= crowdMultiplier;
+    force.y *= crowdMultiplier;
+  }
+  
+  // Cap maximum force
+  const forceMagnitude = Math.sqrt(force.x * force.x + force.y * force.y);
+  if (forceMagnitude > SOCIAL_DISTANCING_CONFIG.MAX_SEPARATION_FORCE) {
+    const scale = SOCIAL_DISTANCING_CONFIG.MAX_SEPARATION_FORCE / forceMagnitude;
+    force.x *= scale;
+    force.y *= scale;
+  }
+  
+  return force;
+}
+
+/**
+ * Calculate boundary force to keep resident inside walkable area
+ * Applies soft push-back when approaching non-walkable tiles
+ */
+export function calculateBoundaryForce(
+  grid: Grid,
+  x: number,
+  y: number
+): Vector2D {
+  const force: Vector2D = { x: 0, y: 0 };
+  const { BOUNDARY_FORCE_STRENGTH, BOUNDARY_CHECK_RADIUS } = SOCIAL_DISTANCING_CONFIG;
+  
+  // Check all 8 directions for boundaries
+  const directions = [
+    { dx: 1, dy: 0 },   // East
+    { dx: -1, dy: 0 },  // West
+    { dx: 0, dy: 1 },   // South
+    { dx: 0, dy: -1 },  // North
+    { dx: 1, dy: 1 },   // SE
+    { dx: -1, dy: 1 },  // SW
+    { dx: 1, dy: -1 },  // NE
+    { dx: -1, dy: -1 }, // NW
+  ];
+  
+  for (const dir of directions) {
+    const checkX = Math.floor(x + dir.dx * BOUNDARY_CHECK_RADIUS);
+    const checkY = Math.floor(y + dir.dy * BOUNDARY_CHECK_RADIUS);
+    
+    // If the adjacent tile is not walkable, apply force away from it
+    if (!isWalkable(grid, checkX, checkY)) {
+      // Calculate how close we are to the boundary
+      const fractionalX = x - Math.floor(x);
+      const fractionalY = y - Math.floor(y);
+      
+      // Distance to the boundary edge
+      let distanceToBoundary = 1;
+      if (dir.dx > 0) distanceToBoundary = Math.min(distanceToBoundary, 1 - fractionalX);
+      if (dir.dx < 0) distanceToBoundary = Math.min(distanceToBoundary, fractionalX);
+      if (dir.dy > 0) distanceToBoundary = Math.min(distanceToBoundary, 1 - fractionalY);
+      if (dir.dy < 0) distanceToBoundary = Math.min(distanceToBoundary, fractionalY);
+      
+      // Apply stronger force as we get closer to boundary
+      if (distanceToBoundary < BOUNDARY_CHECK_RADIUS) {
+        const strength = BOUNDARY_FORCE_STRENGTH * (1 - distanceToBoundary / BOUNDARY_CHECK_RADIUS);
+        force.x -= dir.dx * strength;
+        force.y -= dir.dy * strength;
+      }
+    }
+  }
+  
+  // Also check if current tile is somehow not walkable (shouldn't happen but safety check)
+  const currentTileX = Math.floor(x);
+  const currentTileY = Math.floor(y);
+  if (!isWalkable(grid, currentTileX, currentTileY)) {
+    // Find nearest walkable tile and push towards it
+    const nearest = findNearestWalkableTile(grid, currentTileX, currentTileY);
+    if (nearest) {
+      const dx = nearest.x + 0.5 - x;
+      const dy = nearest.y + 0.5 - y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance > 0.01) {
+        force.x += (dx / distance) * BOUNDARY_FORCE_STRENGTH * 2;
+        force.y += (dy / distance) * BOUNDARY_FORCE_STRENGTH * 2;
+      }
+    }
+  }
+  
+  return force;
+}
+
+/**
+ * Find nearest walkable tile from a given position
+ */
+function findNearestWalkableTile(
+  grid: Grid,
+  startX: number,
+  startY: number,
+  maxRadius: number = 5
+): { x: number; y: number } | null {
+  // Spiral outward search
+  for (let radius = 1; radius <= maxRadius; radius++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
+          const x = startX + dx;
+          const y = startY + dy;
+          if (isWalkable(grid, x, y)) {
+            return { x, y };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply social distancing forces to get adjusted position
+ * This is the main function to call for gradual separation
+ */
+export function applySocialDistancing(
+  resident: Resident,
+  allResidents: Resident[],
+  grid: Grid,
+  deltaTime: number
+): { newX: number; newY: number; wasAdjusted: boolean } {
+  // Calculate separation force from other residents
+  const separationForce = calculateSeparationForce(resident, allResidents);
+  
+  // Calculate boundary force to stay inside walkable area
+  const boundaryForce = calculateBoundaryForce(grid, resident.gridX, resident.gridY);
+  
+  // Combine forces
+  const totalForceX = separationForce.x + boundaryForce.x;
+  const totalForceY = separationForce.y + boundaryForce.y;
+  
+  // Check if any adjustment is needed
+  const forceMagnitude = Math.sqrt(totalForceX * totalForceX + totalForceY * totalForceY);
+  if (forceMagnitude < 0.01) {
+    return { newX: resident.gridX, newY: resident.gridY, wasAdjusted: false };
+  }
+  
+  // Apply force with deltaTime for smooth movement
+  let newX = resident.gridX + totalForceX * deltaTime;
+  let newY = resident.gridY + totalForceY * deltaTime;
+  
+  // Final boundary check - ensure we don't end up outside walkable area
+  const targetTileX = Math.floor(newX);
+  const targetTileY = Math.floor(newY);
+  
+  if (!isWalkable(grid, targetTileX, targetTileY)) {
+    // Clamp to current tile if target is not walkable
+    const currentTileX = Math.floor(resident.gridX);
+    const currentTileY = Math.floor(resident.gridY);
+    
+    // Try to stay within current tile bounds
+    if (isWalkable(grid, currentTileX, currentTileY)) {
+      newX = Math.max(currentTileX + 0.1, Math.min(currentTileX + 0.9, newX));
+      newY = Math.max(currentTileY + 0.1, Math.min(currentTileY + 0.9, newY));
+    } else {
+      // Current tile isn't walkable either - find nearest walkable
+      const nearest = findNearestWalkableTile(grid, currentTileX, currentTileY);
+      if (nearest) {
+        newX = nearest.x + 0.5;
+        newY = nearest.y + 0.5;
+      }
+    }
+  }
+  
+  return { newX, newY, wasAdjusted: true };
+}
+
+/**
+ * Find safe nearby position that is walkable and not too crowded
+ * Used as a fallback when resident needs to be repositioned
+ */
+export function findSafeNearbyPosition(
+  grid: Grid,
+  startX: number,
+  startY: number,
+  excludeResidentId: string,
+  allResidents: Resident[],
+  maxRadius: number = 3
+): { x: number; y: number } | null {
+  const candidates: Array<{ x: number; y: number; score: number }> = [];
+  
+  // Spiral outward search for candidate positions
+  for (let radius = 0; radius <= maxRadius; radius++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        // Only check tiles at current radius (spiral shell)
+        if (radius > 0 && Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+        
+        const x = Math.floor(startX) + dx;
+        const y = Math.floor(startY) + dy;
+        
+        // Check if walkable
+        if (!isWalkable(grid, x, y)) continue;
+        
+        // Check if occupied by another resident
+        if (isTileOccupiedByOther(x, y, excludeResidentId)) continue;
+        
+        // Calculate crowd score (lower is better)
+        let crowdScore = 0;
+        for (const other of allResidents) {
+          if (other.id === excludeResidentId) continue;
+          const distX = x + 0.5 - other.gridX;
+          const distY = y + 0.5 - other.gridY;
+          const dist = Math.sqrt(distX * distX + distY * distY);
+          if (dist < SOCIAL_DISTANCING_CONFIG.CROWD_DENSITY_RADIUS) {
+            crowdScore += 1 / (dist + 0.1); // Inverse distance scoring
+          }
+        }
+        
+        // Prefer tiles closer to original position
+        const distanceScore = radius * 0.5;
+        
+        candidates.push({
+          x: x + 0.5, // Center of tile
+          y: y + 0.5,
+          score: crowdScore + distanceScore
+        });
+      }
+    }
+  }
+  
+  if (candidates.length === 0) return null;
+  
+  // Sort by score (lower is better) and return best
+  candidates.sort((a, b) => a.score - b.score);
+  return { x: candidates[0].x, y: candidates[0].y };
+}
+
+/**
+ * Clamp position to ensure it stays within walkable bounds
+ */
+export function clampToWalkableBounds(
+  grid: Grid,
+  x: number,
+  y: number
+): { x: number; y: number } {
+  const tileX = Math.floor(x);
+  const tileY = Math.floor(y);
+  
+  // If current position is walkable, just clamp within tile
+  if (isWalkable(grid, tileX, tileY)) {
+    return {
+      x: Math.max(tileX + 0.05, Math.min(tileX + 0.95, x)),
+      y: Math.max(tileY + 0.05, Math.min(tileY + 0.95, y))
+    };
+  }
+  
+  // Find nearest walkable tile and return its center
+  const nearest = findNearestWalkableTile(grid, tileX, tileY);
+  if (nearest) {
+    return { x: nearest.x + 0.5, y: nearest.y + 0.5 };
+  }
+  
+  // Fallback: return original position
+  return { x, y };
+}
+
+/**
+ * Check if a position would cause stacking with other residents
+ */
+export function wouldCauseStacking(
+  x: number,
+  y: number,
+  excludeResidentId: string,
+  allResidents: Resident[]
+): boolean {
+  const { PERSONAL_SPACE_RADIUS } = SOCIAL_DISTANCING_CONFIG;
+  
+  for (const other of allResidents) {
+    if (other.id === excludeResidentId) continue;
+    
+    const dx = x - other.gridX;
+    const dy = y - other.gridY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < PERSONAL_SPACE_RADIUS * 0.5) {
+      return true; // Too close
+    }
+  }
+  
+  return false;
 }

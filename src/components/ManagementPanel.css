@@ -318,6 +318,247 @@
   font-weight: bold;
 }
 
+/* ============================================================================
+   FOOD TAB STYLES
+   ============================================================================ */
+
+.current-food-setting {
+  background: rgba(102, 126, 234, 0.2);
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.food-setting-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.food-icon {
+  font-size: 24px;
+}
+
+.food-label {
+  font-size: 18px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.food-description {
+  color: #ccc;
+  font-size: 13px;
+  margin: 5px 0 10px 0;
+}
+
+.food-effects {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.food-effects .effect {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.food-effects .effect.positive {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+}
+
+.food-effects .effect.negative {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+
+.food-cost {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.food-warning {
+  background: rgba(241, 196, 15, 0.2);
+  padding: 10px;
+  border-radius: 6px;
+  color: #f1c40f;
+  text-align: center;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.food-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.food-option {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.food-option:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.food-option.selected {
+  background: rgba(102, 126, 234, 0.3);
+  border-color: #667eea;
+}
+
+.food-option.below-standard {
+  border-left: 3px solid #f39c12;
+}
+
+.food-option.unaffordable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.food-option-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.food-option-icon {
+  font-size: 18px;
+}
+
+.food-option-label {
+  font-weight: bold;
+  flex: 1;
+}
+
+.selected-badge {
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.food-option-details {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.food-option-details .positive {
+  color: #2ecc71;
+}
+
+.food-option-details .negative {
+  color: #e74c3c;
+}
+
+.below-standard-warning {
+  font-size: 11px;
+  color: #f39c12;
+  margin-top: 5px;
+}
+
+.unaffordable-warning {
+  font-size: 11px;
+  color: #e74c3c;
+  margin-top: 5px;
+}
+
+/* ============================================================================
+   FUNDRAISER TAB STYLES (UPDATED)
+   ============================================================================ */
+
+.cooldown-status {
+  padding: 10px;
+  border-radius: 8px;
+  margin: 15px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.cooldown-status.ready {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+}
+
+.cooldown-status.cooling {
+  background: rgba(241, 196, 15, 0.2);
+  color: #f1c40f;
+}
+
+.cooldown-note {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.success-high {
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.success-low {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.fundraiser-preview {
+  background: rgba(52, 152, 219, 0.2);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.fundraiser-preview p {
+  margin: 5px 0;
+}
+
+.warning-inline {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.fatigued-residents {
+  background: rgba(241, 196, 15, 0.1);
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 15px;
+}
+
+.fatigued-residents h5 {
+  margin: 0 0 10px 0;
+  color: #f1c40f;
+  font-size: 13px;
+}
+
+.fatigued-resident-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 12px;
+  color: #999;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fatigued-resident-item:last-child {
+  border-bottom: none;
+}
+
+.status-badge.fatigue {
+  background: rgba(241, 196, 15, 0.3);
+  color: #f1c40f;
+}
+
 /* Scrollbar styling */
 .management-panel-content::-webkit-scrollbar,
 .resident-selection::-webkit-scrollbar {
@@ -339,4 +580,276 @@
 .management-panel-content::-webkit-scrollbar-thumb:hover,
 .resident-selection::-webkit-scrollbar-thumb:hover {
   background: #764ba2;
+}
+
+/* ============================================
+   TIER UPGRADE TAB STYLES
+   ============================================ */
+
+/* Tab highlight when upgrade is available */
+.tab.tab-highlight {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.3), rgba(52, 211, 153, 0.3)) !important;
+  border: 1px solid #4ade80;
+  animation: upgradeAvailable 2s ease-in-out infinite;
+}
+
+@keyframes upgradeAvailable {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(74, 222, 128, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(74, 222, 128, 0.6);
+  }
+}
+
+/* Current Tier Info */
+.current-tier-info {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+  border: 2px solid #667eea;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.tier-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tier-badge-large {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-weight: bold;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+.tier-name-large {
+  font-size: 22px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.tier-description {
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
+.tier-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.benefit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.benefit-label {
+  color: #aaa;
+}
+
+.benefit-value {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+/* Next Tier Preview */
+.next-tier-preview {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed #667eea;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.tier-preview-desc {
+  color: #bbb;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.tier-improvements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.improvement {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #4ade80;
+}
+
+.new-rooms-preview {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 6px;
+}
+
+.new-rooms-label {
+  color: #facc15;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.new-rooms-list {
+  color: #fef08a;
+  text-transform: capitalize;
+}
+
+/* Upgrade Requirements */
+.upgrade-requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.requirement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.requirement.met {
+  border-left: 3px solid #4ade80;
+}
+
+.requirement.unmet {
+  border-left: 3px solid #f87171;
+}
+
+.req-icon {
+  font-size: 16px;
+}
+
+.req-label {
+  color: #aaa;
+  min-width: 100px;
+}
+
+.req-value {
+  flex: 1;
+  text-align: right;
+  font-weight: bold;
+}
+
+.requirement.met .req-value {
+  color: #4ade80;
+}
+
+.requirement.unmet .req-value {
+  color: #f87171;
+}
+
+.req-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 6px;
+}
+
+.req-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.req-progress-fill.money {
+  background: linear-gradient(90deg, #f87171, #facc15);
+}
+
+.req-progress-fill.reputation {
+  background: linear-gradient(90deg, #f87171, #facc15);
+}
+
+.req-progress-fill.graduations {
+  background: linear-gradient(90deg, #f87171, #facc15);
+}
+
+.req-progress-fill.utilization {
+  background: linear-gradient(90deg, #f87171, #facc15);
+}
+
+/* Upgrade Button */
+.upgrade-button {
+  width: 100%;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.upgrade-button.ready {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: white;
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+}
+
+.upgrade-button.ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 222, 128, 0.5);
+}
+
+.upgrade-button.disabled {
+  background: rgba(100, 100, 100, 0.5);
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* Max Tier Reached */
+.max-tier-reached {
+  text-align: center;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.1), rgba(251, 191, 36, 0.1));
+  border: 2px solid #facc15;
+  border-radius: 12px;
+}
+
+.max-tier-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.max-tier-reached h4 {
+  color: #facc15;
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.max-tier-reached p {
+  color: #bbb;
+  font-size: 14px;
+  margin: 5px 0;
 }

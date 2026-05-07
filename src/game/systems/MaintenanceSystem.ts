@@ -1,6 +1,8 @@
-import { GameState } from '../../types';
+import { GameState, Room } from '../../types';
 import { MAINTENANCE_CONFIG } from '../../constants';
 import { handleMaintenanceMissedReputation } from './ReputationSystem';
+import { getEffectiveMaintenanceCost } from './AdjacencySystem';
+import { recordExpense } from './DonationSystem';
 
 /**
  * MaintenanceSystem - Manages recurring facility costs
@@ -46,6 +48,9 @@ export function processMaintenance(gameState: GameState): void {
     // Normal maintenance
     gameState.money -= totalCost;
     
+    // Record maintenance expense to financial history
+    recordExpense(gameState, totalCost, 'maintenance', `Maintenance for ${gameState.rooms.length} rooms`);
+    
     // Update last maintenance paid for all rooms
     const now = Date.now();
     for (const room of gameState.rooms) {
@@ -62,6 +67,9 @@ export function processMaintenance(gameState: GameState): void {
     // Still deduct cost (can go negative)
     gameState.money -= totalCost;
     
+    // Record maintenance expense even when can't afford (debt)
+    recordExpense(gameState, totalCost, 'maintenance', `Maintenance (missed) for ${roomCount} rooms`);
+    
     // Reputation penalty
     handleMaintenanceMissedReputation(gameState, roomCount);
     
@@ -76,20 +84,49 @@ export function processMaintenance(gameState: GameState): void {
 // ============================================================================
 
 /**
- * Get total maintenance cost for all rooms
+ * Get effective maintenance cost for a single room (with adjacency bonus applied)
+ */
+export function getRoomEffectiveMaintenanceCost(room: Room): number {
+  return getEffectiveMaintenanceCost(room);
+}
+
+/**
+ * Get total maintenance cost for all rooms (with adjacency bonuses applied)
  */
 export function getTotalMaintenanceCost(gameState: GameState): number {
+  return gameState.rooms.reduce((sum, room) => sum + getEffectiveMaintenanceCost(room), 0);
+}
+
+/**
+ * Get total base maintenance cost (without adjacency bonuses)
+ */
+export function getTotalBaseMaintenanceCost(gameState: GameState): number {
   return gameState.rooms.reduce((sum, room) => sum + room.maintenanceCost, 0);
 }
 
 /**
- * Get maintenance cost breakdown by room type
+ * Get total maintenance savings from adjacency bonuses
  */
-export function getMaintenanceCostByType(gameState: GameState): Record<string, number> {
-  const costs: Record<string, number> = {};
+export function getTotalMaintenanceSavings(gameState: GameState): number {
+  const baseCost = getTotalBaseMaintenanceCost(gameState);
+  const effectiveCost = getTotalMaintenanceCost(gameState);
+  return baseCost - effectiveCost;
+}
+
+/**
+ * Get maintenance cost breakdown by room type (with adjacency bonuses)
+ */
+export function getMaintenanceCostByType(gameState: GameState): Record<string, { base: number; effective: number; savings: number }> {
+  const costs: Record<string, { base: number; effective: number; savings: number }> = {};
   
   for (const room of gameState.rooms) {
-    costs[room.type] = (costs[room.type] || 0) + room.maintenanceCost;
+    if (!costs[room.type]) {
+      costs[room.type] = { base: 0, effective: 0, savings: 0 };
+    }
+    const effectiveCost = getEffectiveMaintenanceCost(room);
+    costs[room.type].base += room.maintenanceCost;
+    costs[room.type].effective += effectiveCost;
+    costs[room.type].savings += room.maintenanceCost - effectiveCost;
   }
   
   return costs;
@@ -265,21 +302,48 @@ export function applyOfflineMaintenance(
 // ============================================================================
 
 /**
+ * Emit unified money change event for animations
+ */
+function emitMoneyChangeEvent(
+  amount: number,
+  source: string,
+  icon?: string,
+  type?: 'income' | 'expense'
+): void {
+  window.dispatchEvent(new CustomEvent('game:money_change', {
+    detail: {
+      amount,
+      source,
+      icon,
+      type: type || (amount >= 0 ? 'income' : 'expense')
+    }
+  }));
+}
+
+/**
  * Emit maintenance paid event
  */
 function emitMaintenancePaid(cost: number, roomCount: number): void {
+  // Legacy event for backward compatibility
   window.dispatchEvent(new CustomEvent('maintenance_paid', {
     detail: { cost, roomCount }
   }));
+  
+  // New unified money change event for animations
+  emitMoneyChangeEvent(-cost, 'Maintenance', '🔧', 'expense');
 }
 
 /**
  * Emit maintenance missed event
  */
 function emitMaintenanceMissed(cost: number, roomCount: number): void {
+  // Legacy event for backward compatibility
   window.dispatchEvent(new CustomEvent('maintenance_missed', {
     detail: { cost, roomCount }
   }));
+  
+  // New unified money change event for animations (still shows expense)
+  emitMoneyChangeEvent(-cost, 'Maintenance (Missed)', '🔧', 'expense');
 }
 
 /**
@@ -290,7 +354,11 @@ function emitOfflineMaintenance(
   cycles: number,
   reputationLost: number
 ): void {
+  // Legacy event for backward compatibility
   window.dispatchEvent(new CustomEvent('offline_maintenance', {
     detail: { totalCost, cycles, reputationLost }
   }));
+  
+  // New unified money change event for animations
+  emitMoneyChangeEvent(-totalCost, 'Offline Maintenance', '🔧', 'expense');
 }

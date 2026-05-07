@@ -1,10 +1,11 @@
-import { GameState, Resident, ResidentState, Need, Room, RoomType } from '../../types';
-import { PROFILE_SPECS, HAPPINESS_CONFIG, ROOM_SPECS } from '../../constants';
-import { findNearestRoomForNeed } from './PathfindingSystem';
+import { GameState, Resident, ResidentState, Need, Room, RoomType, DepartureReason } from '../../types';
+import { PROFILE_SPECS, HAPPINESS_CONFIG, ROOM_SPECS, DEPARTURE_CONFIG, GRID_CONFIG } from '../../constants';
+import { findNearestRoomForNeed, findPath } from './PathfindingSystem';
 import { updateSleepingResident } from './DayNightSystem';
 import { updateResidentLife } from './LIFEMeterSystem';
-import { handleUnhappyDepartureReputation } from './ReputationSystem';
+import { handleUnhappyDepartureReputation, handleHopelessDepartureReputation } from './ReputationSystem';
 import { consumeFood } from './FoodSystem';
+import { getRoomHappinessBonus } from './AdjacencySystem';
 import {
   canMoveTo,
   updateResidentPosition,
@@ -16,7 +17,10 @@ import {
   canProceedFromWait,
   updateWaitingResidents,
   reserveTileForResident,
-  clearTileReservation
+  clearTileReservation,
+  applySocialDistancing,
+  findSafeNearbyPosition,
+  clampToWalkableBounds
 } from './CollisionDetectionSystem';
 
 /**
@@ -39,6 +43,25 @@ const AI_CONFIG = {
   MAX_WAIT_TIME: 3000,              // Maximum time to wait for occupied tile (3 seconds)
   REPATH_COOLDOWN: 2000             // Cooldown before attempting to repath (2 seconds)
 };
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Check if a resident is inside a room's bounds
+ */
+function isResidentInsideRoom(resident: Resident, room: Room): boolean {
+  const resX = Math.floor(resident.gridX);
+  const resY = Math.floor(resident.gridY);
+  
+  return (
+    resX >= room.gridX &&
+    resX < room.gridX + room.width &&
+    resY >= room.gridY &&
+    resY < room.gridY + room.height
+  );
+}
 
 // ============================================================================
 // Log Throttling
@@ -189,6 +212,11 @@ export function updateResidentState(
   gameState: GameState,
   deltaTime: number
 ): void {
+  // Check departure conditions first (except if already leaving)
+  if (resident.currentState !== "leaving") {
+    checkDepartureConditions(resident, gameState, deltaTime);
+  }
+  
   switch (resident.currentState) {
     case "idle":
       handleIdleState(resident, gameState);
@@ -212,6 +240,10 @@ export function updateResidentState(
     
     case "sleeping":
       handleSleepingState(resident, gameState, deltaTime);
+      break;
+    
+    case "leaving":
+      handleLeavingState(resident, gameState, deltaTime);
       break;
   }
 }
@@ -248,14 +280,9 @@ function handleIdleState(resident: Resident, gameState: GameState): void {
     );
     
     if (otherResident) {
-      console.log(`🐛 DEBUG: ${resident.name} overlapping with ${otherResident.name}, finding new spot`);
-      // Find a nearby unoccupied tile and move there
-      const newPos = findNearbyUnoccupiedTile(gameState.grid, currentX, currentY, resident.id);
-      if (newPos) {
-        resident.gridX = newPos.x;
-        resident.gridY = newPos.y;
-        updateResidentPosition(resident, currentX, currentY);
-      }
+      // Use gradual social distancing instead of instant teleportation
+      // The social distancing system will gradually push them apart
+      // Don't reset their state - let them continue their activity
     }
     return;
   }
@@ -352,7 +379,8 @@ function handleSeekingNeedState(resident: Resident, gameState: GameState): void 
 }
 
 /**
- * Handle pathfinding state - move along path
+ * Handle pathfinding state - check arrival and transitions
+ * Note: Actual movement is handled by MainScene calling updateResidentMovement()
  */
 function handlePathfindingState(
   resident: Resident,
@@ -365,29 +393,8 @@ function handlePathfindingState(
     return;
   }
   
-  // Check for overlap with another resident - push away if needed
   const currentX = Math.floor(resident.gridX);
   const currentY = Math.floor(resident.gridY);
-  const otherResident = gameState.residents.find(r =>
-    r.id !== resident.id &&
-    Math.floor(r.gridX) === currentX &&
-    Math.floor(r.gridY) === currentY
-  );
-  
-  if (otherResident) {
-    console.log(`${resident.name} overlapping with ${otherResident.name} during pathfinding, pushing away`);
-    const newPos = findNearbyUnoccupiedTile(gameState.grid, currentX, currentY, resident.id);
-    if (newPos) {
-      resident.gridX = newPos.x;
-      resident.gridY = newPos.y;
-      updateResidentPosition(resident, currentX, currentY);
-      // Clear path and let them re-path from new position
-      clearTileReservation(resident.id);
-      resident.path = null;
-      resident.currentState = "idle";
-      return;
-    }
-  }
   
   // Check if waiting for a tile to become available
   if (isWaiting(resident.id)) {
@@ -395,14 +402,26 @@ function handlePathfindingState(
     
     if (canProceed) {
       if (reason === 'timeout') {
-        // Waited too long, push away and re-path
-        console.log(`${resident.name} timed out waiting, clearing path and resetting`);
-        const newPos = findNearbyUnoccupiedTile(gameState.grid, currentX, currentY, resident.id);
-        if (newPos) {
-          resident.gridX = newPos.x + (Math.random() - 0.5) * 0.3; // Add slight randomization
-          resident.gridY = newPos.y + (Math.random() - 0.5) * 0.3;
+        // Waited too long - use social distancing to find safe position
+        console.log(`${resident.name} timed out waiting, using social distancing to reposition`);
+        
+        // Find a safe nearby position using our improved algorithm
+        const safePos = findSafeNearbyPosition(
+          gameState.grid,
+          resident.gridX,
+          resident.gridY,
+          resident.id,
+          gameState.residents
+        );
+        
+        if (safePos) {
+          // Validate position is walkable before applying
+          const clamped = clampToWalkableBounds(gameState.grid, safePos.x, safePos.y);
+          resident.gridX = clamped.x;
+          resident.gridY = clamped.y;
           updateResidentPosition(resident, currentX, currentY);
         }
+        
         clearTileReservation(resident.id);
         removeFromWaitQueue(resident.id);
         resident.currentState = "idle";
@@ -419,28 +438,103 @@ function handlePathfindingState(
     }
   }
   
-  // Update movement along path (with collision detection)
-  updateResidentMovement(resident, gameState, deltaTime);
+  // Check if target room was demolished while walking to it
+  if (resident.targetRoomId) {
+    const targetRoom = gameState.rooms.find(r => r.id === resident.targetRoomId);
+    if (!targetRoom || !targetRoom.isOpen) {
+      console.log(`${resident.name}'s target room was removed or closed, resetting`);
+      clearTileReservation(resident.id);
+      removeFromWaitQueue(resident.id);
+      resident.currentState = "idle";
+      resident.path = null;
+      resident.targetRoomId = null;
+      resident.currentNeed = null;
+      return;
+    }
+  }
   
-  // Check if arrived at destination
-  if (!resident.path) {
-    // Arrived - try to enter room
-    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
-    
-    if (room && room.isOpen) {
-      enterRoom(room, resident.id);
-      resident.currentState = "in_use";
+  // Note: Movement is handled by MainScene calling updateResidentMovement()
+  // Here we only check if we've arrived at the destination
+  
+  // EARLY SLEEP CHECK: If resident is seeking sleep and is already inside the dormitory,
+  // immediately transition to sleeping state - don't wait for path to complete
+  if (resident.currentNeed === "sleep" && resident.targetRoomId) {
+    const targetRoom = gameState.rooms.find(r => r.id === resident.targetRoomId);
+    if (targetRoom && targetRoom.type === "dormitory" && isResidentInsideRoom(resident, targetRoom)) {
+      // Resident has entered the dormitory - immediately start sleeping
+      resident.path = null;
+      resident.pathIndex = 0;
       
-      // If sleeping, transition to sleeping state and lock position
-      if (resident.currentNeed === "sleep") {
+      const entered = enterRoom(targetRoom, resident.id);
+      if (entered) {
         resident.currentState = "sleeping";
         // Lock the resident's position for sleeping
         resident.sleepX = resident.gridX;
         resident.sleepY = resident.gridY;
-        console.log(`😴 ${resident.name} is now sleeping at (${Math.floor(resident.sleepX)}, ${Math.floor(resident.sleepY)})`);
+        console.log(`😴 ${resident.name} entered dormitory and immediately started sleeping at (${Math.floor(resident.sleepX)}, ${Math.floor(resident.sleepY)})`);
+        clearTileReservation(resident.id);
+        removeFromWaitQueue(resident.id);
+        return;
+      }
+    }
+  }
+  
+  // Check if arrived at destination (path completed)
+  // Note: path may have been cleared by early sleep check above
+  if (!resident.path || resident.pathIndex >= resident.path.length) {
+    resident.path = null;
+    resident.pathIndex = 0;
+    
+    // Arrived - try to enter room
+    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
+    
+    if (room && room.isOpen) {
+      const entered = enterRoom(room, resident.id);
+      
+      if (entered) {
+        resident.currentState = "in_use";
+        
+        // If sleeping, transition to sleeping state and lock position
+        if (resident.currentNeed === "sleep") {
+          resident.currentState = "sleeping";
+          // Lock the resident's position for sleeping
+          resident.sleepX = resident.gridX;
+          resident.sleepY = resident.gridY;
+          console.log(`😴 ${resident.name} is now sleeping at (${Math.floor(resident.sleepX)}, ${Math.floor(resident.sleepY)})`);
+        }
+      } else {
+        // Room is full, find alternative or wait
+        console.log(`${resident.name} couldn't enter ${room.type} - room is full`);
+        // Try to find an alternative room of the same type
+        if (resident.currentNeed) {
+          const alternative = findNearestRoomForNeed(
+            gameState.grid,
+            gameState.rooms,
+            Math.floor(resident.gridX),
+            Math.floor(resident.gridY),
+            resident.currentNeed,
+            gameState.currentPhase
+          );
+          
+          if (alternative && alternative.room.id !== room.id) {
+            // Found alternative, path to it
+            resident.path = alternative.path;
+            resident.pathIndex = 0;
+            resident.targetRoomId = alternative.room.id;
+            console.log(`${resident.name} found alternative ${alternative.room.type}`);
+          } else {
+            // No alternative, go back to idle and try again later
+            resident.currentState = "idle";
+            resident.targetRoomId = null;
+            // Keep currentNeed so they'll try again
+          }
+        } else {
+          resident.currentState = "idle";
+          resident.targetRoomId = null;
+        }
       }
     } else {
-      // Room full or closed, go back to idle
+      // Room closed or doesn't exist, go back to idle
       clearTileReservation(resident.id);
       resident.currentState = "idle";
       resident.targetRoomId = null;
@@ -522,6 +616,11 @@ function handleSleepingState(
 ): void {
   // Enforce sleep position lock - resident must stay still
   if (resident.sleepX !== null && resident.sleepY !== null) {
+    // Validate sleep position is still within walkable bounds
+    const clampedSleep = clampToWalkableBounds(gameState.grid, resident.sleepX, resident.sleepY);
+    resident.sleepX = clampedSleep.x;
+    resident.sleepY = clampedSleep.y;
+    
     // Lock resident to their sleep position
     resident.gridX = resident.sleepX;
     resident.gridY = resident.sleepY;
@@ -552,29 +651,302 @@ function handleSleepingState(
 }
 
 // ============================================================================
+// Departure System
+// ============================================================================
+
+// Track when residents started leaving (for exit timeout)
+const leavingStartTime = new Map<string, number>();
+
+/**
+ * Check if resident should start leaving due to unhappiness or hopelessness
+ */
+function checkDepartureConditions(
+  resident: Resident,
+  gameState: GameState,
+  deltaTime: number
+): void {
+  // Check LIFE meter (hopeless departure - immediate)
+  if (resident.lifeMeter <= 0) {
+    initiateHopelessDeparture(resident, gameState);
+    return;
+  }
+  
+  // Check unhappiness duration
+  if (resident.happiness < DEPARTURE_CONFIG.UNHAPPY_THRESHOLD) {
+    // Accumulate unhappy duration (convert deltaTime from seconds to ms)
+    resident.unhappyDuration += deltaTime * 1000;
+    
+    // Check for warning state (1 in-game day = 12 minutes = 720000ms)
+    if (!resident.isAtRisk && resident.unhappyDuration >= DEPARTURE_CONFIG.WARNING_DURATION) {
+      resident.isAtRisk = true;
+      emitResidentAtRisk(resident.id, resident.name);
+      console.log(`⚠️ ${resident.name} is at risk of leaving! (unhappy for ${Math.floor(resident.unhappyDuration / 60000)} minutes)`);
+    }
+    
+    // Check for departure (2 in-game days = 24 minutes = 1440000ms)
+    if (resident.unhappyDuration >= DEPARTURE_CONFIG.DEPARTURE_DURATION) {
+      initiateUnhappyDeparture(resident, gameState);
+    }
+  } else {
+    // Reset unhappy duration if happiness is above threshold
+    if (resident.unhappyDuration > 0) {
+      console.log(`😊 ${resident.name}'s happiness recovered, resetting departure timer`);
+      resident.unhappyDuration = 0;
+      resident.isAtRisk = false;
+    }
+  }
+}
+
+/**
+ * Initiate departure due to prolonged unhappiness
+ */
+function initiateUnhappyDeparture(resident: Resident, gameState: GameState): void {
+  console.log(`😢 ${resident.name} has decided to leave due to prolonged unhappiness`);
+  
+  resident.departureReason = 'unhappy';
+  startLeavingProcess(resident, gameState);
+}
+
+/**
+ * Initiate departure due to LIFE meter reaching 0
+ */
+function initiateHopelessDeparture(resident: Resident, gameState: GameState): void {
+  console.log(`💔 ${resident.name} has lost all hope and decided to leave`);
+  
+  resident.departureReason = 'hopeless';
+  startLeavingProcess(resident, gameState);
+}
+
+/**
+ * Start the leaving process - find path to exit
+ */
+function startLeavingProcess(resident: Resident, gameState: GameState): void {
+  // Leave any room they're currently in
+  if (resident.targetRoomId) {
+    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
+    if (room) {
+      leaveRoom(room, resident.id);
+    }
+  }
+  
+  // Clear sleep position if sleeping
+  resident.sleepX = null;
+  resident.sleepY = null;
+  
+  // Find exit tile
+  const exitPos = findExitPosition(gameState.grid);
+  
+  if (exitPos) {
+    // Find path to exit
+    const path = findPath(
+      gameState.grid,
+      Math.floor(resident.gridX),
+      Math.floor(resident.gridY),
+      exitPos.x,
+      exitPos.y
+    );
+    
+    if (path && path.length > 0) {
+      resident.path = path;
+      resident.pathIndex = 0;
+    } else {
+      // No path found, will teleport after timeout
+      resident.path = null;
+    }
+  } else {
+    // No exit found, will teleport after timeout
+    resident.path = null;
+  }
+  
+  // Set state and track start time
+  resident.currentState = "leaving";
+  resident.currentNeed = null;
+  resident.targetRoomId = null;
+  leavingStartTime.set(resident.id, Date.now());
+  
+  // Emit departure notification
+  emitResidentLeaving(resident.id, resident.name, resident.departureReason || 'unhappy');
+}
+
+/**
+ * Find the entrance/exit tile position
+ */
+function findExitPosition(grid: any): { x: number; y: number } | null {
+  for (let y = 0; y < grid.height; y++) {
+    for (let x = 0; x < grid.width; x++) {
+      if (grid.tiles[y][x].type === "entrance") {
+        return { x, y };
+      }
+    }
+  }
+  
+  // Fallback: use edge of grid
+  return { x: 0, y: Math.floor(grid.height / 2) };
+}
+
+/**
+ * Handle leaving state - walk to exit then remove
+ */
+function handleLeavingState(
+  resident: Resident,
+  gameState: GameState,
+  deltaTime: number
+): void {
+  const startTime = leavingStartTime.get(resident.id) || Date.now();
+  const elapsedTime = Date.now() - startTime;
+  
+  // Check if we've exceeded the exit timeout
+  if (elapsedTime > DEPARTURE_CONFIG.EXIT_TIMEOUT) {
+    console.log(`⏱️ ${resident.name} couldn't reach exit in time, teleporting out`);
+    completeResidentDeparture(resident, gameState);
+    return;
+  }
+  
+  // Check if reached exit (at entrance tile or path completed)
+  const exitPos = findExitPosition(gameState.grid);
+  const atExit = exitPos &&
+    Math.floor(resident.gridX) === exitPos.x &&
+    Math.floor(resident.gridY) === exitPos.y;
+  
+  if (atExit || (!resident.path && !resident.pathIndex)) {
+    // Give a little movement time before removing
+    if (!resident.path || resident.pathIndex >= (resident.path?.length || 0)) {
+      completeResidentDeparture(resident, gameState);
+    }
+  }
+  
+  // Movement is handled by updateResidentMovement which is called from MainScene
+}
+
+/**
+ * Complete the departure - apply penalties and remove resident
+ */
+function completeResidentDeparture(resident: Resident, gameState: GameState): void {
+  console.log(`👋 ${resident.name} has left the shelter`);
+  
+  // Apply reputation penalty based on departure reason
+  if (resident.departureReason === 'hopeless') {
+    handleHopelessDepartureReputation(gameState, resident.name);
+  } else {
+    handleUnhappyDepartureReputation(gameState, resident.name);
+  }
+  
+  // Emit departure completed event
+  emitResidentDeparted(resident.id, resident.name, resident.departureReason || 'unhappy');
+  
+  // Clean up tracking
+  leavingStartTime.delete(resident.id);
+  
+  // Remove resident from game
+  removeResident(gameState, resident.id);
+}
+
+// ============================================================================
+// Departure Event Emissions
+// ============================================================================
+
+/**
+ * Emit event when resident becomes at-risk of leaving
+ */
+function emitResidentAtRisk(residentId: string, residentName: string): void {
+  window.dispatchEvent(new CustomEvent('resident_at_risk', {
+    detail: {
+      residentId,
+      residentName,
+      message: `${residentName} is unhappy and may leave soon!`
+    }
+  }));
+}
+
+/**
+ * Emit event when resident starts leaving
+ */
+function emitResidentLeaving(residentId: string, residentName: string, reason: DepartureReason): void {
+  window.dispatchEvent(new CustomEvent('resident_leaving', {
+    detail: {
+      residentId,
+      residentName,
+      reason,
+      message: reason === 'hopeless'
+        ? `${residentName} has lost hope and is leaving!`
+        : `${residentName} is unhappy and leaving!`
+    }
+  }));
+}
+
+/**
+ * Emit event when resident has fully departed
+ */
+function emitResidentDeparted(residentId: string, residentName: string, reason: DepartureReason): void {
+  window.dispatchEvent(new CustomEvent('resident_departed', {
+    detail: {
+      residentId,
+      residentName,
+      reason,
+      message: reason === 'hopeless'
+        ? `${residentName} has left the shelter, having lost all hope`
+        : `${residentName} has left the shelter disappointed`
+    }
+  }));
+}
+
+// ============================================================================
 // Movement
 // ============================================================================
 
 /**
- * Update resident movement along path (with collision detection)
+ * Update resident movement along path (with collision detection and social distancing)
  */
 export function updateResidentMovement(
   resident: Resident,
   gameState: GameState,
   deltaTime: number
 ): void {
+  // Store old position for collision detection
+  const oldX = Math.floor(resident.gridX);
+  const oldY = Math.floor(resident.gridY);
+  
+  // Only apply social distancing when NOT on a path (idle/stationary residents)
+  // This prevents interference with normal pathfinding movement
   if (!resident.path || resident.path.length === 0) {
-    return;
+    // Check if we're overlapping with another resident
+    const isOverlapping = gameState.residents.some(other =>
+      other.id !== resident.id &&
+      Math.abs(other.gridX - resident.gridX) < 0.5 &&
+      Math.abs(other.gridY - resident.gridY) < 0.5
+    );
+    
+    // Only apply separation if actually overlapping
+    if (isOverlapping) {
+      const socialResult = applySocialDistancing(
+        resident,
+        gameState.residents,
+        gameState.grid,
+        deltaTime
+      );
+      
+      if (socialResult.wasAdjusted) {
+        const newTileX = Math.floor(socialResult.newX);
+        const newTileY = Math.floor(socialResult.newY);
+        
+        if (canMoveTo(gameState.grid, newTileX, newTileY, resident.id) ||
+            (newTileX === oldX && newTileY === oldY)) {
+          resident.gridX = socialResult.newX;
+          resident.gridY = socialResult.newY;
+          
+          if (newTileX !== oldX || newTileY !== oldY) {
+            updateResidentPosition(resident, oldX, oldY);
+          }
+        }
+      }
+    }
+    return; // No path, done
   }
   
   const MOVE_SPEED = AI_CONFIG.MOVE_SPEED;
   const targetNode = resident.path[resident.pathIndex];
   
-  // Store old position for collision detection
-  const oldX = Math.floor(resident.gridX);
-  const oldY = Math.floor(resident.gridY);
-  
-  // Calculate movement
+  // Calculate movement toward path target
   const dx = targetNode.x - resident.gridX;
   const dy = targetNode.y - resident.gridY;
   const distance = Math.sqrt(dx * dx + dy * dy);
@@ -611,12 +983,12 @@ export function updateResidentMovement(
       resident.pathIndex = 0;
     }
   } else {
-    // Move toward waypoint
+    // Move toward waypoint at normal speed
     const moveDistance = MOVE_SPEED * deltaTime;
     const ratio = Math.min(moveDistance / distance, 1);
     
-    const newGridX = resident.gridX + dx * ratio;
-    const newGridY = resident.gridY + dy * ratio;
+    let newGridX = resident.gridX + dx * ratio;
+    let newGridY = resident.gridY + dy * ratio;
     
     // Check if new position crosses into a new tile
     const newX = Math.floor(newGridX);
@@ -646,11 +1018,14 @@ export function updateResidentMovement(
 }
 
 // ============================================================================
-// Overlap Resolution
+// Overlap Resolution (Legacy - kept for compatibility, but prefer findSafeNearbyPosition)
 // ============================================================================
 
 /**
  * Find a nearby unoccupied tile to move to
+ * @deprecated Use findSafeNearbyPosition from CollisionDetectionSystem instead
+ * This legacy function is kept for backward compatibility but should be avoided
+ * as it doesn't account for crowd density or walkable bounds properly
  */
 function findNearbyUnoccupiedTile(
   grid: any,
@@ -668,7 +1043,11 @@ function findNearbyUnoccupiedTile(
           const y = centerY + dy;
           
           if (canMoveTo(grid, x, y, residentId)) {
-            return { x, y };
+            // Additional boundary validation - ensure we're in walkable area
+            const clamped = clampToWalkableBounds(grid, x + 0.5, y + 0.5);
+            if (Math.floor(clamped.x) === x && Math.floor(clamped.y) === y) {
+              return { x: clamped.x, y: clamped.y };
+            }
           }
         }
       }
@@ -793,11 +1172,20 @@ export function clearNeedCache(residentId?: string): void {
 
 /**
  * Enter a room
+ * Returns true if entry was successful, false if room is full
  */
 export function enterRoom(room: Room, residentId: string): boolean {
-  // For now, we don't enforce capacity strictly
-  // Just track occupancy
+  const spec = ROOM_SPECS[room.type];
+  
+  // Check capacity (0 means unlimited)
+  if (spec.capacity > 0 && room.currentOccupancy >= spec.capacity) {
+    console.log(`Room ${room.type} is full (${room.currentOccupancy}/${spec.capacity})`);
+    return false;
+  }
+  
+  // Track occupancy
   room.currentOccupancy++;
+  console.log(`${residentId.substring(0, 8)}... entered ${room.type} (${room.currentOccupancy}/${spec.capacity || '∞'})`);
   return true;
 }
 
@@ -816,6 +1204,7 @@ export function leaveRoom(room: Room, residentId: string): void {
 
 /**
  * Apply room effects to resident
+ * Includes adjacency happiness bonuses when using rooms
  */
 function applyRoomEffects(
   resident: Resident,
@@ -823,15 +1212,23 @@ function applyRoomEffects(
   gameState: GameState,
   deltaTime: number
 ): void {
+  // Apply adjacency happiness bonus (applied gradually while using any room)
+  const adjacencyHappinessBonus = getRoomHappinessBonus(room);
+  if (adjacencyHappinessBonus !== 0) {
+    // Apply bonus over time (spread across 10 seconds of room usage)
+    const happinessChange = (adjacencyHappinessBonus / 10) * deltaTime;
+    resident.happiness = Math.max(0, Math.min(100, resident.happiness + happinessChange));
+  }
+  
   switch (room.type) {
     case "learning_center":
     case "vocational_room":
-      // LIFE meter progression
+      // LIFE meter progression (adjacency modifier is handled in LIFEMeterSystem)
       updateResidentLife(resident, gameState, deltaTime);
       break;
     
     case "common_room":
-      // Boost happiness (10 per minute)
+      // Boost happiness (10 per minute) + adjacency bonus already applied above
       const happinessGain = (HAPPINESS_CONFIG.COMMON_ROOM_BOOST_RATE / 60) * deltaTime;
       resident.happiness = Math.min(100, resident.happiness + happinessGain);
       break;
@@ -845,13 +1242,14 @@ function applyRoomEffects(
       break;
     
     case "bathroom":
-      // Instant satisfaction (no ongoing effect)
+      // Instant satisfaction (no ongoing effect, but adjacency bonus still applies)
       break;
     
     case "cafeteria":
       // Eating at cafeteria - resident is consuming food
       // The actual food cost is handled by daily food system
       // Here we just track that they ate and emit visual feedback
+      // Adjacency bonus already applied above
       break;
   }
 }

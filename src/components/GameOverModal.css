@@ -138,6 +138,45 @@
   border-bottom: 2px solid rgba(244, 67, 54, 0.3);
 }
 
+/* Game Over Reason Banner */
+.game-over-reason {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.game-over-reason-bankruptcy {
+  background: linear-gradient(90deg, rgba(255, 152, 0, 0.2), rgba(255, 87, 34, 0.2));
+  border-bottom: 2px solid rgba(255, 152, 0, 0.5);
+  color: #ffb74d;
+}
+
+.game-over-reason-reputation {
+  background: linear-gradient(90deg, rgba(156, 39, 176, 0.2), rgba(103, 58, 183, 0.2));
+  border-bottom: 2px solid rgba(156, 39, 176, 0.5);
+  color: #ce93d8;
+}
+
+.game-over-reason-exodus {
+  background: linear-gradient(90deg, rgba(33, 150, 243, 0.2), rgba(3, 169, 244, 0.2));
+  border-bottom: 2px solid rgba(33, 150, 243, 0.5);
+  color: #90caf9;
+}
+
+.reason-icon {
+  font-size: 24px;
+}
+
+.reason-text {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .victory-message p,
 .game-over-message p {
   margin: 0;
@@ -153,7 +192,8 @@
 }
 
 .btn-restart,
-.btn-continue {
+.btn-continue,
+.btn-load {
   flex: 1;
   padding: 16px 24px;
   border: none;
@@ -182,6 +222,16 @@
 .btn-continue:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.btn-load {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  color: white;
+}
+
+.btn-load:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
 }
 
 /* Confetti animation for victory */

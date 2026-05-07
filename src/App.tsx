@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import { createPhaserGame, destroyPhaserGame } from './game/PhaserGame';
 import { GameStateManager, createInitialGameState } from './game/systems/GameStateManager';
@@ -9,6 +9,8 @@ import { getAudioSystem, playSFX } from './game/systems/AudioSystem';
 import { saveGame } from './game/systems/SaveLoadSystem';
 import { transitionToDay, transitionToNight } from './game/systems/DayNightSystem';
 import { initializeCafeteriaGeneration } from './game/systems/FoodSystem';
+import { performUpgrade } from './game/systems/TierSystem';
+import { getWarningSystem } from './game/systems/WarningSystem';
 import { setDevTimersEnabled, isDevTimersEnabled } from './constants';
 import { HUD } from './components/HUD';
 import { BuildMenu } from './components/BuildMenu';
@@ -17,10 +19,12 @@ import { EventModal } from './components/EventModal';
 import { NotificationContainer, useNotifications } from './components/NotificationToast';
 import { SettingsModal } from './components/SettingsModal';
 import { TutorialModal, useTutorial } from './components/TutorialModal';
-import { GameOverModal, checkVictoryConditions, checkGameOverConditions } from './components/GameOverModal';
+import { GameOverModal, checkVictoryConditions } from './components/GameOverModal';
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import { DevModeMenu } from './components/DevModeMenu';
-import { GameState, RoomType } from './types';
+import { MoneyAnimationOverlay } from './components/MoneyAnimations';
+import { WarningPanel } from './components/WarningPanel';
+import { GameState, RoomType, GameOverReason, Warning } from './types';
 import { MainScene } from './game/scenes/MainScene';
 import './App.css';
 
@@ -41,12 +45,15 @@ function App() {
   const [currentEvent, setCurrentEvent] = useState<GameEvent | null>(null);
   const [showGameOver, setShowGameOver] = useState(false);
   const [isVictory, setIsVictory] = useState(false);
-  const [totalMoneyEarned, setTotalMoneyEarned] = useState(0);
+  const [gameOverReason, setGameOverReason] = useState<GameOverReason>(null);
   const [selectedRoomType, setSelectedRoomType] = useState<RoomType | null>(null);
   const [showDevMode, setShowDevMode] = useState(false);
   const [devTimersEnabled, setDevTimersEnabledState] = useState(isDevTimersEnabled());
+  const [showManagementPanel, setShowManagementPanel] = useState(false);
+  const [managementPanelTab, setManagementPanelTab] = useState<string>('residents');
   
   const { notifications, addNotification, dismissNotification } = useNotifications();
+  const warningSystem = getWarningSystem();
   const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
   const audioSystem = getAudioSystem();
   
@@ -54,16 +61,19 @@ function App() {
   const checkEndGameConditions = (state: GameState) => {
     if (showGameOver) return; // Already showing game over
     
+    // Check victory conditions
     const victory = checkVictoryConditions(state.graduatedCount, state.reputation, state.currentDay);
-    const gameOver = checkGameOverConditions(state.money, state.reputation);
     
     if (victory && !isVictory) {
       setIsVictory(true);
       setShowGameOver(true);
+      setGameOverReason(null);
       playSFX('graduation');
-    } else if (gameOver && !showGameOver) {
+    } else if (state.isGameOver && state.gameOverReason && !showGameOver) {
+      // Game over triggered by GameStateManager
       setIsVictory(false);
       setShowGameOver(true);
+      setGameOverReason(state.gameOverReason);
       playSFX('error');
     }
   };
@@ -82,7 +92,6 @@ function App() {
       // Set initial state
       const initialState = gameStateManagerRef.current.getState();
       setGameState(initialState);
-      setTotalMoneyEarned(initialState.money);
     }
     
     // Initialize event system
@@ -157,8 +166,38 @@ function App() {
       addNotification(`${count} new residents arrived!`, 'info');
     };
     
+    // Handle game over event from GameStateManager
+    const handleGameOver = (event: CustomEvent) => {
+      const { reason, message, stats } = event.detail;
+      console.log('[App] Game over event received:', reason, message);
+      setIsVictory(false);
+      setShowGameOver(true);
+      setGameOverReason(reason);
+      playSFX('error');
+    };
+    
+    // NOTE: Financial warnings are handled by WarningSystem with proper deduplication
+    // and cooldowns. See src/game/systems/WarningSystem.ts - checkFinancialWarnings()
+    // The WarningSystem dispatches 'game:warning_critical' for critical financial warnings.
+    
+    // Handle critical warning toast notifications
+    const handleCriticalWarning = (event: CustomEvent) => {
+      const { warning } = event.detail;
+      addNotification(`🚨 ${warning.message}: ${warning.detail || ''}`, 'error');
+      playSFX('error');
+    };
+    
+    // Handle warning escalation notifications
+    const handleWarningEscalated = (event: CustomEvent) => {
+      const { warning } = event.detail;
+      addNotification(`⚠️ Warning escalated: ${warning.message}`, 'warning');
+    };
+    
     window.addEventListener('game:event_triggered' as any, handleEventTriggered);
     window.addEventListener('game:add_residents' as any, handleAddResidents);
+    window.addEventListener('game:game_over' as any, handleGameOver);
+    window.addEventListener('game:warning_critical' as any, handleCriticalWarning);
+    window.addEventListener('game:warning_escalated' as any, handleWarningEscalated);
     
     // Start background music
     audioSystem.updateMusicForPhase('day');
@@ -168,6 +207,9 @@ function App() {
       window.removeEventListener('keydown', handleKeyPress);
       window.removeEventListener('game:event_triggered' as any, handleEventTriggered);
       window.removeEventListener('game:add_residents' as any, handleAddResidents);
+      window.removeEventListener('game:game_over' as any, handleGameOver);
+      window.removeEventListener('game:warning_critical' as any, handleCriticalWarning);
+      window.removeEventListener('game:warning_escalated' as any, handleWarningEscalated);
       
       if (gameRef.current) {
         destroyPhaserGame(gameRef.current);
@@ -189,6 +231,21 @@ function App() {
     return () => clearInterval(interval);
   }, [gameState]);
   
+  // Update warning system periodically
+  useEffect(() => {
+    if (!gameStateManagerRef.current || !gameState) return;
+    
+    const interval = setInterval(() => {
+      const mutableState = gameStateManagerRef.current?.getMutableState();
+      if (mutableState) {
+        warningSystem.updateWarnings(mutableState);
+        gameStateManagerRef.current?.forceUpdate();
+      }
+    }, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [gameState, warningSystem]);
+  
   // Update music based on day/night cycle
   useEffect(() => {
     if (gameState) {
@@ -198,6 +255,13 @@ function App() {
   
   const handlePlaceRoom = (roomType: RoomType, gridX: number, gridY: number) => {
     if (!gameStateManagerRef.current) return;
+    
+    // Check if building is allowed (not during bankruptcy)
+    if (!gameStateManagerRef.current.canBuild()) {
+      addNotification('Cannot build during bankruptcy! Focus on recovering your finances.', 'error');
+      playSFX('error');
+      return;
+    }
     
     // DEBUG: Log placement handler call
     console.log('[App] handlePlaceRoom called, current selectedRoomType:', selectedRoomType);
@@ -291,6 +355,13 @@ function App() {
   const handleStartFundraiser = (stationId: string, residentIds: string[]) => {
     if (!gameStateManagerRef.current) return;
     
+    // Check if fundraisers are allowed (not during bankruptcy)
+    if (!gameStateManagerRef.current.canStartFundraiser()) {
+      addNotification('Cannot start fundraisers during bankruptcy! Focus on recovering your finances.', 'error');
+      playSFX('error');
+      return;
+    }
+    
     const state = gameStateManagerRef.current.getMutableState();
     const result = startFundraiser(state, stationId, residentIds);
     
@@ -368,17 +439,11 @@ function App() {
   
   const handleRestartGame = () => {
     if (gameStateManagerRef.current) {
-      const newState = createInitialGameState();
-      gameStateManagerRef.current.getMutableState().money = newState.money;
-      gameStateManagerRef.current.getMutableState().reputation = newState.reputation;
-      gameStateManagerRef.current.getMutableState().residents = newState.residents;
-      gameStateManagerRef.current.getMutableState().rooms = [];
-      gameStateManagerRef.current.getMutableState().currentDay = 1;
-      gameStateManagerRef.current.getMutableState().graduatedCount = 0;
-      gameStateManagerRef.current.forceUpdate();
+      // Use the resetGame method to properly reset all state including bankruptcy
+      gameStateManagerRef.current.resetGame();
       setShowGameOver(false);
       setIsVictory(false);
-      setTotalMoneyEarned(newState.money);
+      setGameOverReason(null);
     }
   };
   
@@ -453,6 +518,84 @@ function App() {
     playSFX('click');
   };
   
+  const handleUpgradeTier = () => {
+    if (!gameStateManagerRef.current) return;
+    const state = gameStateManagerRef.current.getMutableState();
+    const result = performUpgrade(state);
+    if (result.success) {
+      gameStateManagerRef.current.forceUpdate();
+      const newRoomsText = result.newRooms && result.newRooms.length > 0
+        ? ` New rooms unlocked: ${result.newRooms.join(', ')}`
+        : '';
+      addNotification(`Tier upgraded successfully!${newRoomsText}`, 'success');
+      playSFX('graduation');
+    } else {
+      addNotification(result.error || 'Cannot upgrade tier', 'warning');
+      playSFX('error');
+    }
+  };
+  
+  // Warning system action handlers
+  const handleWarningAction = useCallback((actionType: string, warning: Warning) => {
+    playSFX('click');
+    
+    switch (actionType) {
+      case 'low_funds':
+      case 'in_debt':
+      case 'near_bankruptcy':
+      case 'maintenance_due':
+      case 'operating_costs_due':
+        // Open finances tab in management panel
+        setShowManagementPanel(true);
+        setManagementPanelTab('finances');
+        break;
+      case 'unhappy_resident':
+      case 'at_risk_resident':
+      case 'stalled_progress':
+      case 'life_meters_stalled':
+      case 'reputation_dropping':
+        // Open residents tab in management panel
+        setShowManagementPanel(true);
+        setManagementPanelTab('residents');
+        break;
+      case 'overcrowded':
+      case 'capacity_warning':
+      case 'ready_to_upgrade':
+        // Open tier upgrade tab
+        setShowManagementPanel(true);
+        setManagementPanelTab('tier');
+        break;
+      case 'hungry_residents':
+      case 'maintenance_overdue':
+        // Open rooms tab
+        setShowManagementPanel(true);
+        setManagementPanelTab('rooms');
+        break;
+      case 'low_reputation':
+        // Show general dashboard
+        setShowManagementPanel(true);
+        setManagementPanelTab('overview');
+        break;
+      default:
+        // Default to opening management panel
+        setShowManagementPanel(true);
+    }
+  }, []);
+  
+  const handleWarningDismiss = useCallback((warningId: string) => {
+    if (!gameStateManagerRef.current) return;
+    
+    const mutableState = gameStateManagerRef.current.getMutableState();
+    warningSystem.dismissWarning(mutableState, warningId);
+    gameStateManagerRef.current.forceUpdate();
+    playSFX('click');
+  }, [warningSystem]);
+  
+  const handleWarningClick = useCallback(() => {
+    // Warning button in HUD clicked - just let the panel handle expansion
+    // The WarningPanel has its own expand/collapse logic
+  }, []);
+  
   if (!gameState) {
     return (
       <div className="loading">
@@ -463,9 +606,9 @@ function App() {
   
   const gameStats = {
     daysSurvived: gameState.currentDay,
-    residentsHelped: gameState.residents.length + gameState.graduatedCount,
+    residentsHelped: gameState.totalResidentsHelped,
     graduatedCount: gameState.graduatedCount,
-    moneyEarned: totalMoneyEarned,
+    moneyEarned: gameState.totalMoneyEarned,
     finalReputation: gameState.reputation,
     finalMoney: gameState.money
   };
@@ -499,6 +642,14 @@ function App() {
           gameSpeed={gameSpeed}
           onGameSpeedChange={setGameSpeed}
           onResetGame={handleRestartGame}
+          statusBarSettings={gameState.statusBarSettings}
+          onStatusBarSettingsChange={(settings) => {
+            const mutableState = gameStateManagerRef.current?.getMutableState();
+            if (mutableState) {
+              Object.assign(mutableState.statusBarSettings, settings);
+              gameStateManagerRef.current?.forceUpdate();
+            }
+          }}
         />
       )}
       
@@ -507,6 +658,7 @@ function App() {
         <GameOverModal
           isVictory={isVictory}
           stats={gameStats}
+          gameOverReason={gameOverReason}
           onRestart={handleRestartGame}
           onContinue={isVictory ? () => setShowGameOver(false) : undefined}
         />
@@ -543,12 +695,23 @@ function App() {
         onDismiss={dismissNotification}
       />
       
+      {/* Money Animation Overlay */}
+      <MoneyAnimationOverlay />
+      
       {/* HUD */}
       <HUD
         gameState={gameState}
         onPauseToggle={handlePauseToggle}
         isPaused={isPaused}
         onSettingsClick={() => setShowSettings(true)}
+        onWarningClick={handleWarningClick}
+      />
+      
+      {/* Warning Panel */}
+      <WarningPanel
+        gameState={gameState}
+        onAction={handleWarningAction}
+        onDismiss={handleWarningDismiss}
       />
       
       {/* Game Canvas */}
@@ -559,6 +722,7 @@ function App() {
         onPlaceRoom={handlePlaceRoom}
         onRoomSelected={handleRoomSelected}
         currentMoney={gameState.money}
+        gameState={gameState}
       />
       
       {/* Management Panel */}
@@ -567,6 +731,7 @@ function App() {
         onStartFundraiser={handleStartFundraiser}
         onCancelFundraiser={handleCancelFundraiser}
         onExpandGrid={handleExpandGrid}
+        onUpgradeTier={handleUpgradeTier}
       />
       
       {/* Performance Monitor (F3 to toggle) */}

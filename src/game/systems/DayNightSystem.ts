@@ -1,9 +1,12 @@
 import { GameState, Room, Resident, DayPhase } from '../../types';
 import { getActiveTimerConfig, ROOM_SPECS } from '../../constants';
 import { processDailyFood } from './FoodSystem';
+import { deductDailyOperatingCosts } from './DonationSystem';
+import { applyReputationDecay } from './ReputationSystem';
 
 /**
  * DayNightSystem - Manages day/night cycle and phase transitions
+ * Now with faster 6-minute full day cycle (4 min day, 2 min night)
  */
 
 // ============================================================================
@@ -34,8 +37,14 @@ export function transitionToDay(gameState: GameState): void {
     resident.daysInShelter++;
   }
   
+  // Deduct daily operating costs at the start of each day
+  deductDailyOperatingCosts(gameState);
+  
   // Process daily food consumption
   processDailyFood(gameState);
+  
+  // Apply reputation decay at day transition
+  applyReputationDecay(gameState);
   
   // Wake up residents
   wakeUpResidents(gameState);

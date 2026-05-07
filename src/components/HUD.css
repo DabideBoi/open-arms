@@ -138,10 +138,392 @@
   border-color: #8a2be2;
 }
 
+/* Bankruptcy Warning Banner */
+.hud-bankruptcy-active {
+  border-bottom-color: #ff0000;
+}
+
+.hud-bankruptcy-warning {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(139, 0, 0, 0.95), rgba(255, 0, 0, 0.85));
+  border: 3px solid #ff0000;
+  border-radius: 12px;
+  padding: 16px 24px;
+  z-index: 1001;
+  min-width: 400px;
+  box-shadow: 0 4px 20px rgba(255, 0, 0, 0.5), 0 0 40px rgba(255, 0, 0, 0.3);
+  animation: bankruptcyPulse 1s ease-in-out infinite;
+}
+
+@keyframes bankruptcyPulse {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(255, 0, 0, 0.5), 0 0 40px rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(255, 0, 0, 0.8), 0 0 60px rgba(255, 0, 0, 0.5);
+  }
+}
+
+.bankruptcy-warning-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.bankruptcy-icon {
+  font-size: 40px;
+  animation: shake 0.5s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px) rotate(-5deg); }
+  75% { transform: translateX(5px) rotate(5deg); }
+}
+
+.bankruptcy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.bankruptcy-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  letter-spacing: 1px;
+}
+
+.bankruptcy-message {
+  font-size: 13px;
+  color: #ffcccc;
+}
+
+.bankruptcy-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.countdown-label {
+  font-size: 11px;
+  color: #ffaaaa;
+  text-transform: uppercase;
+}
+
+.countdown-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 10px #ff0000;
+}
+
+.bankruptcy-progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bankruptcy-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4444, #ffaa00);
+  border-radius: 4px;
+  transition: width 1s linear;
+}
+
+/* Money Warning States */
+.money-warning-low {
+  animation: moneyWarningLow 2s ease-in-out infinite;
+}
+
+.money-warning-debt {
+  animation: moneyWarningDebt 1.5s ease-in-out infinite;
+}
+
+.money-warning-critical {
+  animation: moneyWarningCritical 0.5s ease-in-out infinite;
+  background: rgba(255, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+@keyframes moneyWarningLow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes moneyWarningDebt {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes moneyWarningCritical {
+  0%, 100% { opacity: 1; background: rgba(255, 0, 0, 0.2); }
+  50% { opacity: 0.8; background: rgba(255, 0, 0, 0.4); }
+}
+
 /* Tooltips */
 .hud-item[title]:hover {
   cursor: help;
   opacity: 0.9;
+}
+
+/* Tier Info Section */
+.hud-tier-section {
+  min-width: 180px;
+}
+
+.hud-tier-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-tier-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(147, 112, 219, 0.3), rgba(74, 158, 255, 0.3));
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(147, 112, 219, 0.5);
+}
+
+.tier-icon {
+  font-size: 18px;
+}
+
+.tier-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #d8b4fe;
+}
+
+.hud-tier-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.progress-label {
+  font-size: 14px;
+}
+
+.progress-text {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+/* Capacity Warning States */
+.hud-item.capacity-warning .hud-value {
+  color: #facc15 !important;
+}
+
+.hud-item.capacity-full .hud-value {
+  color: #f87171 !important;
+  animation: capacityPulse 1s ease-in-out infinite;
+}
+
+.capacity-indicator {
+  animation: shake 0.5s ease-in-out infinite;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+@keyframes capacityPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ============================================================================
+   Money Change Pulse Effects
+   ============================================================================ */
+
+/* Money item container - enables proper pulse effect */
+.hud-money-item {
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Income pulse - green glow */
+.hud-money-item.money-pulse-income {
+  animation: hudMoneyPulseIncome 0.5s ease-out;
+}
+
+.hud-money-item.money-pulse-income-large {
+  animation: hudMoneyPulseIncomeLarge 0.6s ease-out;
+}
+
+/* Expense pulse - red glow */
+.hud-money-item.money-pulse-expense {
+  animation: hudMoneyPulseExpense 0.5s ease-out;
+}
+
+.hud-money-item.money-pulse-expense-large {
+  animation: hudMoneyPulseExpenseLarge 0.6s ease-out;
+}
+
+@keyframes hudMoneyPulseIncome {
+  0% {
+    background: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background: rgba(34, 197, 94, 0.25);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes hudMoneyPulseIncomeLarge {
+  0% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+  30% {
+    background: rgba(34, 197, 94, 0.35);
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.7);
+    transform: scale(1.05);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+@keyframes hudMoneyPulseExpense {
+  0% {
+    background: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background: rgba(239, 68, 68, 0.25);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@keyframes hudMoneyPulseExpenseLarge {
+  0% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+  30% {
+    background: rgba(239, 68, 68, 0.35);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.7);
+    transform: scale(1.05);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+/* Enhanced warning states with shake for critical */
+.hud-money-item.money-warning-critical {
+  animation: moneyWarningCritical 0.5s ease-in-out infinite, moneyShake 0.4s ease-in-out infinite;
+}
+
+@keyframes moneyShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+/* Warning Button Styles */
+.hud-warning-button {
+  position: relative;
+  background: linear-gradient(135deg, #444 0%, #333 100%);
+  border: 2px solid #666;
+  transition: all 0.2s ease;
+}
+
+.hud-warning-button.info {
+  background: linear-gradient(135deg, #4488ff 0%, #3366cc 100%);
+  border-color: #4488ff;
+}
+
+.hud-warning-button.warning {
+  background: linear-gradient(135deg, #ffaa00 0%, #cc8800 100%);
+  border-color: #ffaa00;
+  animation: warningPulse 2s ease-in-out infinite;
+}
+
+.hud-warning-button.critical {
+  background: linear-gradient(135deg, #ff4444 0%, #cc3333 100%);
+  border-color: #ff4444;
+  animation: criticalPulse 0.5s ease-in-out infinite;
+}
+
+.warning-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ff4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hud-warning-button.info .warning-count-badge {
+  background: #4488ff;
+}
+
+.hud-warning-button.warning .warning-count-badge {
+  background: #ffaa00;
+  color: #333;
+}
+
+@keyframes warningPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 170, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px rgba(255, 170, 0, 0.6);
+  }
+}
+
+@keyframes criticalPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(255, 68, 68, 0.8);
+  }
 }
 
 @media (max-width: 768px) {
@@ -157,5 +539,9 @@
   
   .hud-value {
     font-size: 16px;
+  }
+  
+  .hud-tier-section {
+    min-width: auto;
   }
 }

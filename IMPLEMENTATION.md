@@ -1,193 +1,544 @@
-# Phase 1 Implementation Summary
+# Phase 8 Implementation Summary
 
-## What Was Implemented
+## Production-Ready Tycoon Game
 
-### 1. Project Foundation ✅
-- Initialized React + TypeScript project with Vite
-- Configured TypeScript with strict mode
-- Set up proper project structure following the architecture plan
+This document details all features implemented across 8 development phases, culminating in a fully playable shelter management tycoon game.
 
-### 2. Core Type Definitions ✅
-Created comprehensive TypeScript interfaces in [`src/types/index.ts`](src/types/index.ts):
-- `GameState` - Central state structure
-- `Resident` - Resident data model with profiles (young_adult, veteran, elderly)
-- `Room` - Room/building data model
-- `Grid` & `Tile` - Grid system structures
-- All necessary enums (RoomType, ResidentState, Need, etc.)
+---
 
-### 3. Constants Configuration ✅
-Implemented game constants in [`src/constants/index.ts`](src/constants/index.ts):
-- Grid configuration (40×30 total, 20×20 starter area)
-- Room specifications with costs and sizes
-- Resident profile specifications
-- Visual configuration and colors
-- Name generation lists
+## Table of Contents
 
-### 4. Grid System ✅
-Implemented in [`src/game/systems/GridSystem.ts`](src/game/systems/GridSystem.ts):
-- Grid initialization with unlocked starter area
-- Room placement validation
-- Room placement with cost deduction
-- Tile walkability checks
-- Entrance tile detection
+1. [Core Systems](#core-systems)
+2. [Economic Systems](#economic-systems)
+3. [Progression Systems](#progression-systems)
+4. [Visual & UI Systems](#visual--ui-systems)
+5. [Game Balance](#game-balance)
+6. [File Structure](#file-structure)
+7. [How to Run](#how-to-run)
 
-### 5. Resident System ✅
-Implemented in [`src/game/systems/ResidentSystem.ts`](src/game/systems/ResidentSystem.ts):
-- Resident creation with random names and attributes
-- Test resident generation (3 residents with different profiles)
-- Profile specification access
+---
 
-### 6. Game State Manager ✅
-Implemented in [`src/game/systems/GameStateManager.ts`](src/game/systems/GameStateManager.ts):
-- Centralized state management
-- Observable pattern with listeners
-- State mutation methods
-- Initial game state creation
+## Core Systems
 
-### 7. Phaser Integration ✅
-Implemented in [`src/game/`](src/game/):
-- **MainScene** ([`src/game/scenes/MainScene.ts`](src/game/scenes/MainScene.ts)):
-  - Grid rendering with tile colors
-  - Room rendering with distinct colors per type
-  - Resident rendering as colored circles
-  - Camera controls (drag to pan)
-- **PhaserGame** ([`src/game/PhaserGame.ts`](src/game/PhaserGame.ts)):
-  - Game instance creation and configuration
-  - Scene initialization with state manager
+### 1. Grid & Building System ✅
+**Location**: [`src/game/systems/GridSystem.ts`](src/game/systems/GridSystem.ts)
 
-### 8. React UI Components ✅
-- **HUD** ([`src/components/HUD.tsx`](src/components/HUD.tsx)):
-  - Displays money, reputation, residents, graduated count
-  - Shows current day and phase (day/night)
-  - Shows room count
-- **BuildMenu** ([`src/components/BuildMenu.tsx`](src/components/BuildMenu.tsx)):
-  - Lists available rooms with costs
-  - Shows which rooms are affordable
-  - Handles room placement requests
+- **Dynamic Grid**: 40×30 total tiles, starting with 10×10 unlocked area
+- **Room Types**: 8 different facilities
+  - Dormitory (3×3) - $300 - Sleeping quarters
+  - Cafeteria (5×3) - $500 - Food service
+  - Bathroom (2×2) - $200 - Hygiene facilities
+  - Common Room (3×3) - $350 - Social space
+  - Learning Center (4×3) - $450 - Education
+  - Vocational Room (4×3) - $550 - Job training
+  - Admin Office (2×2) - $700 - Management
+  - Fundraiser Station (3×2) - $400 - Events
+- **Room Placement Validation**: Boundary checks, overlap detection
+- **Grid Expansion**: Unlocks with tier progression
 
-### 9. Main App ✅
-Implemented in [`src/App.tsx`](src/App.tsx):
-- Integrates Phaser game with React
-- Manages game state updates
-- Handles room placement
-- Provides user interface overlay
+### 2. Resident System ✅
+**Locations**: 
+- [`src/game/systems/ResidentSystem.ts`](src/game/systems/ResidentSystem.ts)
+- [`src/game/systems/ResidentAISystem.ts`](src/game/systems/ResidentAISystem.ts)
 
-## File Structure Created
+- **Three Profiles**:
+  - Young Adult (40%) - Fast LIFE progression, higher need decay
+  - Veteran (40%) - Balanced stats, +2 reputation on graduation
+  - Elderly (20%) - Slower progression, highest need decay
+- **Five Core Needs**: Hunger, Sleep, Hygiene, Happiness, Health
+- **AI Behavior**: Need-based pathfinding, activity scheduling
+- **Spawning**: Reputation-based (40%+ required), profile-weighted
+
+### 3. Resident Departure System ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `DEPARTURE_CONFIG`
+
+- **Unhappy Threshold**: Happiness below 20% triggers at-risk status
+- **Warning Period**: 12 minutes (1 game day) at low happiness
+- **Departure Timer**: 24 minutes (2 game days) to leave
+- **Reputation Penalties**:
+  - Unhappy departure: -3 reputation
+  - Hopeless departure (extreme unhappiness): -5 reputation
+- **Exit Behavior**: Residents walk to exit or teleport after 30 seconds
+
+### 4. Pathfinding System ✅
+**Location**: [`src/game/systems/PathfindingSystem.ts`](src/game/systems/PathfindingSystem.ts)
+
+- **A* Algorithm**: Manhattan distance heuristic
+- **Path Caching**: 100 cached paths for performance
+- **Movement Speed**: 2 tiles/second
+- **Collision Avoidance**: Tile walkability checks
+
+### 5. Day/Night Cycle ✅
+**Location**: [`src/game/systems/DayNightSystem.ts`](src/game/systems/DayNightSystem.ts)
+
+- **Full Day Cycle**: 6 minutes real-time (was 12 minutes)
+- **Day Phase**: 4 minutes
+- **Night Phase**: 2 minutes
+- **Visual Effects**: Ambient lighting changes, color tinting
+- **Activity Restrictions**: Some rooms close at night
+
+---
+
+## Economic Systems
+
+### 6. Donation System ✅
+**Location**: [`src/game/systems/DonationSystem.ts`](src/game/systems/DonationSystem.ts)
+
+- **Donation Interval**: Every 90 seconds (was 5 minutes)
+- **Base Amount**: $25 per resident (was $50)
+- **Reputation Multiplier**: 0.8x to 1.2x variance
+- **Graduate Bonus**: +10% per recent graduate
+- **Tier Multiplier**: 1.0x to 2.0x based on shelter tier
+
+### 7. Food System ✅ (REBALANCED)
+**Location**: [`src/game/systems/FoodSystem.ts`](src/game/systems/FoodSystem.ts)
+
+#### Five Food Portion Tiers:
+
+| Tier | Cost | Happiness | Reputation | LIFE Modifier |
+|------|------|-----------|------------|---------------|
+| Minimal | $5/resident | -10 | -3 | 0.5x |
+| Small | $10/resident | -5 | -1 | 0.8x |
+| Standard | $18/resident | 0 | 0 | 1.0x |
+| Generous | $30/resident | +10 | +2 | 1.2x |
+| Premium | $50/resident | +20 | +5 | 1.5x |
+
+- **Food Generation**: Cafeterias produce 1 food per 15 seconds
+- **Consumption**: Daily per-resident based on portion setting
+
+### 8. Maintenance System ✅ (FASTER)
+**Location**: [`src/game/systems/MaintenanceSystem.ts`](src/game/systems/MaintenanceSystem.ts)
+
+- **Check Interval**: Every 5 minutes (was 15 minutes)
+- **Cost**: Sum of all room maintenance costs
+- **Failure Penalty**: -2 reputation per room if unpaid
+- **Warning Time**: 2 minutes before due
+
+### 9. Daily Operating Costs ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `OPERATING_COSTS_CONFIG`
+
+- **Base Cost**: $100/day
+- **Per Resident**: $5/day per resident
+- **Per Room**: $10/day per room built
+- **Formula**: `Daily Cost = $100 + ($5 × residents) + ($10 × rooms)`
+
+### 10. Random Expense Events ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `EXPENSE_EVENTS_CONFIG`
+
+- **Trigger Chance**: 15% per donation cycle
+- **Cost Range**: $50 - $200
+- **Event Types**:
+  - Plumbing emergency
+  - Electrical issue
+  - Health inspection fine
+  - Emergency repairs
+  - Pest control
+  - HVAC maintenance
+
+### 11. Fundraiser System ✅ (REBALANCED)
+**Location**: [`src/game/systems/FundraiserSystem.ts`](src/game/systems/FundraiserSystem.ts)
+
+#### Success Chance (Based on Average Happiness):
+| Happiness | Success Rate |
+|-----------|--------------|
+| 80%+ | 95% |
+| 60-79% | 80% |
+| 40-59% | 60% |
+| 20-39% | 40% |
+| <20% | 20% |
+
+#### Cooldown & Fatigue:
+- **Cooldown**: 10 minutes between fundraisers
+- **Fatigue Duration**: 5 minutes per resident after participating
+- **Fatigue Penalty**: -5 happiness during fatigue
+- **Minimum Non-Fatigued**: 3 residents required to start
+
+#### Payouts:
+- **Base Range**: $150 - $350 (was $200 - $500)
+- **Duration**: 15 minutes (was 30 minutes)
+- **Effects**:
+  - Success: +5 LIFE, -10 happiness, +2 reputation
+  - Failure: -5 happiness, -2 reputation
+
+### 12. Bankruptcy System ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `BANKRUPTCY_CONFIG`
+
+- **Threshold**: Money below -$500 triggers bankruptcy countdown
+- **Countdown Duration**: 18 minutes (3 game days)
+- **Warning Levels**:
+  - Low funds: Below $200
+  - Debt: Below $0
+  - Critical: Below -$300
+- **Recovery**: Must reach $0+ to cancel countdown
+- **Game Over**: Triggered when countdown expires
+
+---
+
+## Progression Systems
+
+### 13. LIFE Meter System ✅
+**Location**: [`src/game/systems/LIFEMeterSystem.ts`](src/game/systems/LIFEMeterSystem.ts)
+
+- **Four Stages**: Survival (0-25%) → Stability (25-50%) → Growth (50-75%) → Independence (75-100%)
+- **Fill Rates** (per hour):
+  - Young Adult: 20 points
+  - Veteran: 12 points
+  - Elderly: 8 points
+- **Graduation Threshold**: 100%
+- **Graduation Rewards**: +5-10 reputation, $500 donation
+
+### 14. Reputation System ✅
+**Location**: [`src/game/systems/ReputationSystem.ts`](src/game/systems/ReputationSystem.ts)
+
+#### Positive Changes:
+| Event | Reputation |
+|-------|------------|
+| Resident graduated | +5 |
+| Veteran graduated | +7 |
+| Fundraiser completed | +2 |
+| Large food portion | +1 |
+| Disaster accepted | +3 |
+
+#### Negative Changes:
+| Event | Reputation |
+|-------|------------|
+| Resident left unhappy | -3 |
+| Resident left hopeless | -5 |
+| Small food portion | -1 |
+| No food | -5 |
+| Maintenance missed | -2 |
+| Overcrowding | -1 |
+| Disaster rejected | -5 |
+
+### 15. Reputation Decay System ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `REPUTATION_DECAY`
+
+#### Decay Rates (per game day):
+| Reputation Range | Decay Rate |
+|------------------|------------|
+| 90-100% | 3% per day |
+| 70-89% | 2% per day |
+| 50-69% | 1% per day |
+| 30-49% | 0.5% per day |
+| 0-29% | No decay |
+
+#### Decay Mitigation Factors:
+- Per active resident: -10% decay
+- Per recent graduation (7-day window): -20% decay
+- High average happiness (>70%): -30% decay
+- At tier capacity: -20% decay
+
+**Decay Floor**: Cannot decay below 30%
+
+### 16. Shelter Tier System ✅ (NEW)
+**Location**: [`src/game/systems/TierSystem.ts`](src/game/systems/TierSystem.ts)
+
+#### Four Tiers:
+
+| Tier | Name | Max Residents | Grid Size | Donation Multiplier |
+|------|------|---------------|-----------|---------------------|
+| 1 | Starter Shelter | 10 | 10×10 | 1.0x |
+| 2 | Community Hub | 25 | 15×15 | 1.2x |
+| 3 | Opportunity Center | 50 | 20×20 | 1.5x |
+| 4 | Campus | 100 | 25×25 | 2.0x |
+
+#### Upgrade Requirements:
+
+| To Tier | Cost | Reputation | Graduations | Grid Utilization |
+|---------|------|------------|-------------|------------------|
+| 2 | $3,000 | 60% | 5 | 70% |
+| 3 | $8,000 | 60% | 15 | 70% |
+| 4 | $20,000 | 60% | 40 | 70% |
+
+#### Room Unlocks:
+- **Tier 1**: Dormitory, Cafeteria, Bathroom, Common Room
+- **Tier 2**: + Learning Center, Admin Office
+- **Tier 3**: + Vocational Room
+- **Tier 4**: All rooms available
+
+### 17. Adjacency Bonus System ✅ (NEW)
+**Location**: [`src/game/systems/AdjacencySystem.ts`](src/game/systems/AdjacencySystem.ts)
+
+#### 13 Adjacency Rules:
+
+**Positive Synergies:**
+| Combination | Effect |
+|-------------|--------|
+| Bathroom + Dormitory | +5 happiness, -10% maintenance |
+| Common Room + Dormitory | +3 happiness, +5% LIFE fill |
+| Cafeteria + Common Room | +5 happiness |
+| Admin Office + Learning Center | +10% LIFE fill |
+| Learning Center + Vocational Room | +15% LIFE fill |
+| Admin Office + Vocational Room | +8% LIFE fill, -5% maintenance |
+| Common Room + Fundraiser Station | +2 happiness, -5% maintenance |
+| Admin Office + Fundraiser Station | -10% maintenance |
+
+**Negative Synergies (Penalties):**
+| Combination | Effect |
+|-------------|--------|
+| Cafeteria + Dormitory | -5 happiness, +10% maintenance |
+| Dormitory + Fundraiser Station | -3 happiness, +5% maintenance |
+| Bathroom + Cafeteria | -8 happiness, +15% maintenance |
+| Bathroom + Learning Center | -2 happiness, -5% LIFE fill |
+| Bathroom + Vocational Room | -2 happiness, -5% LIFE fill |
+
+### 18. Disaster Event System ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `DISASTER_EVENTS`
+
+#### Six Disaster Types:
+
+| Type | Residents | Urgency | Rep Gain | Rep Loss (Decline) | Donation |
+|------|-----------|---------|----------|-------------------|----------|
+| House Fire | 3 | Immediate | +8 | -5 | $200 |
+| Winter Storm | 5 | 24 hours | +10 | -10 | $350 |
+| Factory Closure | 4 | Week | +5 | 0 | $100 |
+| Domestic Violence | 2 | Immediate | +12 | -3 | $150 |
+| Hospital Discharge | 2 | 24 hours | +6 | -2 | $100 |
+| Mass Eviction | 8 | Immediate | +15 | -15 | $500 |
+
+#### Special Effects:
+- **Winter Storm**: +50% maintenance surge
+- **Factory Closure**: Residents get LIFE boost (1.25x)
+- **Domestic Violence**: Security costs ($30/resident)
+- **Hospital Discharge**: Medical costs ($50)
+
+#### Partial Accept:
+- Available for surges of 4+ residents
+- Accept half the residents for proportional rewards
+
+#### Capacity Overflow:
+- Disasters can exceed tier cap by 50%
+- Overcrowded residents suffer -2 happiness penalty
+
+---
+
+## Visual & UI Systems
+
+### 19. Resident Status Bars ✅ (NEW)
+**Location**: [`src/constants/index.ts`](src/constants/index.ts) - `STATUS_BAR_CONFIG`
+
+- **LIFE Bar** (Blue): Shows progress toward graduation
+  - Gold color at 90%+ (near graduation)
+  - Grey when stalled (no progress for 1 minute)
+- **Happiness Bar** (Dynamic color):
+  - Green: 70-100%
+  - Yellow: 40-69%
+  - Orange: 20-39%
+  - Red: 0-19% (pulses when critical)
+- **Status Emoji**: 😊 😐 😟 😰 💤 🍽️ 📚 🚶 🏃
+- **Toggle**: Press `B` to show/hide
+
+### 20. Money Animations ✅ (NEW)
+**Location**: [`src/components/MoneyAnimations.tsx`](src/components/MoneyAnimations.tsx)
+
+- **Floating Text**: Shows +/- amounts above HUD
+- **Pulse Effect**: Money display pulses on change
+- **Color Coding**: Green for gains, red for losses
+
+### 21. Warning System ✅ (NEW)
+**Location**: [`src/game/systems/WarningSystem.ts`](src/game/systems/WarningSystem.ts)
+
+#### 16 Warning Types:
+
+**Financial:**
+- `low_funds` - Below $500
+- `in_debt` - Below $0
+- `near_bankruptcy` - Below -$300
+- `maintenance_due` - Due in 2 minutes
+- `operating_costs_due` - Day ending soon
+
+**Resident:**
+- `unhappy_resident` - Happiness < 30% for > 1 minute
+- `at_risk_resident` - About to leave
+- `overcrowded` - Over tier capacity
+- `hungry_residents` - Low food supply
+
+**Operational:**
+- `low_reputation` - Below 40%
+- `reputation_dropping` - 3+ drops in 2 minutes
+- `maintenance_overdue` - Past maintenance window
+- `capacity_warning` - At 90% capacity
+
+**Progression:**
+- `ready_to_upgrade` - All requirements met
+- `stalled_progress` - No graduations in 5+ minutes
+- `life_meters_stalled` - LIFE not progressing
+
+#### Warning Severity:
+- **Info** (blue): Informational alerts
+- **Warning** (yellow): Needs attention
+- **Critical** (red): Immediate action required
+
+#### Escalation:
+- Warnings escalate severity after 3 minutes if unresolved
+- Critical warnings have shorter cooldowns (30 seconds vs 5 minutes)
+
+### 22. Economic Dashboard ✅ (NEW)
+**Location**: [`src/components/EconomicDashboard.tsx`](src/components/EconomicDashboard.tsx)
+
+- **Income Breakdown**: Donations, tier multiplier, fundraisers
+- **Expense Breakdown**: Food, maintenance, operating, random
+- **Financial Projections**: 3-day forecast, bankruptcy countdown
+- **Efficiency Metrics**: Cost/resident, revenue/resident, efficiency score
+- **Alerts**: Dynamic warnings based on financial state
+- **Health Status**: Healthy / Stable / Warning / Critical
+
+---
+
+## Game Balance
+
+### Timing Changes (Phase 8)
+
+| Parameter | Old Value | New Value |
+|-----------|-----------|-----------|
+| Day Cycle | 12 minutes | 6 minutes |
+| Donation Interval | 5 minutes | 90 seconds |
+| Maintenance Interval | 15 minutes | 5 minutes |
+| Event Interval | 30-60 minutes | 1-3 minutes |
+
+### Economic Changes (Phase 8)
+
+| Parameter | Old Value | New Value |
+|-----------|-----------|-----------|
+| Starting Money | $5,000 | $2,000 |
+| Starting Reputation | 50% | 40% |
+| Base Donation | $50/resident | $25/resident |
+| Standard Food Cost | $10/resident | $18/resident |
+| Fundraiser Payout | $200-$500 | $150-$350 |
+
+---
+
+## File Structure
 
 ```
 open-arms/
 ├── src/
 │   ├── components/
-│   │   ├── HUD.tsx
-│   │   ├── HUD.css
-│   │   ├── BuildMenu.tsx
-│   │   └── BuildMenu.css
+│   │   ├── BuildMenu.tsx           # Room building interface
+│   │   ├── DevModeMenu.tsx         # Developer testing tools
+│   │   ├── DisasterModal.tsx       # Disaster event UI
+│   │   ├── EconomicDashboard.tsx   # Financial overview ✨
+│   │   ├── EventModal.tsx          # Random event handling
+│   │   ├── GameOverModal.tsx       # Bankruptcy/game over
+│   │   ├── HUD.tsx                 # Main status display
+│   │   ├── ManagementPanel.tsx     # Detailed management
+│   │   ├── MoneyAnimations.tsx     # Floating money text ✨
+│   │   ├── NotificationToast.tsx   # Toast notifications
+│   │   ├── PerformanceMonitor.tsx  # FPS/memory tracking
+│   │   ├── SettingsModal.tsx       # Game settings
+│   │   ├── TutorialModal.tsx       # Tutorial system
+│   │   └── WarningPanel.tsx        # Warning display ✨
+│   │
 │   ├── game/
+│   │   ├── PhaserGame.ts           # Phaser initialization
 │   │   ├── scenes/
-│   │   │   └── MainScene.ts
-│   │   ├── systems/
-│   │   │   ├── GridSystem.ts
-│   │   │   ├── ResidentSystem.ts
-│   │   │   └── GameStateManager.ts
-│   │   └── PhaserGame.ts
+│   │   │   └── MainScene.ts        # Main game scene
+│   │   └── systems/
+│   │       ├── AdjacencySystem.ts      # Room bonuses ✨
+│   │       ├── AudioSystem.ts          # Sound management
+│   │       ├── CollisionDetectionSystem.ts
+│   │       ├── DayNightSystem.ts       # Time management
+│   │       ├── DonationSystem.ts       # Income
+│   │       ├── EventSystem.ts          # Random events
+│   │       ├── FoodSystem.ts           # Food management
+│   │       ├── FundraiserSystem.ts     # Fundraiser events
+│   │       ├── GameStateManager.ts     # Central state
+│   │       ├── GridSystem.ts           # Grid & building
+│   │       ├── LIFEMeterSystem.ts      # Progression
+│   │       ├── MaintenanceSystem.ts    # Facility upkeep
+│   │       ├── PathfindingSystem.ts    # A* movement
+│   │       ├── ReputationSystem.ts     # Reputation tracking
+│   │       ├── ResidentAISystem.ts     # Resident behavior
+│   │       ├── ResidentSpawningSystem.ts
+│   │       ├── ResidentSystem.ts       # Resident management
+│   │       ├── SaveLoadSystem.ts       # Persistence
+│   │       ├── TierSystem.ts           # Shelter tiers ✨
+│   │       ├── TimerManager.ts         # Timer coordination
+│   │       └── WarningSystem.ts        # Warning generation ✨
+│   │
 │   ├── types/
-│   │   └── index.ts
+│   │   └── index.ts                # TypeScript definitions
 │   ├── constants/
-│   │   └── index.ts
+│   │   └── index.ts                # Game configuration
 │   ├── utils/
-│   │   └── helpers.ts
-│   ├── App.tsx
-│   ├── App.css
-│   ├── main.tsx
-│   └── index.css
-├── plans/ (existing)
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-├── tsconfig.node.json
-├── package.json
-├── .gitignore
-└── README.md
+│   │   ├── helpers.ts              # Utility functions
+│   │   └── stressTest.ts           # Performance testing
+│   ├── App.tsx                     # Main React app
+│   └── main.tsx                    # Entry point
+│
+├── plans/                          # Design documents (21 files)
+├── public/assets/                  # Game assets
+└── Documentation files...
 ```
+
+✨ = New in Phase 8
+
+---
 
 ## How to Run
 
-1. **Install dependencies** (if not already done):
-   ```bash
-   npm install
-   ```
+### Development
+```bash
+npm install
+npm run dev
+# Open http://localhost:3000
+```
 
-2. **Start development server**:
-   ```bash
-   npm run dev
-   ```
+### Production Build
+```bash
+npm run build
+npm run preview
+```
 
-3. **Open browser** to `http://localhost:3000`
+### Dev Mode Features
+- Press `D` to toggle dev menu
+- Fast timers for testing
+- Instant money/reputation controls
+- Spawn/remove residents
+- Skip to specific game days
 
-## Current Features
+---
 
-### What You Can See:
-- ✅ 20×20 tile grid with entrance tile highlighted
-- ✅ 3 test residents (young adult, veteran, elderly) rendered as colored circles
-- ✅ HUD showing game stats at the top
-- ✅ Build menu button in bottom-right corner
-- ✅ Info panel in bottom-left corner
+## Current Game Features Summary
 
 ### What You Can Do:
-- ✅ View the grid and residents
-- ✅ Drag the camera to pan around
-- ✅ Open the build menu
-- ✅ Place rooms (currently at default position 5,5)
-- ✅ See money deducted when placing rooms
-- ✅ See rooms rendered on the grid with distinct colors
+- ✅ Build and manage 8 room types
+- ✅ Care for residents with 3 different profiles
+- ✅ Progress residents through 4 LIFE stages
+- ✅ Graduate residents for rewards
+- ✅ Manage finances (donations, food, maintenance)
+- ✅ Run fundraisers with success/failure mechanics
+- ✅ Handle 6 types of disaster events
+- ✅ Upgrade through 4 shelter tiers
+- ✅ Optimize room placement with 13 adjacency rules
+- ✅ Monitor 16 types of warnings
+- ✅ View detailed economic projections
+- ✅ Experience day/night cycles
+- ✅ Save and load game progress
 
-## Room Types Available
+### Win Condition:
+There is no "win" - goal is to help as many residents as possible while maintaining a sustainable shelter. Track your success through:
+- Total graduations
+- Highest reputation achieved
+- Days survived
+- Maximum residents helped
 
-1. **Dormitory** (3×3) - $500 - Brown color
-2. **Cafeteria** (5×3) - $800 - Orange color
-3. **Bathroom** (2×2) - $300 - Light blue color
-4. **Common Room** (3×3) - $600 - Green color
-5. **Learning Center** (4×3) - $1000 - Blue color
+### Lose Condition:
+Bankruptcy (money below -$500 for 18 minutes) triggers game over.
 
-## Resident Profiles
+---
 
-- **Young Adult** 🧑 - Green circle
-- **Veteran** 🎖️ - Red circle
-- **Elderly** 👴 - Yellow circle
+## Next Steps (Post-Launch)
 
-## What's NOT Implemented (Phase 2+)
+Potential future features:
+- Additional room types (Medical Center, Counseling)
+- More resident personality types
+- Seasonal events
+- Achievement system
+- Leaderboards
+- Mobile app version
 
-As per scope limitation:
-- ❌ Pathfinding and AI behavior
-- ❌ Game loop timers
-- ❌ Day/night cycle transitions
-- ❌ Economy systems (donations, food, maintenance)
-- ❌ Resident needs and happiness updates
-- ❌ LIFE meter progression
-- ❌ Events and fundraisers
-- ❌ Save/load system
-- ❌ Click-to-place room functionality (uses default position)
+---
 
-## Technical Decisions
-
-1. **Centralized State Management**: Used GameStateManager with observer pattern for React-Phaser communication
-2. **Type Safety**: Strict TypeScript throughout with comprehensive interfaces
-3. **Modular Architecture**: Separated concerns into systems, scenes, and components
-4. **Grid-Based Rendering**: 32px tiles for clear visual representation
-5. **Simple Graphics**: Used Phaser graphics primitives (no sprites needed for MVP)
-
-## Known Limitations
-
-1. Room placement currently uses a default position (5,5) - click-to-place will be added in Phase 2
-2. TypeScript may show import errors in IDE until first build completes
-3. Residents are static (no movement) - pathfinding comes in Phase 2
-4. No time progression - timer system comes in Phase 2
-
-## Next Steps (Phase 2)
-
-1. Implement pathfinding system (A* algorithm)
-2. Add resident AI state machine
-3. Implement day/night cycle with timer
-4. Add click-to-place room functionality
-5. Implement basic economy (donations)
-6. Add resident movement along paths
+**Version**: 0.9.0 (Production Release Candidate)  
+**Last Updated**: 2026-05-07

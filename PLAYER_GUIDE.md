@@ -7,15 +7,20 @@ Welcome to Open Arms! This comprehensive guide will help you master the art of s
 1. [Getting Started](#getting-started)
 2. [Game Basics](#game-basics)
 3. [Room Types & Facilities](#room-types--facilities)
-4. [Resident System](#resident-system)
-5. [LIFE Meter Progression](#life-meter-progression)
-6. [Economic Management](#economic-management)
-7. [Day/Night Cycle](#daynight-cycle)
-8. [Events & Challenges](#events--challenges)
-9. [Reputation System](#reputation-system)
-10. [Tips & Strategies](#tips--strategies)
-11. [Keyboard Shortcuts](#keyboard-shortcuts)
-12. [FAQ](#faq)
+4. [Room Placement Strategy](#room-placement-strategy)
+5. [Resident System](#resident-system)
+6. [LIFE Meter Progression](#life-meter-progression)
+7. [Food System & Portions](#food-system--portions)
+8. [Economic Management](#economic-management)
+9. [Fundraiser System](#fundraiser-system)
+10. [Tier Progression](#tier-progression)
+11. [Disaster Events](#disaster-events)
+12. [Day/Night Cycle](#daynight-cycle)
+13. [Warning System](#warning-system)
+14. [Reputation System](#reputation-system)
+15. [Tips & Strategies](#tips--strategies)
+16. [Keyboard Shortcuts](#keyboard-shortcuts)
+17. [FAQ](#faq)
 
 ---
 
@@ -24,28 +29,29 @@ Welcome to Open Arms! This comprehensive guide will help you master the art of s
 ### Your First Day
 
 When you start a new game, you'll have:
-- **$5,000** starting budget
-- **50 reputation** points
+- **$2,000** starting budget
+- **40% reputation**
 - **3 initial residents**
-- **20×20 tile grid** for building
-- **30 days of food** in storage
+- **10×10 tile grid** for building (Tier 1)
+- **Basic room access** (Dormitory, Cafeteria, Bathroom, Common Room)
 
 ### Initial Setup Strategy
 
-1. **Build Core Facilities First**
-   - Place 1-2 Dormitories (residents need sleep!)
-   - Add 1 Cafeteria (everyone needs to eat)
-   - Include 1-2 Bathrooms (hygiene is important)
+1. **Build Essential Facilities First**
+   - Place 1 Dormitory ($300) for sleeping
+   - Add 1 Cafeteria ($500) for meals
+   - Include 1 Bathroom ($200) for hygiene
+   - Place them adjacent for bonuses!
 
 2. **Monitor Your Resources**
-   - Keep an eye on your money
-   - Watch food supply levels
-   - Check resident satisfaction
+   - Watch your money carefully (game is faster-paced now)
+   - Keep an eye on resident happiness
+   - Check the warning panel for issues
 
-3. **Complete the Tutorial**
-   - Follow the in-game tutorial prompts
-   - Learn the basic controls
-   - Understand the HUD elements
+3. **Understand the Pace**
+   - Full day cycle: 6 minutes
+   - Donations arrive every 90 seconds
+   - Maintenance due every 5 minutes
 
 ---
 
@@ -55,13 +61,13 @@ When you start a new game, you'll have:
 
 Located at the top of the screen:
 
-- **💰 Money**: Your current budget
-- **⭐ Reputation**: Community trust level (0-100)
-- **👥 Residents**: Current/Maximum capacity
+- **💰 Money**: Your current budget (goes negative = bankruptcy danger!)
+- **⭐ Reputation**: Community trust level (0-100%)
+- **👥 Residents**: Current/Maximum capacity for your tier
 - **📅 Day**: Current day number
-- **🌅 Phase**: Time of day (Morning/Afternoon/Evening/Night)
-- **🍽️ Food**: Days of food remaining
-- **⏸️ Pause**: Pause/Resume game
+- **🌅 Phase**: Time of day (Day/Night)
+- **🍽️ Food**: Current food supply level
+- **📊 Dashboard**: Click for detailed economic breakdown
 
 ### Camera Controls
 
@@ -73,15 +79,14 @@ Located at the top of the screen:
 
 1. Click the **Build** button in the HUD
 2. Select a room type from the menu
-3. Click on the grid to place (must be on empty tiles)
-4. Confirm placement (costs money immediately)
+3. **Check the adjacency preview** - green = bonus, red = penalty
+4. Click on the grid to place
 5. Room becomes functional instantly
 
-### Time Management
+### Time & Speed
 
-- Game progresses through 4 phases per day
-- Each phase lasts 30 seconds (real-time)
-- Use the **Speed Controls** to adjust pace:
+- Game progresses automatically
+- Use **Speed Controls** to adjust pace:
   - ⏸️ Pause
   - ▶️ Normal (1x)
   - ⏩ Fast (2x)
@@ -92,77 +97,116 @@ Located at the top of the screen:
 ## 🏗️ Room Types & Facilities
 
 ### Dormitory
-**Size**: 3×3 tiles | **Cost**: $500 | **Capacity**: 4 residents
+**Size**: 3×3 tiles | **Cost**: $300 | **Capacity**: 4 residents | **Maintenance**: $25/cycle
 
-**Purpose**: Sleeping quarters where residents rest and recover energy.
+**Purpose**: Sleeping quarters where residents rest.
 
-**Key Features**:
-- Residents sleep during Night phase
-- Restores energy and reduces stress
-- Required for resident intake
-- Low maintenance cost
-
-**Optimal Placement**: Near bathrooms and common areas
+**Good Adjacent To**: Bathroom (+5 happiness), Common Room (+3 happiness)  
+**Bad Adjacent To**: Cafeteria (-5 happiness), Fundraiser Station (-3 happiness)
 
 ---
 
 ### Cafeteria
-**Size**: 5×3 tiles | **Cost**: $800 | **Capacity**: 8 residents
+**Size**: 5×3 tiles | **Cost**: $500 | **Capacity**: 10 residents | **Maintenance**: $50/cycle
 
-**Purpose**: Dining area where residents eat meals.
+**Purpose**: Dining area where residents eat meals. Also generates food over time.
 
-**Key Features**:
-- Serves meals during Morning, Afternoon, and Evening
-- Consumes food from storage
-- Social gathering space
-- Moderate maintenance cost
-
-**Optimal Placement**: Central location, accessible from all areas
+**Good Adjacent To**: Common Room (+5 happiness)  
+**Bad Adjacent To**: Dormitory (-5 happiness), Bathroom (-8 happiness)
 
 ---
 
 ### Bathroom
-**Size**: 2×2 tiles | **Cost**: $300 | **Capacity**: 2 residents
+**Size**: 2×2 tiles | **Cost**: $200 | **Capacity**: N/A | **Maintenance**: $20/cycle
 
-**Purpose**: Hygiene facilities for washing and sanitation.
+**Purpose**: Hygiene facilities for residents.
 
-**Key Features**:
-- Used throughout the day
-- Improves resident hygiene
-- Prevents health issues
-- Low maintenance cost
-
-**Optimal Placement**: Near dormitories, multiple locations recommended
+**Good Adjacent To**: Dormitory (+5 happiness, -10% maintenance)  
+**Bad Adjacent To**: Cafeteria (-8 happiness), Learning Center (-5% LIFE fill)
 
 ---
 
 ### Common Room
-**Size**: 3×3 tiles | **Cost**: $600 | **Capacity**: 6 residents
+**Size**: 3×3 tiles | **Cost**: $350 | **Capacity**: N/A | **Maintenance**: $30/cycle
 
-**Purpose**: Social and recreational space for relaxation and community building.
+**Purpose**: Social and recreational space for relaxation.
 
-**Key Features**:
-- Reduces stress and loneliness
-- Builds social connections
-- Improves overall happiness
-- Low maintenance cost
-
-**Optimal Placement**: Central area, away from dormitories
+**Good Adjacent To**: Dormitory (+3 happiness, +5% LIFE), Cafeteria (+5 happiness), Fundraiser Station (+2 happiness)
 
 ---
 
-### Learning Center
-**Size**: 4×3 tiles | **Cost**: $1,000 | **Capacity**: 6 residents
+### Learning Center (Unlocks at Tier 2)
+**Size**: 4×3 tiles | **Cost**: $450 | **Capacity**: 6 residents | **Maintenance**: $40/cycle
 
-**Purpose**: Education and skill development facility.
+**Purpose**: Education and skill development facility. Accelerates LIFE meter!
 
-**Key Features**:
-- Accelerates LIFE meter progression
-- Teaches job skills
-- Improves resident confidence
-- Moderate maintenance cost
+**Good Adjacent To**: Admin Office (+10% LIFE fill), Vocational Room (+15% LIFE fill)  
+**Bad Adjacent To**: Bathroom (-2 happiness, -5% LIFE fill)
 
-**Optimal Placement**: Quiet area, accessible but not central
+---
+
+### Vocational Room (Unlocks at Tier 3)
+**Size**: 4×3 tiles | **Cost**: $550 | **Capacity**: 6 residents | **Maintenance**: $45/cycle
+
+**Purpose**: Job training and career preparation.
+
+**Good Adjacent To**: Learning Center (+15% LIFE fill), Admin Office (+8% LIFE fill)  
+**Bad Adjacent To**: Bathroom (-2 happiness, -5% LIFE fill)
+
+---
+
+### Admin Office (Unlocks at Tier 2)
+**Size**: 2×2 tiles | **Cost**: $700 | **Capacity**: N/A | **Maintenance**: $60/cycle
+
+**Purpose**: Management and coordination. Boosts efficiency of adjacent rooms.
+
+**Good Adjacent To**: Learning Center (+10% LIFE), Vocational Room (+8% LIFE), Fundraiser Station (-10% maintenance)
+
+---
+
+### Fundraiser Station (Unlocks at Tier 1)
+**Size**: 3×2 tiles | **Cost**: $400 | **Capacity**: 4 residents | **Maintenance**: $35/cycle
+
+**Purpose**: Location for running fundraiser events.
+
+**Good Adjacent To**: Common Room (+2 happiness), Admin Office (-10% maintenance)  
+**Bad Adjacent To**: Dormitory (-3 happiness)
+
+---
+
+## 📐 Room Placement Strategy
+
+### Adjacency Bonus System
+
+Rooms that share an edge (not diagonal) can give each other bonuses or penalties. Plan your layout carefully!
+
+### Optimal Layout Tips
+
+1. **Create a "Quiet Zone"**
+   - Group Dormitories together
+   - Place Bathrooms adjacent to Dormitories
+   - Keep Cafeteria and Fundraiser Station away
+
+2. **Create an "Education Zone"**
+   - Place Learning Center next to Vocational Room (+15% LIFE!)
+   - Add Admin Office for extra efficiency
+   - Keep Bathrooms far away
+
+3. **Create a "Social Zone"**
+   - Common Room adjacent to Cafeteria (+5 happiness)
+   - Fundraiser Station nearby for events
+   - This keeps activity noise away from sleeping areas
+
+### Example Layout (Tier 1)
+```
+[BATH][DORM DORM DORM]
+[BATH][DORM DORM DORM]
+      [DORM DORM DORM]
+      
+[CAFE CAFE CAFE CAFE CAFE][COMMON COMMON COMMON]
+[CAFE CAFE CAFE CAFE CAFE][COMMON COMMON COMMON]
+[CAFE CAFE CAFE CAFE CAFE][COMMON COMMON COMMON]
+```
 
 ---
 
@@ -170,52 +214,57 @@ Located at the top of the screen:
 
 ### Resident Profiles
 
-Each resident has unique characteristics:
+Each resident has one of three profiles:
 
-#### Personality Types
-1. **Optimistic** - Adapts quickly, higher happiness baseline
-2. **Cautious** - Slower to trust, but loyal once comfortable
-3. **Social** - Thrives on interaction, needs common rooms
-4. **Independent** - Self-sufficient, progresses faster
-5. **Struggling** - Needs extra support, slower progression
+#### 🧑 Young Adult (40% spawn rate)
+- **LIFE Fill**: 20 points/hour (fastest)
+- **Need Decay**: 12 points/day (moderate)
+- **Fundraiser Efficiency**: 1.2x
+- **Best For**: Quick graduations
 
-#### Basic Needs
+#### 🎖️ Veteran (40% spawn rate)
+- **LIFE Fill**: 12 points/hour (moderate)
+- **Need Decay**: 7 points/day (slowest)
+- **Graduation Bonus**: +2 reputation
+- **Best For**: Steady progression, reputation building
+
+#### 👴 Elderly (20% spawn rate)
+- **LIFE Fill**: 8 points/hour (slowest)
+- **Need Decay**: 20 points/day (fastest)
+- **Special**: Requires more care
+- **Best For**: When you have resources to spare
+
+### Resident Needs
 
 Residents have 5 core needs (0-100 scale):
 
-1. **🛏️ Sleep** (Energy)
-   - Depletes throughout the day
-   - Restored in Dormitories during Night phase
-   - Low energy = reduced activity
+1. **🛏️ Sleep** - Restored in Dormitories at night
+2. **🍽️ Hunger** - Satisfied in Cafeteria
+3. **🚿 Hygiene** - Improved in Bathrooms
+4. **😊 Happiness** - Affected by all factors
+5. **🏥 Health** - Deteriorates if needs unmet
 
-2. **🍽️ Hunger** (Food)
-   - Increases over time
-   - Satisfied in Cafeteria during meal times
-   - Extreme hunger = health issues
+### Resident Status Bars
 
-3. **🚿 Hygiene**
-   - Decreases daily
-   - Improved in Bathrooms
-   - Poor hygiene = health and social problems
+Press **B** to toggle status bars above residents:
 
-4. **😊 Happiness**
-   - Affected by all factors
-   - Improved by meeting needs and social interaction
-   - Low happiness = risk of leaving
+- **Blue Bar**: LIFE meter progress
+  - Turns gold when near graduation (90%+)
+  - Turns grey if stalled
+- **Color Bar**: Happiness level
+  - 🟢 Green (70-100%) - Happy
+  - 🟡 Yellow (40-69%) - Neutral
+  - 🟠 Orange (20-39%) - Unhappy
+  - 🔴 Red (0-19%) - At risk (pulses!)
 
-5. **🏥 Health**
-   - Affected by other needs
-   - Deteriorates if needs unmet
-   - Critical health = emergency situations
+### Departure Warning
 
-### Resident Behavior
+If happiness stays below 20% for too long:
+1. **Warning Phase** (12 minutes): Resident becomes "at-risk"
+2. **Departure Phase** (24 minutes): Resident leaves
+3. **Reputation Loss**: -3 to -5 depending on severity
 
-Residents autonomously:
-- Navigate to facilities when needs arise
-- Follow daily schedules based on time of day
-- Interact with other residents
-- Progress through LIFE stages
-- Provide feedback through satisfaction levels
+**Prevention**: Watch for the 😰 emoji and red pulsing bars!
 
 ---
 
@@ -226,77 +275,80 @@ The **LIFE (Living Independently For Empowerment)** meter tracks each resident's
 ### Four Stages
 
 #### 1. 🔴 Survival (0-25%)
-**Focus**: Meeting basic needs
-
-**Characteristics**:
-- Just arrived at shelter
-- High stress and uncertainty
-- Needs constant support
-- Focus on food, sleep, hygiene
-
-**Duration**: 10-20 days typically
-
-**Your Role**: Ensure all basic needs are met consistently
-
----
+- Focus: Meeting basic needs
+- Duration: ~10-20 game days
+- Priority: Ensure food, sleep, hygiene
 
 #### 2. 🟡 Stability (25-50%)
-**Focus**: Establishing routines
-
-**Characteristics**:
-- Adjusting to shelter life
-- Building trust
-- Starting to engage socially
-- More independent with basic needs
-
-**Duration**: 15-30 days typically
-
-**Your Role**: Provide social opportunities, maintain consistency
-
----
+- Focus: Establishing routines
+- Duration: ~15-30 game days
+- Priority: Build trust, provide social opportunities
 
 #### 3. 🟢 Growth (50-75%)
-**Focus**: Skill development
-
-**Characteristics**:
-- Actively improving themselves
-- Using Learning Centers
-- Building confidence
-- Planning for future
-
-**Duration**: 20-40 days typically
-
-**Your Role**: Provide education, encourage progress
-
----
+- Focus: Skill development
+- Duration: ~20-40 game days
+- Priority: Learning Centers, Vocational Rooms
 
 #### 4. 🔵 Independence (75-100%)
-**Focus**: Preparing to graduate
+- Focus: Preparing to graduate
+- Duration: ~10-20 game days
+- Priority: Final support, job preparation
 
-**Characteristics**:
-- Nearly ready to leave
-- High confidence
-- Helping other residents
-- Job-ready skills
+### Boosting LIFE Progression
 
-**Duration**: 10-20 days typically
-
-**Your Role**: Final support, celebrate achievements
-
----
+| Factor | Effect |
+|--------|--------|
+| Learning Center | +0.5% per visit |
+| Vocational Room | +0.5% per visit |
+| Food: Premium | +50% fill rate |
+| Food: Generous | +20% fill rate |
+| Adjacent bonuses | Up to +15% fill rate |
+| High happiness | Faster progression |
 
 ### Graduation
 
-When a resident reaches 100% on the LIFE meter:
-- They "graduate" from the shelter
-- You receive a reputation boost (+5-10 points)
-- Frees up capacity for new residents
-- Provides a sense of accomplishment
+When LIFE reaches 100%:
+- Resident "graduates" and leaves
+- You receive +5 reputation (+7 for Veterans)
+- Potential $500 bonus donation
+- Progress toward next tier unlock
 
-**Graduation Bonuses**:
-- +$500 donation from grateful graduate
-- +10 reputation
-- Positive event chance increases
+---
+
+## 🍽️ Food System & Portions
+
+### Five Food Tiers
+
+| Tier | Cost/Resident | Happiness | Reputation | LIFE Fill |
+|------|---------------|-----------|------------|-----------|
+| **Minimal** | $5 | -10 | -3 | 0.5x |
+| **Small** | $10 | -5 | -1 | 0.8x |
+| **Standard** | $18 | 0 | 0 | 1.0x |
+| **Generous** | $30 | +10 | +2 | 1.2x |
+| **Premium** | $50 | +20 | +5 | 1.5x |
+
+### Food Strategy
+
+**Early Game (Tight Budget)**
+- Use **Small** portions to save money
+- Accept the happiness penalty temporarily
+- Switch to Standard when stable
+
+**Mid Game (Stable)**
+- Use **Standard** as baseline
+- Switch to **Generous** before fundraisers (boosts happiness)
+- Use **Minimal** only in emergencies
+
+**Late Game (Prosperous)**
+- **Generous** or **Premium** accelerates graduations
+- Higher reputation = better donations
+- ROI is positive at higher tiers
+
+### Food Generation
+
+- Cafeterias generate 1 food every 15 seconds
+- More cafeterias = more passive food income
+- Food is consumed daily based on portion setting
 
 ---
 
@@ -304,350 +356,431 @@ When a resident reaches 100% on the LIFE meter:
 
 ### Income Sources
 
-#### 1. Daily Donations
-**Base Amount**: $200/day
+#### 1. Automatic Donations
+- **Frequency**: Every 90 seconds
+- **Base Amount**: $25 per resident
+- **Reputation Multiplier**: Affects donation chance
+- **Tier Multiplier**: 1.0x → 2.0x based on tier
 
-**Reputation Multiplier**:
-- 0-25 reputation: 0.5x ($100/day)
-- 26-50 reputation: 1.0x ($200/day)
-- 51-75 reputation: 1.5x ($300/day)
-- 76-100 reputation: 2.0x ($400/day)
+#### 2. Fundraisers
+- Manual events with success/failure mechanics
+- See [Fundraiser System](#fundraiser-system)
 
-**Timing**: Received each morning
-
----
-
-#### 2. Fundraiser Events
-**Frequency**: Can run one every 7 days
-
-**Types**:
-- **Bake Sale**: Low cost ($100), Low return ($300-500)
-- **Charity Dinner**: Medium cost ($300), Medium return ($800-1200)
-- **Gala Event**: High cost ($500), High return ($1500-2500)
-
-**Success Factors**:
-- Current reputation
-- Resident satisfaction
-- Random chance
-
----
-
-#### 3. Special Events
-**Frequency**: Random
-
-**Types**:
-- Large donations from benefactors
-- Government grants
-- Community support drives
-
-**Triggers**: High reputation, positive events
-
----
+#### 3. Graduation Bonuses
+- $500 potential bonus per graduation
+- Veterans provide +$200 extra
 
 ### Expenses
 
 #### 1. Food Costs
-**Price**: $10 per day of food
+- Daily cost = Residents × Portion Cost
+- Example: 10 residents × $18 (Standard) = $180/day
 
-**Consumption**: 1 day of food per resident per day
+#### 2. Maintenance
+- Due every 5 minutes
+- Cost = Sum of all room maintenance costs
+- **Failure = -2 reputation per room!**
 
-**Strategy**: Buy in bulk when you have surplus money
+#### 3. Operating Costs (Daily)
+- Base: $100/day
+- Per resident: $5/day each
+- Per room: $10/day each
+- Example: $100 + (10 × $5) + (5 × $10) = $200/day
+
+#### 4. Random Expenses
+- 15% chance each donation cycle
+- Range: $50-$200
+- Types: Plumbing, electrical, inspections, etc.
+
+### Economic Dashboard
+
+Click 📊 in the HUD to see:
+- **Daily Income Estimate**: Projected donations
+- **Daily Expenses**: Breakdown of all costs
+- **Net Daily Cash Flow**: Income - Expenses
+- **3-Day Projection**: Where you'll be financially
+- **Efficiency Score**: Revenue vs. costs per resident
+
+### Bankruptcy Warning
+
+| Money Level | Status |
+|-------------|--------|
+| Below $200 | Low funds warning |
+| Below $0 | In debt warning |
+| Below -$300 | Near bankruptcy |
+| Below -$500 | **Bankruptcy countdown starts** |
+
+**Bankruptcy Countdown**: 18 minutes to recover above $0 or game over!
 
 ---
 
-#### 2. Maintenance Costs
-**Frequency**: Varies by facility condition
+## 🎪 Fundraiser System
 
-**Deterioration Rate**:
-- Normal use: -1 condition per day
-- Heavy use: -2 condition per day
-- Neglect: Accelerated deterioration
+### How Fundraisers Work
 
-**Repair Costs**:
-- Minor (80-99 condition): $50-100
-- Moderate (50-79 condition): $150-300
-- Major (20-49 condition): $400-600
-- Critical (<20 condition): $800-1200
+1. Click "Start Fundraiser" in management panel
+2. Non-fatigued residents participate
+3. Duration: 15 minutes
+4. Outcome based on average happiness
 
-**Prevention**: Regular maintenance is cheaper than emergency repairs
+### Success Chance
+
+| Avg. Happiness | Success Rate |
+|----------------|--------------|
+| 80%+ | 95% |
+| 60-79% | 80% |
+| 40-59% | 60% |
+| 20-39% | 40% |
+| Below 20% | 20% |
+
+### Outcomes
+
+**On Success:**
+- Payout: $150-$350
+- +5 LIFE meter for participants
+- +2 reputation
+
+**On Failure:**
+- -5 happiness for participants
+- -2 reputation
+- No money earned
+
+### Cooldown & Fatigue
+
+- **Fundraiser Cooldown**: 10 minutes between events
+- **Resident Fatigue**: 5 minutes after participating
+  - Fatigued residents can't participate
+  - -5 happiness during fatigue
+- **Minimum Requirement**: 3 non-fatigued residents to start
+
+### Fundraiser Tips
+
+1. **Boost happiness first** - Use generous food before starting
+2. **Wait for cooldown** - Don't rush between fundraisers
+3. **Watch fatigue** - Rotate which residents participate
+4. **Timing matters** - Run when reputation is high for bonus
+5. **Don't rely on them** - Donations are more reliable income
 
 ---
 
-#### 3. Building Costs
-See [Room Types](#room-types--facilities) for individual costs
+## 🏛️ Tier Progression
 
-**Budget Planning**:
-- Keep 20-30% of budget as emergency fund
-- Don't build if it leaves you with <$500
-- Plan expansions during high-income periods
+### Four Shelter Tiers
+
+| Tier | Name | Residents | Grid | Donation Bonus |
+|------|------|-----------|------|----------------|
+| 1 | Starter Shelter | 10 | 10×10 | 1.0x |
+| 2 | Community Hub | 25 | 15×15 | 1.2x |
+| 3 | Opportunity Center | 50 | 20×20 | 1.5x |
+| 4 | Campus | 100 | 25×25 | 2.0x |
+
+### Upgrade Requirements
+
+**To Tier 2 (Community Hub):**
+- $3,000 cash
+- 60% reputation
+- 5 graduations
+- 70% grid utilization
+
+**To Tier 3 (Opportunity Center):**
+- $8,000 cash
+- 60% reputation
+- 15 graduations
+- 70% grid utilization
+
+**To Tier 4 (Campus):**
+- $20,000 cash
+- 60% reputation
+- 40 graduations
+- 70% grid utilization
+
+### Room Unlocks by Tier
+
+- **Tier 1**: Dormitory, Cafeteria, Bathroom, Common Room, Fundraiser Station
+- **Tier 2**: + Learning Center, Admin Office
+- **Tier 3**: + Vocational Room
+- **Tier 4**: All rooms
+
+### Tier Strategy
+
+1. **Fill your grid** to 70% before upgrading
+2. **Graduate steadily** - don't rush capacity
+3. **Save money** for upgrade + post-upgrade building
+4. **Maintain reputation** at 60%+ for qualification
 
 ---
 
-### Financial Tips
+## 🌊 Disaster Events
 
-1. **Early Game**: Be conservative, build slowly
-2. **Mid Game**: Invest in Learning Centers for faster progression
-3. **Late Game**: Expand capacity, run frequent fundraisers
-4. **Always**: Maintain emergency fund for unexpected events
+Random emergencies that bring new residents seeking shelter.
+
+### Six Disaster Types
+
+| Disaster | Residents | Urgency | Rep Gain | Donation |
+|----------|-----------|---------|----------|----------|
+| House Fire | 3 | 1 min | +8 | $200 |
+| Winter Storm | 5 | 3 min | +10 | $350 |
+| Factory Closure | 4 | 5 min | +5 | $100 |
+| Domestic Violence | 2 | 1 min | +12 | $150 |
+| Hospital Discharge | 2 | 3 min | +6 | $100 |
+| Mass Eviction | 8 | 1 min | +15 | $500 |
+
+### Response Options
+
+- **Accept All**: Take all residents, full rewards
+- **Accept Partial** (if 4+ residents): Take half, half rewards
+- **Decline**: Reputation penalty (varies by disaster)
+
+### Special Considerations
+
+- **Winter Storm**: +50% maintenance costs temporarily
+- **Factory Closure**: Residents get +25% LIFE fill boost
+- **Domestic Violence**: Extra $30/resident security cost
+- **Hospital Discharge**: $50 medical costs
+
+### Capacity Overflow
+
+- Disasters can push you 50% over tier capacity
+- Overcrowded residents suffer -2 happiness penalty
+- Consider declining if already near capacity
+
+### Disaster Strategy
+
+1. **Keep some capacity buffer** - Don't max out
+2. **Check finances first** - Can you afford the extra mouths?
+3. **Accept high-value disasters** - Mass Eviction has best rewards
+4. **Decline when struggling** - Better than bankrupting
 
 ---
 
 ## 🌅 Day/Night Cycle
 
-### Phase Schedule
+### Timing
 
-Each day consists of 4 phases (30 seconds each in real-time):
+- **Full Day**: 6 minutes real-time
+- **Day Phase**: 4 minutes
+- **Night Phase**: 2 minutes
 
-#### ☀️ Morning (6:00 AM - 12:00 PM)
-**Resident Activities**:
-- Wake up and leave dormitories
-- Eat breakfast in cafeteria
-- Use bathrooms
-- Begin daily activities
+### Day Phase Activities
 
-**Your Focus**:
-- Check food supplies
-- Review overnight issues
-- Plan daily tasks
-- Collect donations
+- Donations arrive (every 90 seconds)
+- Residents use all facilities
+- Random events can occur
+- Maintenance may be due
 
----
+### Night Phase Activities
 
-#### 🌤️ Afternoon (12:00 PM - 6:00 PM)
-**Resident Activities**:
-- Lunch in cafeteria
-- Use Learning Centers
-- Socialize in Common Rooms
-- Various activities
+- Some rooms close (Learning Center, Vocational Room)
+- Residents sleep in Dormitories
+- Energy restores
+- Fewer random events
 
-**Your Focus**:
-- Monitor resident needs
-- Perform maintenance
-- Build new facilities
-- Manage events
+### Strategy
+
+- **Build during day** when you can see activity
+- **Review finances** during night
+- **Plan next day** during the quiet period
+- **Save game** at the start of a new day
 
 ---
 
-#### 🌆 Evening (6:00 PM - 12:00 AM)
-**Resident Activities**:
-- Dinner in cafeteria
-- Social time in Common Rooms
-- Relaxation activities
-- Prepare for bed
+## ⚠️ Warning System
 
-**Your Focus**:
-- Final checks on needs
-- Address any issues
-- Plan for next day
-- Review progress
+### Warning Panel
 
----
+Shows current issues requiring attention. Three severity levels:
 
-#### 🌙 Night (12:00 AM - 6:00 AM)
-**Resident Activities**:
-- Sleep in dormitories
-- Energy restoration
-- Minimal activity
+| Level | Color | Meaning |
+|-------|-------|---------|
+| Info | Blue | Awareness (e.g., approaching capacity) |
+| Warning | Yellow | Needs attention soon |
+| Critical | Red | Immediate action required |
 
-**Your Focus**:
-- Review statistics
-- Plan expansions
-- Save game
-- Prepare for morning
+### Warning Types (16 Total)
 
----
+**Financial Warnings:**
+- Low funds (below $500)
+- In debt (below $0)
+- Near bankruptcy (below -$300)
+- Maintenance due soon
+- Operating costs due
 
-## 🎲 Events & Challenges
+**Resident Warnings:**
+- Unhappy resident (prolonged low happiness)
+- At-risk resident (about to leave)
+- Overcrowded
+- Hungry residents (low food)
 
-### Event Types
+**Operational Warnings:**
+- Low reputation
+- Reputation dropping rapidly
+- Maintenance overdue
+- Approaching capacity
 
-#### Positive Events
-- **Large Donation**: Receive $500-2000
-- **Volunteer Help**: Free maintenance for all facilities
-- **Food Drive**: Receive 10-30 days of food
-- **Media Coverage**: +10-20 reputation
+**Progression Warnings:**
+- Ready to upgrade
+- Progress stalled
+- LIFE meters stalled
 
-#### Negative Events
-- **Facility Breakdown**: Major repair needed
-- **Food Shortage**: Lose 5-15 days of food
-- **Resident Crisis**: Special needs require attention
-- **Budget Cut**: Lose $300-800
+### Warning Escalation
 
-#### Choice Events
-Present dilemmas with multiple options:
-- Each choice has different outcomes
-- Consider short-term vs long-term effects
-- Some choices affect reputation
-- Others affect finances or resident happiness
-
-### Event Frequency
-
-- **Base Rate**: 1 event every 3-5 days
-- **Reputation Impact**: Higher reputation = more positive events
-- **Random Factor**: Some events are purely random
-
-### Handling Events
-
-1. **Read Carefully**: Understand the situation
-2. **Consider Resources**: Can you afford the choice?
-3. **Think Long-Term**: What are the lasting effects?
-4. **Save First**: Save before major decisions (if possible)
-5. **Learn**: Remember outcomes for future events
+- Unresolved warnings escalate after 3 minutes
+- Info → Warning → Critical
+- Critical warnings reappear faster if dismissed
 
 ---
 
 ## ⭐ Reputation System
 
-### Reputation Scale (0-100)
+### Reputation Scale (0-100%)
 
-- **0-25**: Poor - Struggling shelter, low donations
-- **26-50**: Fair - Stable but unremarkable
-- **51-75**: Good - Well-regarded in community
-- **76-100**: Excellent - Model shelter, maximum support
+| Range | Status | Donation Modifier |
+|-------|--------|-------------------|
+| 0-29% | Poor | 0.5x |
+| 30-49% | Fair | 0.75x |
+| 50-69% | Good | 1.0x |
+| 70-89% | Great | 1.25x |
+| 90-100% | Excellent | 1.5x |
 
-### Reputation Factors
+### Reputation Gains
 
-#### Positive Impacts
-- ✅ High resident satisfaction (+1-3 per day)
-- ✅ Resident graduations (+10 per graduation)
-- ✅ Well-maintained facilities (+1 per day)
-- ✅ Positive event outcomes (+5-15)
-- ✅ Successful fundraisers (+3-8)
+| Action | Change |
+|--------|--------|
+| Resident graduated | +5 |
+| Veteran graduated | +7 |
+| Fundraiser success | +2 |
+| Generous food | +1 |
+| Premium food | +2 |
+| Disaster accepted | +3 to +15 |
 
-#### Negative Impacts
-- ❌ Low resident satisfaction (-1-3 per day)
-- ❌ Residents leaving unhappy (-5-10)
-- ❌ Poor facility conditions (-1-2 per day)
-- ❌ Negative event outcomes (-5-15)
-- ❌ Failed fundraisers (-2-5)
+### Reputation Losses
 
-### Reputation Benefits
+| Action | Change |
+|--------|--------|
+| Resident left unhappy | -3 |
+| Resident left hopeless | -5 |
+| Small food portion | -1 |
+| No food | -5 |
+| Maintenance missed | -2 |
+| Overcrowding | -1 |
+| Disaster rejected | -5 to -15 |
 
-1. **Increased Donations**: Up to 2x base donation rate
-2. **Better Events**: More positive events occur
-3. **Resident Intake**: Easier to attract new residents
-4. **Community Support**: More volunteers and help
-5. **Fundraiser Success**: Higher returns on events
+### Reputation Decay
+
+Your reputation naturally decays over time:
+
+| Current Rep | Decay Rate |
+|-------------|------------|
+| 90-100% | -3% per day |
+| 70-89% | -2% per day |
+| 50-69% | -1% per day |
+| 30-49% | -0.5% per day |
+| Below 30% | No decay |
+
+**Decay Mitigation:**
+- Each active resident: -10% decay
+- Recent graduation (7 days): -20% decay
+- High happiness (>70% avg): -30% decay
+- At tier capacity: -20% decay
 
 ---
 
 ## 💡 Tips & Strategies
 
-### Early Game (Days 1-30)
+### Early Game (Days 1-10)
 
-**Priority**: Establish stable foundation
+**Priority**: Survive and stabilize
 
-✅ **Do**:
-- Build 2 dormitories, 1 cafeteria, 2 bathrooms first
-- Maintain 15+ days of food at all times
-- Keep $1000+ emergency fund
-- Focus on meeting basic needs
-- Complete tutorial objectives
+✅ **Do:**
+- Build essentials: Dormitory, Cafeteria, Bathroom
+- Use Small or Standard food portions
+- Accept most disasters (need the residents!)
+- Place rooms with adjacency bonuses
+- Maintain 40%+ reputation for spawns
 
-❌ **Don't**:
-- Overbuild too quickly
-- Let food drop below 7 days
-- Ignore maintenance warnings
-- Accept every resident immediately
-- Spend all your money
-
----
-
-### Mid Game (Days 31-100)
-
-**Priority**: Expand and optimize
-
-✅ **Do**:
-- Add Learning Centers for faster progression
-- Build Common Rooms for happiness
-- Run fundraisers regularly
-- Aim for 60+ reputation
-- Balance resident intake with capacity
-
-❌ **Don't**:
-- Neglect existing facilities
-- Overextend financially
-- Ignore resident satisfaction
-- Skip maintenance
-- Rush expansions
+❌ **Don't:**
+- Build luxury rooms yet
+- Use Premium food (too expensive)
+- Let money drop below $200
+- Ignore happiness warnings
+- Expand too fast
 
 ---
 
-### Late Game (Days 100+)
+### Mid Game (Days 11-50)
 
-**Priority**: Maximize efficiency and impact
+**Priority**: Build toward Tier 2
 
-✅ **Do**:
-- Maintain 80+ reputation
-- Run high-value fundraisers
-- Graduate residents regularly
-- Expand to maximum capacity
-- Optimize facility placement
+✅ **Do:**
+- Graduate residents steadily
+- Run fundraisers when happiness is high
+- Build to 70% grid utilization
+- Save for Tier 2 upgrade ($3,000)
+- Unlock Learning Center for faster LIFE fill
 
-❌ **Don't**:
-- Become complacent
-- Ignore new residents
-- Let reputation slip
-- Forget about maintenance
-- Stop planning ahead
+❌ **Don't:**
+- Let reputation decay below 60%
+- Accept disasters if overcapacity
+- Skip maintenance payments
+- Neglect resident happiness
 
 ---
 
-### Advanced Strategies
+### Late Game (Days 50+)
 
-#### Optimal Facility Ratios
-- **1 Cafeteria** per 8-10 residents
-- **1 Bathroom** per 4-5 residents
-- **1 Dormitory** per 4 residents
-- **1 Learning Center** per 10-12 residents
-- **1 Common Room** per 8-10 residents
+**Priority**: Maximize efficiency
 
-#### Pathfinding Optimization
-- Place bathrooms near dormitories
-- Central cafeteria location
-- Multiple bathroom locations
-- Clear pathways between facilities
-- Avoid bottlenecks
+✅ **Do:**
+- Use Generous/Premium food for faster graduations
+- Optimize room adjacencies
+- Run fundraisers consistently
+- Push for higher tiers
+- Maintain 80%+ reputation
 
-#### Financial Optimization
-- Buy food in bulk during surplus
-- Schedule fundraisers strategically
-- Maintain 30% budget buffer
-- Invest in Learning Centers early
-- Regular maintenance prevents costly repairs
+❌ **Don't:**
+- Rest on success (reputation decays!)
+- Ignore the economic dashboard
+- Let warnings pile up
+- Forget about new residents
 
-#### Reputation Management
-- Prioritize resident satisfaction
-- Graduate residents regularly
-- Keep facilities above 70 condition
-- Make wise event choices
-- Run successful fundraisers
+---
+
+### Bankruptcy Recovery
+
+If you're heading toward bankruptcy:
+
+1. **Immediately** switch to Minimal food
+2. **Run a fundraiser** if cooldown allows
+3. **Accept any disaster** for donation bonus
+4. **Pause the game** to plan recovery
+5. **Sell non-essential rooms** if option available
+6. **Wait for donations** (90 seconds between)
 
 ---
 
 ## ⌨️ Keyboard Shortcuts
 
-### General Controls
-- **Space**: Pause/Resume game
-- **Esc**: Close current modal/menu
-- **Tab**: Cycle through UI panels
+### Essential Controls
+| Key | Action |
+|-----|--------|
+| **Space** | Pause/Resume game |
+| **Esc** | Close current modal |
+| **B** | Toggle resident status bars |
+| **D** | Toggle dev mode (testing) |
 
 ### Speed Controls
-- **1**: Normal speed (1x)
-- **2**: Fast speed (2x)
-- **3**: Very fast speed (3x)
-- **0**: Pause
+| Key | Action |
+|-----|--------|
+| **1** | Normal speed (1x) |
+| **2** | Fast speed (2x) |
+| **3** | Very fast speed (3x) |
+| **0** | Pause |
 
-### Quick Actions
-- **B**: Open Build Menu
-- **M**: Open Management Panel
-- **S**: Open Settings
-- **P**: Pause Menu (Save/Load)
-
-### Camera Controls
-- **Arrow Keys**: Pan camera
-- **Home**: Center camera
-- **+/-**: Zoom in/out (if enabled)
+### Navigation
+| Key | Action |
+|-----|--------|
+| **Arrow Keys** | Pan camera |
+| **Home** | Center camera |
 
 ---
 
@@ -655,98 +788,78 @@ Present dilemmas with multiple options:
 
 ### Gameplay Questions
 
-**Q: How do I get more residents?**
-A: Residents arrive automatically based on your capacity and reputation. Build more dormitories to increase capacity.
+**Q: Why are my residents leaving?**
+A: Happiness has been below 20% for too long. Watch for the 😰 emoji and red pulsing status bars. Improve food quality, build social rooms, and ensure needs are met.
 
-**Q: Why are my residents unhappy?**
-A: Check if their needs are being met. Common issues: not enough food, poor facility conditions, lack of social spaces, or overcrowding.
+**Q: How do I increase LIFE meter faster?**
+A: Build Learning Centers and Vocational Rooms (Tier 2+), use higher food portions, optimize room adjacencies, and keep happiness high.
 
-**Q: How do I increase reputation?**
-A: Keep residents satisfied, maintain facilities, graduate residents, and make good event choices.
+**Q: Why did my fundraiser fail?**
+A: Success rate is based on average happiness. If average happiness was below 60%, there's a significant chance of failure. Boost happiness before starting!
 
-**Q: What happens if I run out of money?**
-A: You'll receive an emergency donation of $500, but your reputation will decrease. Try to avoid this by maintaining a budget buffer.
+**Q: What happens when I go bankrupt?**
+A: Money below -$500 starts an 18-minute countdown. Get above $0 to cancel. If time runs out, game over.
 
-**Q: Can residents die?**
-A: No, but they can leave if very unhappy, which hurts your reputation.
+**Q: How do I unlock more room types?**
+A: Upgrade your shelter tier. Tier 2 unlocks Learning Center and Admin Office. Tier 3 unlocks Vocational Room.
 
-**Q: How do I win the game?**
-A: There's no "win" condition - the goal is to help as many residents as possible and maintain a successful shelter indefinitely.
+**Q: Should I accept every disaster?**
+A: Not necessarily. Consider your capacity, finances, and current stability. It's okay to decline if you're struggling.
+
+**Q: Why is my reputation dropping?**
+A: Reputation decays naturally over time. Higher reputation = faster decay. Mitigate with graduations, high happiness, and active residents.
 
 ---
 
 ### Technical Questions
 
 **Q: How do I save my game?**
-A: Click the Pause button (⏸️) and select "Save Game". The game also auto-saves periodically.
+A: Click Pause (⏸️) and select "Save Game". Auto-saves also occur periodically.
 
-**Q: Can I play on mobile?**
-A: Yes! The game is responsive and works on tablets and phones, though desktop is recommended for the best experience.
+**Q: The game feels too fast. Can I slow it down?**
+A: Yes! Use speed controls (1, 2, 3 keys) or pause to plan.
 
-**Q: Why is the game running slowly?**
-A: Try reducing the game speed, closing other browser tabs, or checking the Performance Monitor in settings.
+**Q: What do the colored bars above residents mean?**
+A: Blue = LIFE progress, Colored = Happiness. Press B to toggle visibility.
 
-**Q: How do I report a bug?**
-A: Visit the GitHub Issues page linked in the main menu or README.
-
----
-
-### Strategy Questions
-
-**Q: What's the best room to build first?**
-A: Dormitories and a Cafeteria are essential. Add Bathrooms next, then expand based on needs.
-
-**Q: Should I accept every resident?**
-A: Only if you have capacity and resources. It's better to provide excellent care to fewer residents than poor care to many.
-
-**Q: When should I run fundraisers?**
-A: When your reputation is high (60+) and you need extra income. Space them out every 7+ days.
-
-**Q: How many Learning Centers do I need?**
-A: Start with 1 for every 10-12 residents. They're expensive but accelerate progression significantly.
-
-**Q: What's the optimal shelter size?**
-A: Aim for 15-20 residents with proper facilities. Quality over quantity!
+**Q: Can I undo building a room?**
+A: There's no undo, but you can demolish rooms through the management panel.
 
 ---
 
-## 🎯 Achievements & Milestones
+## 🏆 Achievements & Milestones
 
 Track your progress with these goals:
 
 ### Beginner
-- [ ] Survive 30 days
+- [ ] Survive 10 days
 - [ ] Graduate your first resident
-- [ ] Reach 50 reputation
-- [ ] Build all room types
-- [ ] Successfully run a fundraiser
+- [ ] Build all Tier 1 room types
+- [ ] Complete a successful fundraiser
 
 ### Intermediate
-- [ ] Survive 100 days
+- [ ] Reach Tier 2 (Community Hub)
 - [ ] Graduate 10 residents
-- [ ] Reach 75 reputation
-- [ ] Manage 15+ residents
-- [ ] Accumulate $10,000
+- [ ] Reach 70% reputation
+- [ ] Survive a Mass Eviction disaster
 
 ### Advanced
-- [ ] Survive 365 days (1 year)
-- [ ] Graduate 50 residents
-- [ ] Maintain 90+ reputation for 30 days
-- [ ] Manage 20+ residents
-- [ ] Never drop below $5,000 after day 100
+- [ ] Reach Tier 3 (Opportunity Center)
+- [ ] Graduate 30 residents
+- [ ] Maintain 85%+ reputation for 5 days
+- [ ] Recover from bankruptcy countdown
 
 ### Master
-- [ ] Survive 730 days (2 years)
+- [ ] Reach Tier 4 (Campus)
 - [ ] Graduate 100 residents
-- [ ] Maintain 95+ reputation for 100 days
-- [ ] Zero residents leave unhappy for 100 days
-- [ ] Accumulate $50,000
+- [ ] Maintain 95%+ reputation for 10 days
+- [ ] Never let a resident leave unhappy
 
 ---
 
 ## 📞 Need More Help?
 
-- **In-Game Tutorial**: Press the Tutorial button for guided help
+- **In-Game Tutorial**: Click the Tutorial button for guided help
 - **Developer Guide**: See DEVELOPER_GUIDE.md for technical details
 - **Community**: Join discussions on GitHub
 - **Issues**: Report bugs on the GitHub Issues page

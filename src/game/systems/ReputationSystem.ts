@@ -1,5 +1,5 @@
 import { GameState } from '../../types';
-import { REPUTATION_CONFIG, REPUTATION_CHANGES } from '../../constants';
+import { REPUTATION_CONFIG, REPUTATION_CHANGES, REPUTATION_DECAY, SHELTER_TIERS } from '../../constants';
 
 /**
  * ReputationSystem - Manages shelter reputation (0-100%)
@@ -113,6 +113,20 @@ export function handleUnhappyDepartureReputation(
 }
 
 /**
+ * Handle hopeless resident departure (LIFE meter = 0)
+ */
+export function handleHopelessDepartureReputation(
+  gameState: GameState,
+  residentName: string
+): void {
+  modifyReputation(
+    gameState,
+    REPUTATION_CHANGES.RESIDENT_LEFT_HOPELESS,
+    `${residentName} lost hope and left`
+  );
+}
+
+/**
  * Handle maintenance missed
  */
 export function handleMaintenanceMissedReputation(
@@ -136,6 +150,241 @@ export function handleOvercrowdingReputation(gameState: GameState): void {
     REPUTATION_CHANGES.OVERCROWDING,
     'Cafeteria overcrowding'
   );
+}
+
+// ============================================================================
+// Reputation Decay System
+// ============================================================================
+
+/**
+ * Get the number of recent graduations within the tracking window
+ */
+export function getRecentGraduationsCount(gameState: GameState): number {
+  const trackingDays = REPUTATION_DECAY.GRADUATION_TRACKING_DAYS;
+  const cutoffDay = gameState.currentDay - trackingDays;
+  
+  return gameState.recentGraduations.filter(g => g.day >= cutoffDay).length;
+}
+
+/**
+ * Record a graduation for decay mitigation tracking
+ */
+export function recordGraduation(gameState: GameState): void {
+  gameState.recentGraduations.push({
+    timestamp: Date.now(),
+    day: gameState.currentDay
+  });
+  
+  // Clean up old graduations beyond tracking window
+  const cutoffDay = gameState.currentDay - REPUTATION_DECAY.GRADUATION_TRACKING_DAYS;
+  gameState.recentGraduations = gameState.recentGraduations.filter(g => g.day >= cutoffDay);
+}
+
+/**
+ * Get average happiness of all residents
+ */
+export function getAverageHappiness(gameState: GameState): number {
+  if (gameState.residents.length === 0) return 0;
+  
+  const totalHappiness = gameState.residents.reduce((sum, r) => sum + r.happiness, 0);
+  return totalHappiness / gameState.residents.length;
+}
+
+/**
+ * Check if shelter is at tier capacity
+ */
+export function isAtCapacity(gameState: GameState): boolean {
+  const tierConfig = SHELTER_TIERS[gameState.currentTier];
+  return gameState.residents.length >= tierConfig.maxResidents;
+}
+
+/**
+ * Calculate decay mitigations and return details
+ */
+export interface DecayMitigationDetails {
+  residentMitigation: number;
+  graduationMitigation: number;
+  happinessMitigation: number;
+  capacityMitigation: number;
+  totalMitigation: number;
+  descriptions: string[];
+}
+
+export function calculateDecayMitigations(gameState: GameState): DecayMitigationDetails {
+  const residentCount = gameState.residents.length;
+  const recentGraduations = getRecentGraduationsCount(gameState);
+  const avgHappiness = getAverageHappiness(gameState);
+  const atCapacity = isAtCapacity(gameState);
+  
+  const residentMitigation = residentCount * REPUTATION_DECAY.MITIGATION.perActiveResident;
+  const graduationMitigation = recentGraduations * REPUTATION_DECAY.MITIGATION.perGraduationThisWeek;
+  const happinessMitigation = avgHappiness > REPUTATION_DECAY.HIGH_HAPPINESS_THRESHOLD
+    ? REPUTATION_DECAY.MITIGATION.highHappinessBonus
+    : 0;
+  const capacityMitigation = atCapacity ? REPUTATION_DECAY.MITIGATION.fullCapacityBonus : 0;
+  
+  const totalMitigation = Math.min(0.9,
+    residentMitigation + graduationMitigation + happinessMitigation + capacityMitigation
+  );
+  
+  const descriptions: string[] = [];
+  if (residentMitigation > 0) {
+    descriptions.push(`${residentCount} residents (-${Math.round(residentMitigation * 100)}%)`);
+  }
+  if (graduationMitigation > 0) {
+    descriptions.push(`${recentGraduations} recent graduations (-${Math.round(graduationMitigation * 100)}%)`);
+  }
+  if (happinessMitigation > 0) {
+    descriptions.push(`High happiness (-${Math.round(happinessMitigation * 100)}%)`);
+  }
+  if (capacityMitigation > 0) {
+    descriptions.push(`At capacity (-${Math.round(capacityMitigation * 100)}%)`);
+  }
+  
+  return {
+    residentMitigation,
+    graduationMitigation,
+    happinessMitigation,
+    capacityMitigation,
+    totalMitigation,
+    descriptions
+  };
+}
+
+/**
+ * Calculate the base decay rate before mitigations
+ */
+export function getBaseDecayRate(reputation: number): number {
+  const threshold = REPUTATION_DECAY.DECAY_THRESHOLDS.find(t =>
+    reputation >= t.min && reputation <= t.max
+  );
+  
+  if (!threshold) {
+    return 0;
+  }
+  
+  return REPUTATION_DECAY.BASE_DECAY_RATE * threshold.decayMultiplier;
+}
+
+/**
+ * Calculate reputation decay amount
+ */
+export function calculateReputationDecay(gameState: GameState): number {
+  const currentRep = gameState.reputation;
+  
+  // No decay if at or below floor
+  if (currentRep <= REPUTATION_DECAY.FLOOR) {
+    return 0;
+  }
+  
+  // Get base decay rate
+  const baseDecay = getBaseDecayRate(currentRep);
+  
+  if (baseDecay === 0) {
+    return 0;
+  }
+  
+  // Apply mitigations
+  const mitigations = calculateDecayMitigations(gameState);
+  const decay = baseDecay * (1 - mitigations.totalMitigation);
+  
+  // Don't decay below floor
+  const maxDecay = currentRep - REPUTATION_DECAY.FLOOR;
+  return Math.min(decay, maxDecay);
+}
+
+/**
+ * Get current decay rate info for UI display
+ */
+export interface DecayRateInfo {
+  baseDecayRate: number;
+  mitigations: DecayMitigationDetails;
+  netDecayRate: number;
+  isFullyMitigated: boolean;
+  isAtFloor: boolean;
+  floor: number;
+}
+
+export function getDecayRateInfo(gameState: GameState): DecayRateInfo {
+  const baseDecayRate = getBaseDecayRate(gameState.reputation);
+  const mitigations = calculateDecayMitigations(gameState);
+  const netDecayRate = calculateReputationDecay(gameState);
+  const isAtFloor = gameState.reputation <= REPUTATION_DECAY.FLOOR;
+  
+  return {
+    baseDecayRate,
+    mitigations,
+    netDecayRate,
+    isFullyMitigated: mitigations.totalMitigation >= 1 || netDecayRate === 0,
+    isAtFloor,
+    floor: REPUTATION_DECAY.FLOOR
+  };
+}
+
+/**
+ * Apply reputation decay at day transition
+ */
+export function applyReputationDecay(gameState: GameState): void {
+  const decay = calculateReputationDecay(gameState);
+  const mitigations = calculateDecayMitigations(gameState);
+  
+  gameState.lastDecayTime = Date.now();
+  gameState.reputationDecayApplied = decay;
+  
+  if (decay > 0) {
+    const oldRep = gameState.reputation;
+    gameState.reputation = Math.max(REPUTATION_DECAY.FLOOR, gameState.reputation - decay);
+    
+    console.log(`📉 Reputation decay: ${oldRep.toFixed(1)} → ${gameState.reputation.toFixed(1)} (-${decay.toFixed(1)}%)`);
+    
+    // Emit notification event
+    emitDecayNotification(decay, false);
+    
+    // Check for critical thresholds
+    checkReputationThresholds(gameState);
+  } else if (mitigations.totalMitigation >= 0.9 && getBaseDecayRate(gameState.reputation) > 0) {
+    // Decay was fully mitigated
+    console.log(`🛡️ Reputation decay prevented by active efforts`);
+    emitDecayNotification(0, true);
+  }
+  
+  // Warning for high reputation (90%+)
+  if (gameState.reputation >= 90) {
+    emitHighReputationWarning();
+  }
+}
+
+/**
+ * Emit decay notification event
+ */
+function emitDecayNotification(decayAmount: number, wasMitigated: boolean): void {
+  if (wasMitigated) {
+    window.dispatchEvent(new CustomEvent('game:show_notification', {
+      detail: {
+        message: '🛡️ Your active efforts prevented reputation decay!',
+        type: 'success'
+      }
+    }));
+  } else {
+    window.dispatchEvent(new CustomEvent('game:show_notification', {
+      detail: {
+        message: `📉 Reputation naturally declined by ${decayAmount.toFixed(1)}%`,
+        type: 'warning'
+      }
+    }));
+  }
+}
+
+/**
+ * Emit high reputation warning
+ */
+function emitHighReputationWarning(): void {
+  window.dispatchEvent(new CustomEvent('game:show_notification', {
+    detail: {
+      message: '⚠️ High reputation is hard to maintain. Keep helping residents!',
+      type: 'info'
+    }
+  }));
 }
 
 // ============================================================================

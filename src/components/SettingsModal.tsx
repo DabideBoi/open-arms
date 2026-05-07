@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AudioSettings } from '../game/systems/AudioSystem';
+import { StatusBarSettings, StatusBarVisibilityMode } from '../types';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -10,6 +11,8 @@ interface SettingsModalProps {
   gameSpeed: number;
   onGameSpeedChange: (speed: number) => void;
   onResetGame: () => void;
+  statusBarSettings: StatusBarSettings;
+  onStatusBarSettingsChange: (settings: Partial<StatusBarSettings>) => void;
 }
 
 export function SettingsModal({
@@ -19,7 +22,9 @@ export function SettingsModal({
   onAudioSettingsChange,
   gameSpeed,
   onGameSpeedChange,
-  onResetGame
+  onResetGame,
+  statusBarSettings,
+  onStatusBarSettingsChange
 }: SettingsModalProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
@@ -125,6 +130,43 @@ export function SettingsModal({
             </p>
           </section>
           
+          {/* Resident Status Bars */}
+          <section className="settings-section">
+            <h3>👥 Resident Status Bars</h3>
+            
+            <div className="setting-item">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={statusBarSettings.enabled}
+                  onChange={(e) => onStatusBarSettingsChange({ enabled: e.target.checked })}
+                />
+                <span>Show Status Bars Above Residents</span>
+              </label>
+            </div>
+            
+            <div className="setting-item">
+              <label htmlFor="visibility-mode">Visibility Mode</label>
+              <select
+                id="visibility-mode"
+                value={statusBarSettings.visibilityMode}
+                onChange={(e) => onStatusBarSettingsChange({
+                  visibilityMode: e.target.value as StatusBarVisibilityMode
+                })}
+                disabled={!statusBarSettings.enabled}
+              >
+                <option value="always">Always Show</option>
+                <option value="hover">Show on Hover</option>
+                <option value="at-risk">Only At-Risk Residents</option>
+              </select>
+            </div>
+            
+            <p className="setting-description">
+              Status bars show LIFE meter (blue) and happiness (color-coded).
+              Press <kbd>B</kbd> to toggle quickly.
+            </p>
+          </section>
+          
           {/* Keyboard Shortcuts */}
           <section className="settings-section">
             <h3>⌨️ Keyboard Shortcuts</h3>
@@ -136,7 +178,7 @@ export function SettingsModal({
               </div>
               <div className="shortcut-item">
                 <kbd>B</kbd>
-                <span>Toggle Build Menu</span>
+                <span>Toggle Status Bars</span>
               </div>
               <div className="shortcut-item">
                 <kbd>M</kbd>

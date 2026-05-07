@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { GameState } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { GameState, Warning } from '../types';
+import { BANKRUPTCY_CONFIG, SHELTER_TIERS } from '../constants';
+import { getResidentCap, getTierProgress, isApproachingCapacity, isAtResidentCap } from '../game/systems/TierSystem';
+import { getDecayRateInfo } from '../game/systems/ReputationSystem';
+import { getWarningSystem } from '../game/systems/WarningSystem';
+import { FinancialIndicator } from './EconomicDashboard';
+import { AnimatedMoneyDisplay } from './MoneyAnimations';
 import './HUD.css';
 
 interface HUDProps {
@@ -7,16 +13,19 @@ interface HUDProps {
   onPauseToggle?: () => void;
   isPaused?: boolean;
   onSettingsClick?: () => void;
+  onWarningClick?: () => void;
 }
 
 /**
  * HUD component displaying game stats
  */
-export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = false, onSettingsClick }) => {
+export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = false, onSettingsClick, onWarningClick }) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('0:00');
   const [phaseProgress, setPhaseProgress] = useState<number>(0);
   const [donationTimer, setDonationTimer] = useState<string>('0:00');
   const [maintenanceTimer, setMaintenanceTimer] = useState<string>('0:00');
+  const [bankruptcyTimer, setBankruptcyTimer] = useState<string>('0:00');
+  const [moneyPulseClass, setMoneyPulseClass] = useState<string>('');
   
   // Update time remaining every second
   useEffect(() => {
@@ -45,13 +54,21 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
       const maintenanceMin = Math.floor(maintenanceRemaining / 60000);
       const maintenanceSec = Math.floor((maintenanceRemaining % 60000) / 1000);
       setMaintenanceTimer(`${maintenanceMin}:${maintenanceSec.toString().padStart(2, '0')}`);
+      
+      // Bankruptcy timer (when active)
+      if (gameState.isBankrupt) {
+        const bankruptcyRemaining = Math.max(0, gameState.bankruptcyCountdown);
+        const bankruptcyMin = Math.floor(bankruptcyRemaining / 60000);
+        const bankruptcySec = Math.floor((bankruptcyRemaining % 60000) / 1000);
+        setBankruptcyTimer(`${bankruptcyMin}:${bankruptcySec.toString().padStart(2, '0')}`);
+      }
     };
     
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     
     return () => clearInterval(interval);
-  }, [gameState.nextDayNightTransition, gameState.currentPhase, gameState.nextDonationCheck, gameState.nextMaintenanceCheck]);
+  }, [gameState.nextDayNightTransition, gameState.currentPhase, gameState.nextDonationCheck, gameState.nextMaintenanceCheck, gameState.isBankrupt, gameState.bankruptcyCountdown]);
   
   // Get reputation color
   const getReputationColor = (rep: number): string => {
@@ -73,14 +90,65 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
     return icons[setting] || '🍲';
   };
   
+  // Get money warning status
+  const getMoneyWarningLevel = (): 'critical' | 'debt' | 'low' | 'normal' => {
+    if (gameState.money < BANKRUPTCY_CONFIG.THRESHOLD) return 'critical';
+    if (gameState.money < BANKRUPTCY_CONFIG.WARNING_MONEY_DEBT) return 'debt';
+    if (gameState.money < BANKRUPTCY_CONFIG.WARNING_MONEY_LOW) return 'low';
+    return 'normal';
+  };
+  
+  const moneyWarningLevel = getMoneyWarningLevel();
+  
+  // Handle pulse effect when money changes
+  const handleMoneyPulse = useCallback((type: 'income' | 'expense', isLarge: boolean) => {
+    const pulseClass = type === 'income'
+      ? (isLarge ? 'money-pulse-income-large' : 'money-pulse-income')
+      : (isLarge ? 'money-pulse-expense-large' : 'money-pulse-expense');
+    setMoneyPulseClass(pulseClass);
+    
+    // Clear pulse class after animation
+    setTimeout(() => {
+      setMoneyPulseClass('');
+    }, 600);
+  }, []);
+  
   return (
-    <div className="hud">
+    <div className={`hud ${gameState.isBankrupt ? 'hud-bankruptcy-active' : ''}`}>
+      {/* Bankruptcy Warning Banner */}
+      {gameState.isBankrupt && (
+        <div className="hud-bankruptcy-warning">
+          <div className="bankruptcy-warning-content">
+            <span className="bankruptcy-icon">💀</span>
+            <div className="bankruptcy-text">
+              <span className="bankruptcy-title">BANKRUPTCY IMMINENT</span>
+              <span className="bankruptcy-message">Get above $0 to recover!</span>
+            </div>
+            <div className="bankruptcy-countdown">
+              <span className="countdown-label">Time Left:</span>
+              <span className="countdown-value">{bankruptcyTimer}</span>
+            </div>
+          </div>
+          <div className="bankruptcy-progress">
+            <div
+              className="bankruptcy-progress-bar"
+              style={{
+                width: `${(gameState.bankruptcyCountdown / BANKRUPTCY_CONFIG.COUNTDOWN_DURATION) * 100}%`
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
       <div className="hud-section">
-        <div className="hud-item" title="Current shelter funds">
+        <div className={`hud-item hud-money-item ${moneyWarningLevel !== 'normal' ? `money-warning-${moneyWarningLevel}` : ''} ${moneyPulseClass}`} title="Current shelter funds">
           <span className="hud-label">💰 Money:</span>
-          <span className="hud-value" style={{ color: gameState.money < 0 ? '#ff4444' : '#ffffff' }}>
-            ${gameState.money}
-          </span>
+          <AnimatedMoneyDisplay
+            value={gameState.money}
+            warningLevel={moneyWarningLevel}
+            onPulse={handleMoneyPulse}
+            className="hud-value"
+          />
         </div>
         <div className="hud-item" title="Community reputation (0-100%)">
           <span className="hud-label">⭐ Reputation:</span>
@@ -88,16 +156,70 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
             {gameState.reputation}%
           </span>
         </div>
+        {/* Reputation Decay Info */}
+        {(() => {
+          const decayInfo = getDecayRateInfo(gameState);
+          if (decayInfo.isAtFloor) {
+            return (
+              <div className="hud-item hud-decay-info" title="Reputation at floor - no decay">
+                <span className="hud-label">📊 Decay:</span>
+                <span className="hud-value" style={{ color: '#66cc00' }}>At floor ({decayInfo.floor}%)</span>
+              </div>
+            );
+          }
+          if (decayInfo.isFullyMitigated) {
+            return (
+              <div className="hud-item hud-decay-info" title={`Decay mitigated by: ${decayInfo.mitigations.descriptions.join(', ')}`}>
+                <span className="hud-label">📊 Decay:</span>
+                <span className="hud-value" style={{ color: '#66cc00' }}>🛡️ Protected</span>
+              </div>
+            );
+          }
+          return (
+            <div className="hud-item hud-decay-info" title={`Base: -${decayInfo.baseDecayRate.toFixed(1)}%/day | Reduced by: ${decayInfo.mitigations.descriptions.join(', ') || 'None'}`}>
+              <span className="hud-label">📊 Decay:</span>
+              <span className="hud-value" style={{ color: decayInfo.netDecayRate > 1.5 ? '#ff6600' : '#ffcc00' }}>
+                -{decayInfo.netDecayRate.toFixed(1)}%/day
+              </span>
+            </div>
+          );
+        })()}
         <div className="hud-item" title="Food resource generated by cafeterias">
           <span className="hud-label">🍞 Food:</span>
           <span className="hud-value">{gameState.food}</span>
         </div>
+        {/* Financial Trend Indicator */}
+        <div className="hud-item hud-financial-indicator" title="Daily cash flow trend - click Management > Finances for details">
+          <FinancialIndicator gameState={gameState} />
+        </div>
+      </div>
+      
+      {/* Tier Info Section */}
+      <div className="hud-section hud-tier-section">
+        <div className="hud-tier-info">
+          <div className="hud-tier-badge" title={SHELTER_TIERS[gameState.currentTier].description}>
+            <span className="tier-icon">🏛️</span>
+            <span className="tier-name">{SHELTER_TIERS[gameState.currentTier].name}</span>
+          </div>
+          {gameState.currentTier < 4 && (
+            <div className="hud-tier-progress" title="Progress toward next tier">
+              <span className="progress-label">🎓</span>
+              <span className="progress-text">
+                {gameState.graduatedCount}/{SHELTER_TIERS[(gameState.currentTier + 1) as 1 | 2 | 3 | 4].graduationsRequired}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="hud-section">
-        <div className="hud-item">
+        <div className={`hud-item ${isAtResidentCap(gameState) ? 'capacity-full' : isApproachingCapacity(gameState) ? 'capacity-warning' : ''}`}
+             title={`Resident capacity: ${gameState.residents.length}/${getResidentCap(gameState)} (Tier ${gameState.currentTier} max)`}>
           <span className="hud-label">👥 Residents:</span>
-          <span className="hud-value">{gameState.residents.length}</span>
+          <span className="hud-value">
+            {gameState.residents.length}/{getResidentCap(gameState)}
+            {isAtResidentCap(gameState) && <span className="capacity-indicator"> ⚠️</span>}
+          </span>
         </div>
         <div className="hud-item">
           <span className="hud-label">🎓 Graduated:</span>
@@ -170,6 +292,24 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
             {isPaused ? '▶️' : '⏸️'}
           </button>
         )}
+        {/* Warning Indicator Button */}
+        {(() => {
+          const warningSystem = getWarningSystem();
+          const counts = warningSystem.getWarningCounts(gameState);
+          if (counts.total > 0) {
+            return (
+              <button
+                className={`hud-button hud-warning-button ${counts.critical > 0 ? 'critical' : counts.warning > 0 ? 'warning' : 'info'}`}
+                onClick={onWarningClick}
+                title={`${counts.total} active warning${counts.total !== 1 ? 's' : ''}`}
+              >
+                {counts.critical > 0 ? '🚨' : counts.warning > 0 ? '⚠️' : 'ℹ️'}
+                <span className="warning-count-badge">{counts.total}</span>
+              </button>
+            );
+          }
+          return null;
+        })()}
         {onSettingsClick && (
           <button
             className="hud-button hud-settings-button"
