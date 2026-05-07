@@ -1,0 +1,40 @@
+{
+  "name": "open-arms",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A shelter management simulation game",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DabideBoi/open-arms.git"
+  },
+  "keywords": [
+    "game",
+    "simulation",
+    "shelter",
+    "management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DabideBoi/open-arms/issues"
+  },
+  "homepage": "https://github.com/DabideBoi/open-arms#readme",
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

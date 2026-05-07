@@ -1,0 +1,124 @@
+.notification-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.notification-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: rgba(30, 30, 40, 0.95);
+  border: 2px solid;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-out 4.7s;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  min-width: 280px;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.notification-toast.success {
+  border-color: #4caf50;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(30, 30, 40, 0.95) 100%);
+}
+
+.notification-toast.warning {
+  border-color: #ff9800;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.2) 0%, rgba(30, 30, 40, 0.95) 100%);
+}
+
+.notification-toast.info {
+  border-color: #2196f3;
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(30, 30, 40, 0.95) 100%);
+}
+
+.notification-toast.error {
+  border-color: #f44336;
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(30, 30, 40, 0.95) 100%);
+}
+
+.notification-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notification-message {
+  flex: 1;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.notification-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .notification-container {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .notification-toast {
+    min-width: auto;
+  }
+  
+  .notification-message {
+    font-size: 13px;
+  }
+}
+
+/* Stacking animation */
+.notification-toast:not(:first-child) {
+  margin-top: -4px;
+}

@@ -1,0 +1,265 @@
+.game-end-modal {
+  max-width: 700px;
+  padding: 0;
+  animation: scaleIn 0.4s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.game-end-header {
+  padding: 40px 24px 24px;
+  text-align: center;
+  position: relative;
+}
+
+.game-end-modal.victory .game-end-header {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.game-end-modal.game-over .game-end-header {
+  background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+}
+
+.trophy-icon,
+.game-over-icon {
+  font-size: 80px;
+  margin-bottom: 16px;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.game-end-header h2 {
+  margin: 0 0 8px 0;
+  color: white;
+  font-size: 36px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 18px;
+}
+
+.game-end-stats {
+  padding: 32px 24px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.game-end-stats h3 {
+  margin: 0 0 24px 0;
+  color: white;
+  font-size: 20px;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.stat-item.highlight {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.stat-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  color: #b0b0b0;
+  font-size: 13px;
+}
+
+.stat-value {
+  color: white;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.victory-message,
+.game-over-message {
+  padding: 24px;
+  text-align: center;
+}
+
+.victory-message {
+  background: rgba(76, 175, 80, 0.1);
+  border-top: 2px solid rgba(76, 175, 80, 0.3);
+  border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+}
+
+.game-over-message {
+  background: rgba(244, 67, 54, 0.1);
+  border-top: 2px solid rgba(244, 67, 54, 0.3);
+  border-bottom: 2px solid rgba(244, 67, 54, 0.3);
+}
+
+.victory-message p,
+.game-over-message p {
+  margin: 0;
+  color: #e0e0e0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.game-end-actions {
+  padding: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.btn-restart,
+.btn-continue {
+  flex: 1;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-restart {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-restart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-continue {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+}
+
+.btn-continue:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+/* Confetti animation for victory */
+.game-end-modal.victory::before {
+  content: '🎉';
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 40px;
+  animation: confetti 3s ease-in-out infinite;
+}
+
+.game-end-modal.victory::after {
+  content: '🎊';
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  font-size: 40px;
+  animation: confetti 3s ease-in-out infinite 0.5s;
+}
+
+@keyframes confetti {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 0.7;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .game-end-modal {
+    width: 95%;
+  }
+  
+  .game-end-header {
+    padding: 32px 16px 20px;
+  }
+  
+  .trophy-icon,
+  .game-over-icon {
+    font-size: 60px;
+  }
+  
+  .game-end-header h2 {
+    font-size: 28px;
+  }
+  
+  .subtitle {
+    font-size: 16px;
+  }
+  
+  .game-end-stats {
+    padding: 24px 16px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .stat-item {
+    padding: 12px;
+  }
+  
+  .stat-icon {
+    font-size: 28px;
+  }
+  
+  .stat-value {
+    font-size: 18px;
+  }
+  
+  .game-end-actions {
+    flex-direction: column;
+    padding: 16px;
+  }
+}

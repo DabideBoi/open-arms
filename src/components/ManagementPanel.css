@@ -1,0 +1,342 @@
+.management-panel {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.management-panel-toggle {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.management-panel-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.management-panel-content {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  width: 450px;
+  max-height: 600px;
+  background: rgba(30, 30, 40, 0.95);
+  border: 2px solid #667eea;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.management-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #444;
+  padding-bottom: 10px;
+}
+
+.management-tabs .tab {
+  flex: 1;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.management-tabs .tab:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.management-tabs .tab.active {
+  background: #667eea;
+  font-weight: bold;
+}
+
+.tab-content {
+  color: white;
+}
+
+.tab-content h3 {
+  margin: 0 0 15px 0;
+  color: #667eea;
+  font-size: 18px;
+}
+
+.tab-content h4 {
+  margin: 15px 0 10px 0;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.fundraiser-list,
+.resident-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.fundraiser-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fundraiser-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.cancel-button {
+  padding: 6px 12px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.cancel-button:hover {
+  background: #c0392b;
+}
+
+.fundraiser-info-box {
+  background: rgba(102, 126, 234, 0.2);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.fundraiser-info-box p {
+  margin: 5px 0;
+}
+
+.resident-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.resident-select-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.resident-select-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.resident-select-item.selected {
+  background: rgba(102, 126, 234, 0.3);
+  border-color: #667eea;
+}
+
+.start-fundraiser-button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.start-fundraiser-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.start-fundraiser-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.expansion-info {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.expansion-info p {
+  margin: 5px 0;
+}
+
+.expansion-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.expansion-button {
+  padding: 12px;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.expansion-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.expansion-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #555;
+}
+
+.resident-detail-item {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.resident-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.resident-profile {
+  font-size: 12px;
+  color: #aaa;
+  text-transform: capitalize;
+}
+
+.resident-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.stat > span:first-child {
+  min-width: 90px;
+}
+
+.stat-bar {
+  flex: 1;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.stat-bar-fill.happiness {
+  background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-bar-fill.life {
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.resident-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.status-badge {
+  background: rgba(102, 126, 234, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.empty-message {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  padding: 20px;
+}
+
+.warning {
+  background: rgba(231, 76, 60, 0.2);
+  padding: 12px;
+  border-radius: 8px;
+  color: #e74c3c;
+  text-align: center;
+  font-weight: bold;
+}
+
+/* Scrollbar styling */
+.management-panel-content::-webkit-scrollbar,
+.resident-selection::-webkit-scrollbar {
+  width: 8px;
+}
+
+.management-panel-content::-webkit-scrollbar-track,
+.resident-selection::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.management-panel-content::-webkit-scrollbar-thumb,
+.resident-selection::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 4px;
+}
+
+.management-panel-content::-webkit-scrollbar-thumb:hover,
+.resident-selection::-webkit-scrollbar-thumb:hover {
+  background: #764ba2;
+}

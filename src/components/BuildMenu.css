@@ -1,0 +1,114 @@
+.build-menu {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.build-menu-toggle {
+  background: #4a9eff;
+  color: white;
+  border: none;
+  padding: 15px 25px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+}
+
+.build-menu-toggle:hover {
+  background: #3a8eef;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+}
+
+.build-menu-panel {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.95);
+  border: 2px solid #4a9eff;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.build-menu-panel h3 {
+  margin: 0 0 15px 0;
+  color: white;
+  font-size: 18px;
+  border-bottom: 2px solid #4a9eff;
+  padding-bottom: 10px;
+}
+
+.room-category {
+  margin-bottom: 15px;
+}
+
+.room-category h4 {
+  color: #4a9eff;
+  font-size: 14px;
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid #4a9eff;
+  color: white;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.room-button:hover:not(.disabled) {
+  background: rgba(74, 158, 255, 0.3);
+  transform: translateX(-5px);
+}
+
+.room-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #666;
+}
+
+.room-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.room-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.room-details {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.cost-affordable {
+  color: #4ade80;
+}
+
+.cost-expensive {
+  color: #f87171;
+}

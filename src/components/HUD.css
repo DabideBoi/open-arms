@@ -1,0 +1,161 @@
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  z-index: 1000;
+  border-bottom: 2px solid #4a9eff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.hud-section {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.hud-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-label {
+  font-size: 12px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.hud-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+/* Phase Section */
+.hud-phase-section {
+  min-width: 250px;
+}
+
+.hud-phase-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.hud-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud-phase-icon {
+  font-size: 24px;
+}
+
+.hud-phase-label {
+  font-size: 16px;
+  font-weight: bold;
+  flex: 1;
+}
+
+.hud-phase-time {
+  font-size: 14px;
+  color: #aaa;
+  font-family: 'Courier New', monospace;
+}
+
+.hud-phase-progress {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.hud-phase-progress-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+
+.hud-phase-progress-bar.day {
+  background: linear-gradient(90deg, #FFD700, #FFA500);
+}
+
+.hud-phase-progress-bar.night {
+  background: linear-gradient(90deg, #4444AA, #6666CC);
+}
+
+/* Control Buttons */
+.hud-controls {
+  gap: 10px;
+}
+
+.hud-button {
+  padding: 10px 16px;
+  font-size: 20px;
+  background: rgba(74, 158, 255, 0.2);
+  color: white;
+  border: 2px solid #4a9eff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  min-width: 50px;
+}
+
+.hud-button:hover {
+  background: rgba(74, 158, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(74, 158, 255, 0.4);
+}
+
+.hud-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.hud-pause-button.paused {
+  background: rgba(50, 205, 50, 0.3);
+  border-color: #32cd32;
+}
+
+.hud-pause-button.paused:hover {
+  background: rgba(50, 205, 50, 0.5);
+}
+
+.hud-settings-button:hover {
+  background: rgba(138, 43, 226, 0.4);
+  border-color: #8a2be2;
+}
+
+/* Tooltips */
+.hud-item[title]:hover {
+  cursor: help;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .hud {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .hud-section {
+    gap: 10px;
+  }
+  
+  .hud-value {
+    font-size: 16px;
+  }
+}
