@@ -1,0 +1,487 @@
+/* Statistics Modal Overlay */
+.statistics-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+}
+
+/* Statistics Modal Container */
+.statistics-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 25, 35, 0.98);
+  border: 2px solid #4a9eff;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 550px;
+  max-width: 700px;
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: 10000;
+  box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.statistics-modal h2 {
+  margin: 0 0 20px 0;
+  color: #4a9eff;
+  font-size: 24px;
+  text-align: center;
+  border-bottom: 2px solid rgba(74, 158, 255, 0.3);
+  padding-bottom: 12px;
+}
+
+.statistics-modal h3 {
+  margin: 0 0 12px 0;
+  color: #6eb8ff;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statistics-modal h4 {
+  margin: 8px 0;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Close Button */
+.statistics-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 100, 100, 0.8);
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.statistics-close-button:hover {
+  background: rgba(255, 100, 100, 1);
+  transform: rotate(90deg);
+}
+
+/* Section Container */
+.statistics-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(74, 158, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.statistics-content {
+  color: #ddd;
+  font-size: 14px;
+}
+
+/* Decay Status Displays */
+.decay-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.decay-status.decay-protected {
+  background: rgba(102, 204, 0, 0.15);
+  border: 1px solid rgba(102, 204, 0, 0.3);
+}
+
+.decay-status.decay-active {
+  background: rgba(255, 204, 0, 0.15);
+  border: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.decay-icon {
+  font-size: 28px;
+}
+
+.decay-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.decay-label {
+  font-weight: 600;
+  color: #fff;
+  font-size: 15px;
+}
+
+.decay-value {
+  color: #aaa;
+  font-size: 13px;
+}
+
+/* Decay Details */
+.decay-details {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.detail-label {
+  color: #888;
+}
+
+.detail-value {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Protection Sources */
+.protection-sources {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(102, 204, 0, 0.1);
+  border-radius: 6px;
+}
+
+.protection-label {
+  color: #66cc00;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.protection-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.protection-item {
+  background: rgba(102, 204, 0, 0.2);
+  color: #9aee9a;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Mitigation Details */
+.mitigation-details {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.mitigation-label {
+  color: #6eb8ff;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.mitigation-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #aaa;
+  font-size: 12px;
+}
+
+.mitigation-list li {
+  padding: 2px 0;
+}
+
+/* Graduation Stats */
+.graduation-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.stat-card .stat-value {
+  display: block;
+  font-size: 28px;
+  font-weight: bold;
+  color: #4a9eff;
+  margin-bottom: 4px;
+}
+
+.stat-card .stat-label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+/* Finance Stats */
+.finance-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card.income .stat-value {
+  color: #66cc00;
+}
+
+.stat-card.expenses .stat-value {
+  color: #ff6666;
+}
+
+.stat-card.net.positive .stat-value {
+  color: #66cc00;
+}
+
+.stat-card.net.negative .stat-value {
+  color: #ff6666;
+}
+
+/* Finance Breakdown */
+.finance-breakdown {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.breakdown-section {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.breakdown-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.breakdown-item span:first-child {
+  color: #888;
+}
+
+.breakdown-item span:last-child {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Graduation Progress */
+.graduation-progress {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.progress-label {
+  color: #6eb8ff;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.progress-residents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-resident {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(147, 112, 219, 0.2);
+  border-radius: 6px;
+  border: 1px solid rgba(147, 112, 219, 0.3);
+}
+
+.resident-name {
+  color: #d8b4fe;
+  font-weight: 500;
+}
+
+.resident-progress {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.no-residents {
+  color: #666;
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* Food Section */
+.food-current {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.food-icon {
+  font-size: 40px;
+}
+
+.food-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.food-setting {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.food-description {
+  font-size: 13px;
+  color: #888;
+}
+
+.food-stats {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+/* Food Settings Controls */
+.food-settings {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.settings-label {
+  color: #6eb8ff;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.food-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.food-option {
+  padding: 8px 14px;
+  background: rgba(74, 158, 255, 0.15);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  border-radius: 6px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.food-option:hover {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: rgba(74, 158, 255, 0.5);
+  color: #fff;
+}
+
+.food-option.active {
+  background: rgba(74, 158, 255, 0.4);
+  border-color: #4a9eff;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Footer */
+.statistics-footer {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(74, 158, 255, 0.2);
+  text-align: center;
+}
+
+.footer-hint {
+  color: #666;
+  font-size: 12px;
+}
+
+/* Scrollbar styling */
+.statistics-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.statistics-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.statistics-modal::-webkit-scrollbar-thumb {
+  background: #4a9eff;
+  border-radius: 4px;
+}
+
+.statistics-modal::-webkit-scrollbar-thumb:hover {
+  background: #6eb8ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .statistics-modal {
+    min-width: 90%;
+    max-width: 95%;
+    padding: 16px;
+  }
+  
+  .graduation-stats,
+  .finance-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .finance-breakdown {
+    grid-template-columns: 1fr;
+  }
+  
+  .food-options {
+    flex-direction: column;
+  }
+  
+  .food-option {
+    text-align: center;
+  }
+}

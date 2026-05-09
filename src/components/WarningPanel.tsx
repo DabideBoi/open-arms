@@ -7,6 +7,9 @@ interface WarningPanelProps {
   gameState: GameState;
   onAction?: (actionType: string, warning: Warning) => void;
   onDismiss?: (warningId: string) => void;
+  // Controlled mode props for single-menu-at-a-time behavior
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
 /**
@@ -153,10 +156,22 @@ const WarningCard: React.FC<{
 export const WarningPanel: React.FC<WarningPanelProps> = ({
   gameState,
   onAction,
-  onDismiss
+  onDismiss,
+  isExpanded: controlledIsExpanded,
+  onToggle
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalIsExpanded, setInternalIsExpanded] = useState(false);
   const [hasNewCritical, setHasNewCritical] = useState(false);
+  
+  // Support both controlled and uncontrolled modes
+  const isExpanded = controlledIsExpanded !== undefined ? controlledIsExpanded : internalIsExpanded;
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalIsExpanded(!internalIsExpanded);
+    }
+  };
   
   const warnings = gameState.activeWarnings || [];
   const warningSystem = getWarningSystem();
@@ -176,8 +191,12 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
   useEffect(() => {
     const handleCriticalWarning = () => {
       setHasNewCritical(true);
-      // Auto-expand on critical
-      setIsExpanded(true);
+      // Auto-expand on critical - use controlled mode if available
+      if (onToggle && !isExpanded) {
+        onToggle();
+      } else if (!onToggle) {
+        setInternalIsExpanded(true);
+      }
       
       // Reset after animation
       setTimeout(() => setHasNewCritical(false), 2000);
@@ -195,7 +214,7 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
       window.removeEventListener('game:warning_critical', handleCriticalWarning as EventListener);
       window.removeEventListener('game:warning_escalated', handleEscalated as EventListener);
     };
-  }, []);
+  }, [onToggle, isExpanded]);
   
   const handleAction = useCallback((warning: Warning) => {
     if (onAction) {
@@ -225,9 +244,9 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
   return (
     <div className={`warning-panel ${isExpanded ? 'expanded' : 'collapsed'} ${hasNewCritical ? 'pulse-critical' : ''}`}>
       {/* Collapsed State - Icon with Badge */}
-      <div 
+      <div
         className="warning-panel-toggle"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggle}
         title={`${counts.total} active warning${counts.total !== 1 ? 's' : ''}`}
       >
         <span className="warning-panel-icon">

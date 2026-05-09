@@ -3,12 +3,12 @@ import Phaser from 'phaser';
 import { createPhaserGame, destroyPhaserGame } from './game/PhaserGame';
 import { GameStateManager, createInitialGameState } from './game/systems/GameStateManager';
 import { placeRoom, expandGrid } from './game/systems/GridSystem';
-import { startFundraiser, cancelFundraiser } from './game/systems/FundraiserSystem';
+import { startFundraiser, cancelFundraiser, FundraiserCompletionData } from './game/systems/FundraiserSystem';
 import { EventSystem, GameEvent, EventType } from './game/systems/EventSystem';
 import { getAudioSystem, playSFX } from './game/systems/AudioSystem';
 import { saveGame } from './game/systems/SaveLoadSystem';
 import { transitionToDay, transitionToNight } from './game/systems/DayNightSystem';
-import { initializeCafeteriaGeneration } from './game/systems/FoodSystem';
+import { initializeCafeteriaGeneration, changeFoodSetting } from './game/systems/FoodSystem';
 import { performUpgrade } from './game/systems/TierSystem';
 import { getWarningSystem } from './game/systems/WarningSystem';
 import { setDevTimersEnabled, isDevTimersEnabled } from './constants';
@@ -24,7 +24,9 @@ import { PerformanceMonitor } from './components/PerformanceMonitor';
 import { DevModeMenu } from './components/DevModeMenu';
 import { MoneyAnimationOverlay } from './components/MoneyAnimations';
 import { WarningPanel } from './components/WarningPanel';
-import { GameState, RoomType, GameOverReason, Warning } from './types';
+import { StatisticsModal } from './components/StatisticsModal';
+import { FundraiserCompleteModal } from './components/FundraiserCompleteModal';
+import { GameState, RoomType, GameOverReason, Warning, FoodPortionSetting } from './types';
 import { MainScene } from './game/scenes/MainScene';
 import './App.css';
 
@@ -51,6 +53,74 @@ function App() {
   const [devTimersEnabled, setDevTimersEnabledState] = useState(isDevTimersEnabled());
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [managementPanelTab, setManagementPanelTab] = useState<string>('residents');
+  const [showBuildMenu, setShowBuildMenu] = useState(false);
+  const [showWarningPanel, setShowWarningPanel] = useState(false);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [fundraiserCompletionData, setFundraiserCompletionData] = useState<FundraiserCompletionData | null>(null);
+  
+  // Menu types that are mutually exclusive (only one can be open at a time)
+  // Settings modal is a full overlay, so it's treated separately
+  type MenuType = 'build' | 'management' | 'warning' | 'devMode' | null;
+  
+  // Close all side menus (not modals like Settings)
+  const closeAllSideMenus = useCallback(() => {
+    setShowBuildMenu(false);
+    setShowManagementPanel(false);
+    setShowWarningPanel(false);
+    setShowDevMode(false);
+  }, []);
+  
+  // Open a specific menu, closing others first
+  const openMenu = useCallback((menu: MenuType) => {
+    closeAllSideMenus();
+    switch (menu) {
+      case 'build':
+        setShowBuildMenu(true);
+        break;
+      case 'management':
+        setShowManagementPanel(true);
+        break;
+      case 'warning':
+        setShowWarningPanel(true);
+        break;
+      case 'devMode':
+        setShowDevMode(true);
+        break;
+    }
+  }, [closeAllSideMenus]);
+  
+  // Toggle handlers for each menu
+  const handleToggleBuildMenu = useCallback(() => {
+    if (showBuildMenu) {
+      setShowBuildMenu(false);
+    } else {
+      openMenu('build');
+    }
+  }, [showBuildMenu, openMenu]);
+  
+  const handleToggleManagementPanel = useCallback(() => {
+    if (showManagementPanel) {
+      setShowManagementPanel(false);
+    } else {
+      openMenu('management');
+    }
+  }, [showManagementPanel, openMenu]);
+  
+  const handleToggleWarningPanel = useCallback(() => {
+    if (showWarningPanel) {
+      setShowWarningPanel(false);
+    } else {
+      openMenu('warning');
+    }
+  }, [showWarningPanel, openMenu]);
+  
+  const handleToggleDevMode = useCallback(() => {
+    if (showDevMode) {
+      setShowDevMode(false);
+    } else {
+      openMenu('devMode');
+    }
+  }, [showDevMode, openMenu]);
   
   const { notifications, addNotification, dismissNotification } = useNotifications();
   const warningSystem = getWarningSystem();
@@ -141,15 +211,13 @@ function App() {
         handleSaveGame();
       } else if (e.code === 'F12') {
         e.preventDefault();
-        setShowDevMode(!showDevMode);
+        handleToggleDevMode();
       } else if (e.code === 'Escape') {
-        if (showDevMode) {
-          setShowDevMode(false);
-        } else {
-          setShowSettings(false);
-          setCurrentEvent(null);
-          setSelectedRoomType(null); // Cancel placement mode
-        }
+        // Close any open menu/modal
+        closeAllSideMenus();
+        setShowSettings(false);
+        setCurrentEvent(null);
+        setSelectedRoomType(null); // Cancel placement mode
       }
     };
     
@@ -193,11 +261,32 @@ function App() {
       addNotification(`⚠️ Warning escalated: ${warning.message}`, 'warning');
     };
     
+    // Handle fundraiser completion - show modal with details
+    const handleFundraiserCompleted = (event: CustomEvent) => {
+      const completionData = event.detail as FundraiserCompletionData;
+      setFundraiserCompletionData(completionData);
+      
+      // Play appropriate sound
+      if (completionData.success) {
+        playSFX('graduation'); // Success sound
+      } else {
+        playSFX('error'); // Failure sound
+      }
+      
+      // Also show a notification
+      if (completionData.success) {
+        addNotification(`🎉 Fundraiser complete! Raised $${completionData.payout.toLocaleString()}`, 'success');
+      } else {
+        addNotification(`😔 Fundraiser failed. No money raised.`, 'warning');
+      }
+    };
+    
     window.addEventListener('game:event_triggered' as any, handleEventTriggered);
     window.addEventListener('game:add_residents' as any, handleAddResidents);
     window.addEventListener('game:game_over' as any, handleGameOver);
     window.addEventListener('game:warning_critical' as any, handleCriticalWarning);
     window.addEventListener('game:warning_escalated' as any, handleWarningEscalated);
+    window.addEventListener('fundraiser_completed' as any, handleFundraiserCompleted);
     
     // Start background music
     audioSystem.updateMusicForPhase('day');
@@ -210,6 +299,7 @@ function App() {
       window.removeEventListener('game:game_over' as any, handleGameOver);
       window.removeEventListener('game:warning_critical' as any, handleCriticalWarning);
       window.removeEventListener('game:warning_escalated' as any, handleWarningEscalated);
+      window.removeEventListener('fundraiser_completed' as any, handleFundraiserCompleted);
       
       if (gameRef.current) {
         destroyPhaserGame(gameRef.current);
@@ -397,6 +487,12 @@ function App() {
     
     if (result.success && result.newMoney !== undefined) {
       state.money = result.newMoney;
+      
+      // Mark grid as dirty so MainScene re-renders the expanded grid
+      if (mainSceneRef.current) {
+        mainSceneRef.current.markGridDirty();
+      }
+      
       gameStateManagerRef.current.forceUpdate();
       playSFX('build');
       addNotification(`Grid expanded ${direction}!`, 'success');
@@ -518,6 +614,28 @@ function App() {
     playSFX('click');
   };
   
+  const handleChangeFoodSetting = (setting: FoodPortionSetting) => {
+    if (!gameStateManagerRef.current) return;
+    
+    const state = gameStateManagerRef.current.getMutableState();
+    const result = changeFoodSetting(state, setting);
+    
+    if (result.success) {
+      gameStateManagerRef.current.forceUpdate();
+      addNotification(result.message, 'success');
+      
+      // Show warning if applicable
+      if (result.warning) {
+        addNotification(result.warning, 'warning');
+      }
+      
+      playSFX('click');
+    } else {
+      addNotification(result.message, 'error');
+      playSFX('error');
+    }
+  };
+  
   const handleUpgradeTier = () => {
     if (!gameStateManagerRef.current) return;
     const state = gameStateManagerRef.current.getMutableState();
@@ -539,6 +657,9 @@ function App() {
   const handleWarningAction = useCallback((actionType: string, warning: Warning) => {
     playSFX('click');
     
+    // Close other menus and open management panel
+    openMenu('management');
+    
     switch (actionType) {
       case 'low_funds':
       case 'in_debt':
@@ -546,7 +667,6 @@ function App() {
       case 'maintenance_due':
       case 'operating_costs_due':
         // Open finances tab in management panel
-        setShowManagementPanel(true);
         setManagementPanelTab('finances');
         break;
       case 'unhappy_resident':
@@ -555,32 +675,28 @@ function App() {
       case 'life_meters_stalled':
       case 'reputation_dropping':
         // Open residents tab in management panel
-        setShowManagementPanel(true);
         setManagementPanelTab('residents');
         break;
       case 'overcrowded':
       case 'capacity_warning':
       case 'ready_to_upgrade':
         // Open tier upgrade tab
-        setShowManagementPanel(true);
         setManagementPanelTab('tier');
         break;
       case 'hungry_residents':
       case 'maintenance_overdue':
         // Open rooms tab
-        setShowManagementPanel(true);
         setManagementPanelTab('rooms');
         break;
       case 'low_reputation':
         // Show general dashboard
-        setShowManagementPanel(true);
         setManagementPanelTab('overview');
         break;
       default:
-        // Default to opening management panel
-        setShowManagementPanel(true);
+        // Default to showing residents
+        setManagementPanelTab('residents');
     }
-  }, []);
+  }, [openMenu]);
   
   const handleWarningDismiss = useCallback((warningId: string) => {
     if (!gameStateManagerRef.current) return;
@@ -664,6 +780,14 @@ function App() {
         />
       )}
       
+      {/* Fundraiser Complete Modal */}
+      {fundraiserCompletionData && (
+        <FundraiserCompleteModal
+          data={fundraiserCompletionData}
+          onClose={() => setFundraiserCompletionData(null)}
+        />
+      )}
+      
       {/* Dev Mode Menu */}
       {showDevMode && (
         <DevModeMenu
@@ -705,13 +829,26 @@ function App() {
         isPaused={isPaused}
         onSettingsClick={() => setShowSettings(true)}
         onWarningClick={handleWarningClick}
+        onStatisticsClick={() => setShowStatistics(true)}
       />
+      
+      {/* Statistics Modal */}
+      {showStatistics && (
+        <StatisticsModal
+          isOpen={showStatistics}
+          onClose={() => setShowStatistics(false)}
+          gameState={gameState}
+          onChangeFoodSetting={handleChangeFoodSetting}
+        />
+      )}
       
       {/* Warning Panel */}
       <WarningPanel
         gameState={gameState}
         onAction={handleWarningAction}
         onDismiss={handleWarningDismiss}
+        isExpanded={showWarningPanel}
+        onToggle={handleToggleWarningPanel}
       />
       
       {/* Game Canvas */}
@@ -723,6 +860,8 @@ function App() {
         onRoomSelected={handleRoomSelected}
         currentMoney={gameState.money}
         gameState={gameState}
+        isOpen={showBuildMenu}
+        onToggle={handleToggleBuildMenu}
       />
       
       {/* Management Panel */}
@@ -731,7 +870,10 @@ function App() {
         onStartFundraiser={handleStartFundraiser}
         onCancelFundraiser={handleCancelFundraiser}
         onExpandGrid={handleExpandGrid}
+        onChangeFoodSetting={handleChangeFoodSetting}
         onUpgradeTier={handleUpgradeTier}
+        isOpen={showManagementPanel}
+        onToggle={handleToggleManagementPanel}
       />
       
       {/* Performance Monitor (F3 to toggle) */}
@@ -740,15 +882,6 @@ function App() {
         gameState={gameState}
       />
       
-      {/* Info Panel */}
-      <div className="info-panel">
-        <h3>🏠 Open Arms - Phase 6: Optimized & Tested</h3>
-        <p>🎮 Drag to pan | Scroll to zoom</p>
-        <p>⌨️ SPACE: Pause | B: Build | M: Manage | S: Save | F3: Performance | F12: Dev Mode</p>
-        <p>👥 {gameState.residents.length} residents | 🎓 {gameState.graduatedCount} graduated</p>
-        <p>🌓 {gameState.currentPhase === 'day' ? '☀️ Daytime' : '🌙 Nighttime'}</p>
-        <p>⚡ Optimizations: Culling, Pooling, Caching, Staggered Updates</p>
-      </div>
     </div>
   );
 }

@@ -236,6 +236,18 @@
   font-weight: bold;
 }
 
+.dev-timer-item .value.timer-live {
+  color: #4ade80;
+  font-size: 20px;
+  font-family: 'Courier New', monospace;
+  animation: timerPulse 2s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .dev-toggle {
   display: flex;
   align-items: center;

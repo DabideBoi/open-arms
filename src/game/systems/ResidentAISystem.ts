@@ -40,9 +40,116 @@ const AI_CONFIG = {
   EATING_INTERVAL_MIN: 4 * 60 * 1000,  // Minimum 4 game hours (2 minutes real-time in production)
   EATING_INTERVAL_MAX: 6 * 60 * 1000,  // Maximum 6 game hours (3 minutes real-time in production)
   EATING_DURATION: 15,              // Seconds to eat at cafeteria
-  MAX_WAIT_TIME: 3000,              // Maximum time to wait for occupied tile (3 seconds)
-  REPATH_COOLDOWN: 2000             // Cooldown before attempting to repath (2 seconds)
+  MAX_WAIT_TIME: 10000,             // Maximum time to wait for occupied tile (10 seconds - INCREASED)
+  REPATH_COOLDOWN: 2000,            // Cooldown before attempting to repath (2 seconds)
+  REPOSITION_DURATION: 1.0,         // Duration for gradual repositioning animation (1 second)
+  REPATH_ATTEMPTS: 2,               // Number of repath attempts before repositioning
+  FUNDRAISER_WANDER_INTERVAL: 3000, // Interval between wander position changes at fundraiser (3 seconds)
+  FUNDRAISER_WANDER_SPEED: 1.5      // Slower movement speed when wandering (tiles per second)
 };
+
+// ============================================================================
+// Fundraiser Helper Functions
+// ============================================================================
+
+/**
+ * Check if a resident is assigned to an active fundraiser
+ */
+function isResidentInActiveFundraiser(resident: Resident, gameState: GameState): boolean {
+  if (!gameState.activeFundraisers || gameState.activeFundraisers.length === 0) {
+    return false;
+  }
+  
+  return gameState.activeFundraisers.some(f => f.assignedResidents.includes(resident.id));
+}
+
+/**
+ * Get the fundraiser a resident is assigned to (if any)
+ */
+function getResidentFundraiser(resident: Resident, gameState: GameState): { id: string; stationId: string } | null {
+  if (!gameState.activeFundraisers || gameState.activeFundraisers.length === 0) {
+    return null;
+  }
+  
+  const fundraiser = gameState.activeFundraisers.find(f => f.assignedResidents.includes(resident.id));
+  if (fundraiser) {
+    return { id: fundraiser.id, stationId: fundraiser.stationId };
+  }
+  return null;
+}
+
+/**
+ * Get a random wander position within the bounds of a room
+ * Returns a position that is within the room's grid boundaries
+ */
+function getRandomWanderPositionInRoom(room: Room): { x: number; y: number } {
+  // Pick a random position within the room bounds
+  // Add 0.5 to center the position within each tile
+  const x = room.gridX + Math.random() * (room.width - 1) + 0.5;
+  const y = room.gridY + Math.random() * (room.height - 1) + 0.5;
+  
+  return { x, y };
+}
+
+// ============================================================================
+// Gradual Repositioning System
+// ============================================================================
+
+/**
+ * Start gradual repositioning for a resident
+ */
+function startGradualReposition(
+  resident: Resident,
+  targetX: number,
+  targetY: number,
+  duration: number = AI_CONFIG.REPOSITION_DURATION
+): void {
+  resident.repositionTarget = { x: targetX, y: targetY };
+  resident.repositionStartTime = Date.now();
+  resident.repositionDuration = duration;
+  console.log(`🔄 ${resident.name} starting gradual reposition from (${resident.gridX.toFixed(2)}, ${resident.gridY.toFixed(2)}) to (${targetX.toFixed(2)}, ${targetY.toFixed(2)}) over ${duration}s`);
+}
+
+/**
+ * Update gradual repositioning (call each frame)
+ * Returns true if repositioning is complete
+ */
+function updateGradualReposition(resident: Resident, deltaTime: number): boolean {
+  if (!resident.repositionTarget || resident.repositionStartTime === null) {
+    return false;
+  }
+  
+  const elapsed = (Date.now() - resident.repositionStartTime) / 1000; // Convert to seconds
+  const progress = Math.min(elapsed / resident.repositionDuration, 1.0);
+  
+  // Smooth easing function (ease-out cubic)
+  const easedProgress = 1 - Math.pow(1 - progress, 3);
+  
+  // Store start position on first frame
+  if (resident.repositionTarget.startX === undefined) {
+    resident.repositionTarget.startX = resident.gridX;
+    resident.repositionTarget.startY = resident.gridY;
+  }
+  
+  const startX = resident.repositionTarget.startX!;
+  const startY = resident.repositionTarget.startY!;
+  const targetX = resident.repositionTarget.x;
+  const targetY = resident.repositionTarget.y;
+  
+  // Calculate new position with easing
+  resident.gridX = startX + (targetX - startX) * easedProgress;
+  resident.gridY = startY + (targetY - startY) * easedProgress;
+  
+  // Check if repositioning is complete
+  if (progress >= 1.0) {
+    console.log(`✅ ${resident.name} completed gradual reposition at (${resident.gridX.toFixed(2)}, ${resident.gridY.toFixed(2)})`);
+    resident.repositionTarget = null;
+    resident.repositionStartTime = null;
+    return true; // Repositioning complete
+  }
+  
+  return false; // Still repositioning
+}
 
 // ============================================================================
 // Helper Functions
@@ -295,6 +402,26 @@ function handleIdleState(resident: Resident, gameState: GameState): void {
     return;
   }
   
+  // CRITICAL FIX: Don't detect new needs if resident is assigned to an active fundraiser
+  // Fundraiser assignments should take priority over learning, social, etc.
+  // Exception: Sleep can still override (handled above)
+  if (isResidentInActiveFundraiser(resident, gameState)) {
+    console.log(`🎪 ${resident.name} is assigned to active fundraiser - skipping need detection`);
+    // Set them back to seeking/pathfinding to the fundraiser if they somehow became idle
+    if (resident.currentNeed !== 'fundraiser') {
+      resident.currentNeed = 'fundraiser';
+      // If they already have a path, set to pathfinding; otherwise seeking_need
+      if (resident.path && resident.path.length > 0) {
+        resident.currentState = 'pathfinding';
+        console.log(`🎪 ${resident.name} reassigned to fundraiser (pathfinding)`);
+      } else {
+        resident.currentState = 'seeking_need';
+        console.log(`🎪 ${resident.name} reassigned to fundraiser (seeking path)`);
+      }
+    }
+    return;
+  }
+  
   // Detect current need (cached result)
   const need = detectNeedCached(resident, gameState);
   
@@ -312,6 +439,54 @@ function handleIdleState(resident: Resident, gameState: GameState): void {
  */
 function handleSeekingNeedState(resident: Resident, gameState: GameState): void {
   if (!resident.currentNeed) {
+    resident.currentState = "idle";
+    return;
+  }
+  
+  // Special handling for fundraiser need - the targetRoomId is already set by FundraiserSystem
+  if (resident.currentNeed === "fundraiser") {
+    console.log(`🎪 [ResidentAI] ${resident.name} in seeking_need with fundraiser need - Current state: "${resident.currentState}", Has path: ${!!resident.path}, Path length: ${resident.path?.length || 0}`);
+    
+    // If FundraiserSystem already set a valid path, just transition to pathfinding
+    if (resident.path && resident.path.length > 0 && resident.targetRoomId) {
+      console.log(`🎪 [ResidentAI] ${resident.name} already has path from FundraiserSystem, transitioning to pathfinding`);
+      resident.currentState = "pathfinding";
+      return;
+    }
+    
+    // Otherwise, calculate path to the target station
+    if (resident.targetRoomId) {
+      const station = gameState.rooms.find(r => r.id === resident.targetRoomId);
+      if (station && station.isOpen) {
+        const stationCenterX = station.gridX + Math.floor(station.width / 2);
+        const stationCenterY = station.gridY + Math.floor(station.height / 2);
+        
+        const path = findPath(
+          gameState.grid,
+          Math.floor(resident.gridX),
+          Math.floor(resident.gridY),
+          stationCenterX,
+          stationCenterY
+        );
+        
+        if (path && path.length > 0) {
+          console.log(`🎪 [ResidentAI] ${resident.name} calculating path to fundraiser station`);
+          resident.path = path;
+          resident.pathIndex = 0;
+          resident.currentState = "pathfinding";
+          console.log(`🎪 ${resident.name} seeking fundraiser station at (${stationCenterX}, ${stationCenterY})`);
+          return;
+        } else {
+          // No path found - set them to in_use at the station
+          console.warn(`⚠️ ${resident.name} couldn't find path to fundraiser station, setting in_use`);
+          resident.currentState = "in_use";
+          return;
+        }
+      }
+    }
+    // No valid target, clear the fundraiser need
+    console.warn(`⚠️ ${resident.name} has fundraiser need but no valid target station`);
+    resident.currentNeed = null;
     resident.currentState = "idle";
     return;
   }
@@ -338,7 +513,8 @@ function handleSeekingNeedState(resident: Resident, gameState: GameState): void 
         learning: ["learning_center", "vocational_room"],
         social: ["common_room"],
         bathroom: ["bathroom"],
-        food: ["cafeteria"]
+        food: ["cafeteria"],
+        fundraiser: ["fundraiser_station"]
       };
       const validTypes = needRoomTypes[resident.currentNeed] || [];
       
@@ -387,7 +563,13 @@ function handlePathfindingState(
   gameState: GameState,
   deltaTime: number
 ): void {
+  // Debug log for fundraiser residents
+  if (resident.currentNeed === "fundraiser") {
+    console.log(`🚶 [handlePathfindingState] ${resident.name} - Need: "${resident.currentNeed}", Path: ${resident.path?.length || 0} nodes, PathIndex: ${resident.pathIndex}, TargetRoom: ${resident.targetRoomId?.substring(0, 8)}`);
+  }
+  
   if (!resident.path || resident.path.length === 0) {
+    console.error(`⚠️ [handlePathfindingState] ${resident.name} has no path! Need: "${resident.currentNeed}", TargetRoom: ${resident.targetRoomId?.substring(0, 8)}, returning to idle`);
     resident.currentState = "idle";
     removeFromWaitQueue(resident.id);
     return;
@@ -402,10 +584,40 @@ function handlePathfindingState(
     
     if (canProceed) {
       if (reason === 'timeout') {
-        // Waited too long - use social distancing to find safe position
-        console.log(`${resident.name} timed out waiting, using social distancing to reposition`);
+        console.log(`⏱️ ${resident.name} timed out waiting for tile`);
         
-        // Find a safe nearby position using our improved algorithm
+        // Try to repath first (attempt to find alternative route)
+        if (!resident.repathAttempts) resident.repathAttempts = 0;
+        
+        if (resident.repathAttempts < AI_CONFIG.REPATH_ATTEMPTS && resident.targetRoomId && resident.currentNeed) {
+          resident.repathAttempts++;
+          console.log(`🔄 ${resident.name} attempting repath (attempt ${resident.repathAttempts}/${AI_CONFIG.REPATH_ATTEMPTS})`);
+          
+          // Try to find new path to target room
+          const result = findNearestRoomForNeed(
+            gameState.grid,
+            gameState.rooms,
+            Math.floor(resident.gridX),
+            Math.floor(resident.gridY),
+            resident.currentNeed,
+            gameState.currentPhase
+          );
+          
+          if (result && result.path) {
+            console.log(`✅ ${resident.name} found alternative path (length: ${result.path.length})`);
+            resident.path = result.path;
+            resident.pathIndex = 0;
+            resident.targetRoomId = result.room.id;
+            removeFromWaitQueue(resident.id);
+            clearTileReservation(resident.id);
+            return;
+          }
+        }
+        
+        // Repath failed or exhausted attempts - use gradual repositioning
+        console.log(`🚨 ${resident.name} exhausted repath attempts, starting gradual repositioning`);
+        
+        // Find a safe nearby position
         const safePos = findSafeNearbyPosition(
           gameState.grid,
           resident.gridX,
@@ -417,9 +629,9 @@ function handlePathfindingState(
         if (safePos) {
           // Validate position is walkable before applying
           const clamped = clampToWalkableBounds(gameState.grid, safePos.x, safePos.y);
-          resident.gridX = clamped.x;
-          resident.gridY = clamped.y;
-          updateResidentPosition(resident, currentX, currentY);
+          
+          // Start gradual repositioning instead of instant teleport
+          startGradualReposition(resident, clamped.x, clamped.y);
         }
         
         clearTileReservation(resident.id);
@@ -427,11 +639,13 @@ function handlePathfindingState(
         resident.currentState = "idle";
         resident.path = null;
         resident.targetRoomId = null;
+        resident.repathAttempts = 0;
         // Don't clear currentNeed - let them try again on next update
         return;
       }
       // If reason is 'available', continue movement below
       removeFromWaitQueue(resident.id);
+      resident.repathAttempts = 0; // Reset repath attempts on success
     } else {
       // Still waiting, don't move
       return;
@@ -566,6 +780,60 @@ function handleInUseState(
   // Apply room effects
   applyRoomEffects(resident, room, gameState, deltaTime);
   
+  // Check if resident is assigned to an active fundraiser at this station
+  if (room.type === "fundraiser_station") {
+    const fundraiser = getResidentFundraiser(resident, gameState);
+    
+    if (fundraiser && fundraiser.stationId === room.id) {
+      // Resident is participating in an active fundraiser at this station
+      // They should stay here until the fundraiser completes
+      
+      // EXCEPTION: Sleep takes priority - if it's night, allow them to go sleep
+      if (gameState.currentPhase === "night") {
+        console.log(`🌙 ${resident.name} leaving fundraiser station to sleep (night time)`);
+        // Don't leave the room occupancy - fundraiser system handles this
+        resident.currentNeed = "sleep";
+        resident.currentState = "seeking_need";
+        // Keep targetRoomId so we remember the fundraiser station
+        return;
+      }
+      
+      // Wander around the fundraiser station area to look active
+      const now = Date.now();
+      // Handle undefined lastWanderTime (first time entering) - use Infinity to trigger immediately
+      const timeSinceLastWander = resident.lastWanderTime ? now - resident.lastWanderTime : Infinity;
+      
+      // Check if it's time to pick a new wander position
+      // Also check that we're not currently repositioning
+      if (timeSinceLastWander >= AI_CONFIG.FUNDRAISER_WANDER_INTERVAL &&
+          !resident.repositionTarget) {
+        // Pick a random position within the room bounds
+        const wanderPos = getRandomWanderPositionInRoom(room);
+        
+        // Calculate distance and duration for smooth movement
+        const dx = wanderPos.x - resident.gridX;
+        const dy = wanderPos.y - resident.gridY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Only move if the distance is meaningful (avoid jittery small movements)
+        if (distance > 0.5) {
+          // Calculate duration based on wander speed
+          const duration = distance / AI_CONFIG.FUNDRAISER_WANDER_SPEED;
+          
+          // Start gradual reposition to the new wander position
+          startGradualReposition(resident, wanderPos.x, wanderPos.y, duration);
+          console.log(`🚶 ${resident.name} wandering to (${wanderPos.x.toFixed(1)}, ${wanderPos.y.toFixed(1)}) at fundraiser station`);
+        }
+        
+        // Update last wander time regardless (to avoid rapid checks)
+        resident.lastWanderTime = now;
+      }
+      
+      // Stay at the fundraiser station - don't transition to satisfied
+      return;
+    }
+  }
+  
   // Check if need is satisfied (simple timer-based for now)
   // In a real implementation, we'd track time in room
   const USAGE_TIME = room.type === "cafeteria" ? AI_CONFIG.EATING_DURATION : AI_CONFIG.ROOM_USAGE_TIME;
@@ -618,10 +886,19 @@ function handleSleepingState(
   if (resident.sleepX !== null && resident.sleepY !== null) {
     // Validate sleep position is still within walkable bounds
     const clampedSleep = clampToWalkableBounds(gameState.grid, resident.sleepX, resident.sleepY);
+    
+    // Check if sleep position changed (indicating a teleport)
+    if (Math.abs(clampedSleep.x - resident.sleepX) > 0.01 || Math.abs(clampedSleep.y - resident.sleepY) > 0.01) {
+      console.log(`🚨 TELEPORT DEBUG: Sleep position clamped from (${resident.sleepX.toFixed(2)}, ${resident.sleepY.toFixed(2)}) to (${clampedSleep.x.toFixed(2)}, ${clampedSleep.y.toFixed(2)})`);
+    }
+    
     resident.sleepX = clampedSleep.x;
     resident.sleepY = clampedSleep.y;
     
     // Lock resident to their sleep position
+    if (Math.abs(resident.gridX - resident.sleepX) > 0.01 || Math.abs(resident.gridY - resident.sleepY) > 0.01) {
+      console.log(`🚨 TELEPORT DEBUG: ${resident.name} snapped back to sleep position from (${resident.gridX.toFixed(2)}, ${resident.gridY.toFixed(2)}) to (${resident.sleepX.toFixed(2)}, ${resident.sleepY.toFixed(2)})`);
+    }
     resident.gridX = resident.sleepX;
     resident.gridY = resident.sleepY;
     
@@ -638,6 +915,42 @@ function handleSleepingState(
     // Clear sleep position lock
     resident.sleepX = null;
     resident.sleepY = null;
+    
+    // Check if resident is still assigned to an active fundraiser
+    // If so, send them back to the fundraiser station instead of going idle
+    const fundraiser = getResidentFundraiser(resident, gameState);
+    if (fundraiser) {
+      const station = gameState.rooms.find(r => r.id === fundraiser.stationId);
+      if (station) {
+        console.log(`☀️ ${resident.name} woke up and returning to active fundraiser at station`);
+        
+        // Find path to the fundraiser station
+        const stationCenterX = station.gridX + Math.floor(station.width / 2);
+        const stationCenterY = station.gridY + Math.floor(station.height / 2);
+        
+        const path = findPath(
+          gameState.grid,
+          Math.floor(resident.gridX),
+          Math.floor(resident.gridY),
+          stationCenterX,
+          stationCenterY
+        );
+        
+        if (path && path.length > 0) {
+          resident.path = path;
+          resident.pathIndex = 0;
+          resident.currentState = "pathfinding";
+          resident.targetRoomId = fundraiser.stationId;
+          resident.currentNeed = null;
+        } else {
+          // No path found - set them to in_use anyway at the station
+          resident.currentState = "in_use";
+          resident.targetRoomId = fundraiser.stationId;
+          resident.currentNeed = null;
+        }
+        return;
+      }
+    }
     
     resident.currentState = "idle";
     resident.currentNeed = null;
@@ -902,9 +1215,33 @@ export function updateResidentMovement(
   gameState: GameState,
   deltaTime: number
 ): void {
+  // Debug log for fundraiser residents
+  if (resident.currentNeed === "fundraiser" && resident.currentState === "pathfinding") {
+    console.log(`🚶 [updateResidentMovement] ${resident.name} - State: ${resident.currentState}, Path: ${resident.path?.length || 0}, PathIndex: ${resident.pathIndex}`);
+  }
+  
   // Store old position for collision detection
   const oldX = Math.floor(resident.gridX);
   const oldY = Math.floor(resident.gridY);
+  
+  // Check if resident is currently being gradually repositioned
+  if (resident.repositionTarget && resident.repositionStartTime !== null) {
+    const repositionComplete = updateGradualReposition(resident, deltaTime);
+    
+    // Update collision map if position changed tiles
+    const newX = Math.floor(resident.gridX);
+    const newY = Math.floor(resident.gridY);
+    if (oldX !== newX || oldY !== newY) {
+      updateResidentPosition(resident, oldX, oldY);
+    }
+    
+    // If repositioning is complete, allow normal movement to resume
+    if (repositionComplete) {
+      console.log(`✅ ${resident.name} repositioning complete, resuming normal behavior`);
+    }
+    
+    return; // Don't do normal movement while repositioning
+  }
   
   // Only apply social distancing when NOT on a path (idle/stationary residents)
   // This prevents interference with normal pathfinding movement

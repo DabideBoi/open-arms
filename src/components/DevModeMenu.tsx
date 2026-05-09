@@ -32,11 +32,38 @@ export function DevModeMenu({
   devTimersEnabled,
   onToggleDevTimers
 }: DevModeMenuProps) {
+  // Timer display states
+  const [donationTimer, setDonationTimer] = useState<string>('0:00');
+  const [maintenanceTimer, setMaintenanceTimer] = useState<string>('0:00');
   const [selectedResident, setSelectedResident] = useState<string>('');
   const [moneyAmount, setMoneyAmount] = useState<number>(1000);
   const [reputationValue, setReputationValue] = useState<number>(50);
   const [happinessValue, setHappinessValue] = useState<number>(50);
   const [lifeMeterValue, setLifeMeterValue] = useState<number>(50);
+  
+  // Update timer displays
+  useEffect(() => {
+    const updateTimers = () => {
+      const now = Date.now();
+      
+      // Donation timer
+      const donationRemaining = Math.max(0, gameState.nextDonationCheck - now);
+      const donationMin = Math.floor(donationRemaining / 60000);
+      const donationSec = Math.floor((donationRemaining % 60000) / 1000);
+      setDonationTimer(`${donationMin}:${donationSec.toString().padStart(2, '0')}`);
+      
+      // Maintenance timer
+      const maintenanceRemaining = Math.max(0, gameState.nextMaintenanceCheck - now);
+      const maintenanceMin = Math.floor(maintenanceRemaining / 60000);
+      const maintenanceSec = Math.floor((maintenanceRemaining % 60000) / 1000);
+      setMaintenanceTimer(`${maintenanceMin}:${maintenanceSec.toString().padStart(2, '0')}`);
+    };
+    
+    updateTimers();
+    const interval = setInterval(updateTimers, 1000);
+    
+    return () => clearInterval(interval);
+  }, [gameState.nextDonationCheck, gameState.nextMaintenanceCheck]);
   
   useEffect(() => {
     if (gameState.residents.length > 0 && !selectedResident) {
@@ -120,6 +147,28 @@ export function DevModeMenu({
             Current Phase: <strong>{gameState.currentPhase === 'day' ? '☀️ Day' : '🌙 Night'}</strong>
             <br />
             Time until transition: <strong>{formatTime(getTimeUntilNextTransition())}</strong>
+          </div>
+        </div>
+        
+        {/* Live Timers Section - moved from HUD */}
+        <div className="dev-section">
+          <h3>⏰ Live Timers</h3>
+          <div className="dev-timer-display">
+            <div className="dev-timer-item">
+              <div className="label">💝 Next Donation</div>
+              <div className="value timer-live">{donationTimer}</div>
+            </div>
+            <div className="dev-timer-item">
+              <div className="label">🔧 Next Maintenance</div>
+              <div className="value timer-live">{maintenanceTimer}</div>
+            </div>
+          </div>
+          <div className="dev-info">
+            These timers show when the next donation check and maintenance check will occur.
+            <br />
+            <strong>Donation:</strong> Passive income based on reputation.
+            <br />
+            <strong>Maintenance:</strong> Costs deducted for room upkeep.
           </div>
         </div>
         

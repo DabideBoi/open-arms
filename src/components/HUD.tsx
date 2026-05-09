@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { GameState, Warning } from '../types';
 import { BANKRUPTCY_CONFIG, SHELTER_TIERS } from '../constants';
 import { getResidentCap, getTierProgress, isApproachingCapacity, isAtResidentCap } from '../game/systems/TierSystem';
-import { getDecayRateInfo } from '../game/systems/ReputationSystem';
 import { getWarningSystem } from '../game/systems/WarningSystem';
 import { FinancialIndicator } from './EconomicDashboard';
 import { AnimatedMoneyDisplay } from './MoneyAnimations';
@@ -14,16 +13,16 @@ interface HUDProps {
   isPaused?: boolean;
   onSettingsClick?: () => void;
   onWarningClick?: () => void;
+  onStatisticsClick?: () => void;
 }
 
 /**
  * HUD component displaying game stats
+ * Streamlined to show essential stats - detailed stats moved to Statistics modal
  */
-export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = false, onSettingsClick, onWarningClick }) => {
+export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = false, onSettingsClick, onWarningClick, onStatisticsClick }) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('0:00');
   const [phaseProgress, setPhaseProgress] = useState<number>(0);
-  const [donationTimer, setDonationTimer] = useState<string>('0:00');
-  const [maintenanceTimer, setMaintenanceTimer] = useState<string>('0:00');
   const [bankruptcyTimer, setBankruptcyTimer] = useState<string>('0:00');
   const [moneyPulseClass, setMoneyPulseClass] = useState<string>('');
   
@@ -43,18 +42,6 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
       const progress = Math.max(0, Math.min(100, (elapsed / duration) * 100));
       setPhaseProgress(progress);
       
-      // Donation timer
-      const donationRemaining = Math.max(0, gameState.nextDonationCheck - now);
-      const donationMin = Math.floor(donationRemaining / 60000);
-      const donationSec = Math.floor((donationRemaining % 60000) / 1000);
-      setDonationTimer(`${donationMin}:${donationSec.toString().padStart(2, '0')}`);
-      
-      // Maintenance timer
-      const maintenanceRemaining = Math.max(0, gameState.nextMaintenanceCheck - now);
-      const maintenanceMin = Math.floor(maintenanceRemaining / 60000);
-      const maintenanceSec = Math.floor((maintenanceRemaining % 60000) / 1000);
-      setMaintenanceTimer(`${maintenanceMin}:${maintenanceSec.toString().padStart(2, '0')}`);
-      
       // Bankruptcy timer (when active)
       if (gameState.isBankrupt) {
         const bankruptcyRemaining = Math.max(0, gameState.bankruptcyCountdown);
@@ -68,7 +55,7 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
     const interval = setInterval(updateTimer, 1000);
     
     return () => clearInterval(interval);
-  }, [gameState.nextDayNightTransition, gameState.currentPhase, gameState.nextDonationCheck, gameState.nextMaintenanceCheck, gameState.isBankrupt, gameState.bankruptcyCountdown]);
+  }, [gameState.nextDayNightTransition, gameState.currentPhase, gameState.isBankrupt, gameState.bankruptcyCountdown]);
   
   // Get reputation color
   const getReputationColor = (rep: number): string => {
@@ -140,6 +127,7 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
         </div>
       )}
       
+      {/* Essential Stats Section */}
       <div className="hud-section">
         <div className={`hud-item hud-money-item ${moneyWarningLevel !== 'normal' ? `money-warning-${moneyWarningLevel}` : ''} ${moneyPulseClass}`} title="Current shelter funds">
           <span className="hud-label">💰 Money:</span>
@@ -156,40 +144,12 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
             {gameState.reputation}%
           </span>
         </div>
-        {/* Reputation Decay Info */}
-        {(() => {
-          const decayInfo = getDecayRateInfo(gameState);
-          if (decayInfo.isAtFloor) {
-            return (
-              <div className="hud-item hud-decay-info" title="Reputation at floor - no decay">
-                <span className="hud-label">📊 Decay:</span>
-                <span className="hud-value" style={{ color: '#66cc00' }}>At floor ({decayInfo.floor}%)</span>
-              </div>
-            );
-          }
-          if (decayInfo.isFullyMitigated) {
-            return (
-              <div className="hud-item hud-decay-info" title={`Decay mitigated by: ${decayInfo.mitigations.descriptions.join(', ')}`}>
-                <span className="hud-label">📊 Decay:</span>
-                <span className="hud-value" style={{ color: '#66cc00' }}>🛡️ Protected</span>
-              </div>
-            );
-          }
-          return (
-            <div className="hud-item hud-decay-info" title={`Base: -${decayInfo.baseDecayRate.toFixed(1)}%/day | Reduced by: ${decayInfo.mitigations.descriptions.join(', ') || 'None'}`}>
-              <span className="hud-label">📊 Decay:</span>
-              <span className="hud-value" style={{ color: decayInfo.netDecayRate > 1.5 ? '#ff6600' : '#ffcc00' }}>
-                -{decayInfo.netDecayRate.toFixed(1)}%/day
-              </span>
-            </div>
-          );
-        })()}
         <div className="hud-item" title="Food resource generated by cafeterias">
           <span className="hud-label">🍞 Food:</span>
           <span className="hud-value">{gameState.food}</span>
         </div>
         {/* Financial Trend Indicator */}
-        <div className="hud-item hud-financial-indicator" title="Daily cash flow trend - click Management > Finances for details">
+        <div className="hud-item hud-financial-indicator" title="Daily cash flow trend - click Statistics for details">
           <FinancialIndicator gameState={gameState} />
         </div>
       </div>
@@ -212,6 +172,7 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
         </div>
       </div>
       
+      {/* Residents & Rooms Section */}
       <div className="hud-section">
         <div className={`hud-item ${isAtResidentCap(gameState) ? 'capacity-full' : isApproachingCapacity(gameState) ? 'capacity-warning' : ''}`}
              title={`Resident capacity: ${gameState.residents.length}/${getResidentCap(gameState)} (Tier ${gameState.currentTier} max)`}>
@@ -222,19 +183,6 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
           </span>
         </div>
         <div className="hud-item">
-          <span className="hud-label">🎓 Graduated:</span>
-          <span className="hud-value">{gameState.graduatedCount}</span>
-        </div>
-        {gameState.activeFundraisers && gameState.activeFundraisers.length > 0 && (
-          <div className="hud-item">
-            <span className="hud-label">🎪 Fundraisers:</span>
-            <span className="hud-value">{gameState.activeFundraisers.length}</span>
-          </div>
-        )}
-      </div>
-      
-      <div className="hud-section">
-        <div className="hud-item">
           <span className="hud-label">📅 Day:</span>
           <span className="hud-value">{gameState.currentDay}</span>
         </div>
@@ -242,24 +190,12 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
           <span className="hud-label">🏠 Rooms:</span>
           <span className="hud-value">{gameState.rooms.length}</span>
         </div>
-      </div>
-      
-      <div className="hud-section">
-        <div className="hud-item">
-          <span className="hud-label">{getFoodIcon(gameState.foodPortionSetting)} Food:</span>
-          <span className="hud-value">{gameState.foodPortionSetting}</span>
-        </div>
-        <div className="hud-item">
-          <span className="hud-label">💝 Donation:</span>
-          <span className="hud-value">{donationTimer}</span>
-        </div>
-      </div>
-      
-      <div className="hud-section">
-        <div className="hud-item">
-          <span className="hud-label">🔧 Maintenance:</span>
-          <span className="hud-value">{maintenanceTimer}</span>
-        </div>
+        {gameState.activeFundraisers && gameState.activeFundraisers.length > 0 && (
+          <div className="hud-item">
+            <span className="hud-label">🎪 Fundraisers:</span>
+            <span className="hud-value">{gameState.activeFundraisers.length}</span>
+          </div>
+        )}
       </div>
       
       <div className="hud-section hud-phase-section">
@@ -310,6 +246,16 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onPauseToggle, isPaused = f
           }
           return null;
         })()}
+        {/* Statistics Button */}
+        {onStatisticsClick && (
+          <button
+            className="hud-button hud-statistics-button"
+            onClick={onStatisticsClick}
+            title="View detailed statistics (decay, graduated, finances, food)"
+          >
+            📊
+          </button>
+        )}
         {onSettingsClick && (
           <button
             className="hud-button hud-settings-button"

@@ -1,19 +1,158 @@
-import { GameState, Fundraiser, Resident } from '../../types';
+import { GameState, Fundraiser, Resident, ResidentProfile, Room } from '../../types';
 import { FUNDRAISER_CONFIG, PROFILE_SPECS, ROOM_SPECS } from '../../constants';
 import { generateUUID } from '../../utils/helpers';
 import { modifyReputation } from './ReputationSystem';
 import { consumeFood, hasFoodAvailable } from './FoodSystem';
+import { findPath } from './PathfindingSystem';
+import { isWalkable } from './GridSystem';
+import { isTileOccupiedByResident } from './CollisionDetectionSystem';
+
+// ============================================================================
+// Age-Based Cooldown Configuration
+// ============================================================================
+
+/**
+ * Get fatigue duration based on resident's age group (profile)
+ * - Young Adults: 30 seconds (faster recovery)
+ * - Adults: 2 minutes (moderate recovery) - Note: no "adult" profile exists, mapped to default
+ * - Elderly: 5 minutes (slower recovery)
+ * - Veterans: 5 minutes (same as elderly)
+ */
+export function getFatigueDurationForProfile(profile: ResidentProfile): number {
+  switch (profile) {
+    case 'young_adult':
+      return 30 * 1000; // 30 seconds
+    case 'veteran':
+      return 5 * 60 * 1000; // 5 minutes (300 seconds)
+    case 'elderly':
+      return 5 * 60 * 1000; // 5 minutes (300 seconds)
+    default:
+      return FUNDRAISER_CONFIG.FATIGUE_DURATION; // Default fallback
+  }
+}
+
+// ============================================================================
+// Nearest Fundraiser Station Logic
+// ============================================================================
+
+/**
+ * Calculate Manhattan distance between two grid positions
+ */
+function getManhattanDistance(x1: number, y1: number, x2: number, y2: number): number {
+  return Math.abs(x2 - x1) + Math.abs(y2 - y1);
+}
+
+/**
+ * Find the nearest fundraiser station to a resident
+ */
+export function findNearestFundraiserStation(
+  resident: Resident,
+  stations: Room[]
+): Room | null {
+  if (stations.length === 0) return null;
+  if (stations.length === 1) return stations[0];
+  
+  let nearestStation: Room | null = null;
+  let shortestDistance = Infinity;
+  
+  for (const station of stations) {
+    // Calculate distance to station center
+    const stationCenterX = station.gridX + Math.floor(station.width / 2);
+    const stationCenterY = station.gridY + Math.floor(station.height / 2);
+    
+    const distance = getManhattanDistance(
+      resident.gridX,
+      resident.gridY,
+      stationCenterX,
+      stationCenterY
+    );
+    
+    if (distance < shortestDistance) {
+      shortestDistance = distance;
+      nearestStation = station;
+    }
+  }
+  
+  return nearestStation;
+}
+
+/**
+ * Find the best fundraiser station for a group of residents
+ * (minimizes total distance for all residents)
+ */
+export function findBestFundraiserStationForGroup(
+  residents: Resident[],
+  stations: Room[]
+): Room | null {
+  if (stations.length === 0) return null;
+  if (stations.length === 1) return stations[0];
+  
+  let bestStation: Room | null = null;
+  let lowestTotalDistance = Infinity;
+  
+  for (const station of stations) {
+    const stationCenterX = station.gridX + Math.floor(station.width / 2);
+    const stationCenterY = station.gridY + Math.floor(station.height / 2);
+    
+    let totalDistance = 0;
+    for (const resident of residents) {
+      totalDistance += getManhattanDistance(
+        resident.gridX,
+        resident.gridY,
+        stationCenterX,
+        stationCenterY
+      );
+    }
+    
+    if (totalDistance < lowestTotalDistance) {
+      lowestTotalDistance = totalDistance;
+      bestStation = station;
+    }
+  }
+  
+  return bestStation;
+}
+
+/**
+ * Find a random unoccupied tile within a room
+ * This prevents multiple NPCs from targeting the same position
+ */
+function findRandomUnoccupiedTileInRoom(
+  grid: any,
+  room: Room
+): { x: number; y: number } | null {
+  const tiles: { x: number; y: number }[] = [];
+  
+  // Collect all walkable, unoccupied tiles in the room
+  for (let y = room.gridY; y < room.gridY + room.height; y++) {
+    for (let x = room.gridX; x < room.gridX + room.width; x++) {
+      if (isWalkable(grid, x, y) && !isTileOccupiedByResident(x, y)) {
+        tiles.push({ x, y });
+      }
+    }
+  }
+  
+  // Return random tile if available
+  if (tiles.length > 0) {
+    return tiles[Math.floor(Math.random() * tiles.length)];
+  }
+  
+  // Fallback: return center of room (even if occupied, pathfinding will handle waiting)
+  return {
+    x: room.gridX + Math.floor(room.width / 2),
+    y: room.gridY + Math.floor(room.height / 2)
+  };
+}
 
 /**
  * FundraiserSystem - Manages fundraiser events with rebalanced mechanics
- * 
- * NEW MECHANICS:
+ *
+ * MECHANICS:
  * - Failure chance based on average resident happiness
  * - Food consumption (3 units per participating resident)
- * - Cooldown period (10 minutes between fundraisers)
  * - Failed fundraisers have consequences
  * - Variable payout based on success roll
- * - Resident fatigue system (5 minute cooldown per resident)
+ * - Resident fatigue system (age-based cooldown per resident)
  */
 
 // ============================================================================
@@ -33,48 +172,6 @@ export function getFundraiserSuccessChance(residents: Resident[]): number {
   if (avgHappiness >= 40) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_40_PLUS;
   if (avgHappiness >= 20) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_20_PLUS;
   return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_BELOW_20;
-}
-
-// ============================================================================
-// Cooldown Management
-// ============================================================================
-
-/**
- * Check if fundraiser cooldown is active
- */
-export function isFundraiserOnCooldown(gameState: GameState): boolean {
-  if (!gameState.lastFundraiserEndTime) return false;
-  
-  const now = Date.now();
-  const cooldownEnd = gameState.lastFundraiserEndTime + FUNDRAISER_CONFIG.COOLDOWN_DURATION;
-  
-  return now < cooldownEnd;
-}
-
-/**
- * Get remaining cooldown time in milliseconds
- */
-export function getFundraiserCooldownRemaining(gameState: GameState): number {
-  if (!gameState.lastFundraiserEndTime) return 0;
-  
-  const now = Date.now();
-  const cooldownEnd = gameState.lastFundraiserEndTime + FUNDRAISER_CONFIG.COOLDOWN_DURATION;
-  
-  return Math.max(0, cooldownEnd - now);
-}
-
-/**
- * Get formatted cooldown time string
- */
-export function getFundraiserCooldownFormatted(gameState: GameState): string {
-  const remaining = getFundraiserCooldownRemaining(gameState);
-  
-  if (remaining <= 0) return 'Ready';
-  
-  const minutes = Math.floor(remaining / 60000);
-  const seconds = Math.floor((remaining % 60000) / 1000);
-  
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 // ============================================================================
@@ -99,14 +196,20 @@ export function getResidentFatigueRemaining(resident: Resident): number {
 
 /**
  * Apply fatigue to participating residents
+ * Now uses age-based cooldown durations
  */
 function applyFatigueToResidents(residents: Resident[]): void {
-  const fatigueEndTime = Date.now() + FUNDRAISER_CONFIG.FATIGUE_DURATION;
+  const now = Date.now();
   
   for (const resident of residents) {
-    resident.fundraiserFatigueUntil = fatigueEndTime;
+    // Get age-based fatigue duration for this specific resident
+    const fatigueDuration = getFatigueDurationForProfile(resident.profile);
+    resident.fundraiserFatigueUntil = now + fatigueDuration;
+    
     // Apply fatigue happiness penalty
     resident.happiness = Math.max(0, resident.happiness + FUNDRAISER_CONFIG.FATIGUE_HAPPINESS_PENALTY);
+    
+    console.log(`⏳ ${resident.name} (${resident.profile}) fatigued for ${fatigueDuration / 1000}s`);
   }
 }
 
@@ -142,19 +245,13 @@ export function canAffordFundraiserFood(gameState: GameState, residentCount: num
 
 /**
  * Start a new fundraiser at a fundraiser station
- * Now includes validation for cooldown, fatigue, and food requirements
+ * Validates fatigue and food requirements (no global cooldown)
  */
 export function startFundraiser(
   gameState: GameState,
   stationId: string,
   residentIds: string[]
 ): { success: boolean; error?: string; fundraiser?: Fundraiser; warning?: string } {
-  
-  // Check cooldown
-  if (isFundraiserOnCooldown(gameState)) {
-    const remaining = getFundraiserCooldownFormatted(gameState);
-    return { success: false, error: `Fundraiser on cooldown. Ready in ${remaining}` };
-  }
   
   // Validate residents
   if (residentIds.length === 0) {
@@ -252,10 +349,44 @@ export function startFundraiser(
   // Add to active fundraisers
   gameState.activeFundraisers.push(fundraiser);
   
-  // Update resident states
+  // Update resident states - make them pathfind to the station
   for (const resident of residents) {
-    resident.currentState = "in_use";
-    resident.targetRoomId = stationId;
+    // Find a random UNOCCUPIED position within the fundraiser station
+    // This prevents multiple residents from targeting the same tile
+    let targetTile = findRandomUnoccupiedTileInRoom(gameState.grid, station);
+    
+    if (!targetTile) {
+      console.warn(`⚠️ ${resident.name} couldn't find unoccupied tile in fundraiser station, using center`);
+      // Fallback to center if no unoccupied tiles found
+      targetTile = {
+        x: station.gridX + Math.floor(station.width / 2),
+        y: station.gridY + Math.floor(station.height / 2)
+      };
+    }
+    
+    const path = findPath(
+      gameState.grid,
+      Math.floor(resident.gridX),
+      Math.floor(resident.gridY),
+      targetTile.x,
+      targetTile.y
+    );
+    
+    if (path && path.length > 0) {
+      console.log(`🎪 [FundraiserSystem] ${resident.name} - Current state: "${resident.currentState}", Setting path (length: ${path.length})`);
+      resident.path = path;
+      resident.pathIndex = 0;
+      resident.currentState = "pathfinding";
+      resident.targetRoomId = stationId;
+      resident.currentNeed = "fundraiser";
+      console.log(`🚶 ${resident.name} pathfinding to fundraiser station at (${targetTile.x}, ${targetTile.y})`);
+    } else {
+      // No path found - set them to in_use anyway (they'll teleport or handle it)
+      console.warn(`⚠️ ${resident.name} couldn't find path to fundraiser station, setting in_use anyway`);
+      resident.currentState = "in_use";
+      resident.targetRoomId = stationId;
+      resident.currentNeed = "fundraiser";
+    }
   }
   
   // Generate warning if low success chance
@@ -387,9 +518,12 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
       // Happiness cost (fatigue from work)
       resident.happiness = Math.max(0, resident.happiness - FUNDRAISER_CONFIG.HAPPINESS_COST);
       
-      // Reset state
+      // Reset state and clear fundraiser need
       resident.currentState = "satisfied";
       resident.targetRoomId = null;
+      if (resident.currentNeed === "fundraiser") {
+        resident.currentNeed = null;
+      }
     }
     
     // Apply fatigue to all participants
@@ -397,8 +531,8 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     
     console.log(`✅ Fundraiser SUCCEEDED! Earned $${actualPayout} (expected: $${fundraiser.expectedPayout})`);
     
-    // Emit success event
-    emitFundraiserCompleted(fundraiser.id, true, actualPayout, participants.length);
+    // Emit success event with full details
+    emitFundraiserCompleted(fundraiser, true, actualPayout, participants);
   } else {
     // FAILURE: Apply negative consequences
     
@@ -410,9 +544,12 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
       // Happiness penalty (embarrassment)
       resident.happiness = Math.max(0, resident.happiness + FUNDRAISER_CONFIG.FAILURE_HAPPINESS_PENALTY);
       
-      // Reset state
+      // Reset state and clear fundraiser need
       resident.currentState = "satisfied";
       resident.targetRoomId = null;
+      if (resident.currentNeed === "fundraiser") {
+        resident.currentNeed = null;
+      }
     }
     
     // Apply fatigue to all participants (they still worked, even if it failed)
@@ -420,12 +557,9 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     
     console.log(`❌ Fundraiser FAILED! No money earned. (Success chance was ${Math.round(fundraiser.successChance * 100)}%)`);
     
-    // Emit failure event
-    emitFundraiserCompleted(fundraiser.id, false, 0, participants.length);
+    // Emit failure event with full details
+    emitFundraiserCompleted(fundraiser, false, 0, participants);
   }
-  
-  // Update cooldown timer
-  gameState.lastFundraiserEndTime = Date.now();
 }
 
 // ============================================================================
@@ -449,13 +583,16 @@ export function cancelFundraiser(
   
   const fundraiser = gameState.activeFundraisers[index];
   
-  // Release residents
+  // Release residents and clear fundraiser need
   for (const residentId of fundraiser.assignedResidents) {
     const resident = gameState.residents.find(r => r.id === residentId);
     
     if (resident) {
       resident.currentState = "idle";
       resident.targetRoomId = null;
+      if (resident.currentNeed === "fundraiser") {
+        resident.currentNeed = null;
+      }
     }
   }
   
@@ -522,19 +659,14 @@ export function getAvailableResidentsForFundraiser(gameState: GameState): Reside
  */
 export function getFundraiserStatus(gameState: GameState): {
   canStart: boolean;
-  cooldownRemaining: string;
-  isOnCooldown: boolean;
   availableResidents: number;
   minResidentsRequired: number;
   foodCostPerResident: number;
 } {
   const availableResidents = getAvailableResidentsForFundraiser(gameState);
-  const isOnCooldown = isFundraiserOnCooldown(gameState);
   
   return {
-    canStart: !isOnCooldown && availableResidents.length >= FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
-    cooldownRemaining: getFundraiserCooldownFormatted(gameState),
-    isOnCooldown,
+    canStart: availableResidents.length >= FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
     availableResidents: availableResidents.length,
     minResidentsRequired: FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
     foodCostPerResident: FUNDRAISER_CONFIG.FOOD_COST_PER_RESIDENT
@@ -546,15 +678,48 @@ export function getFundraiserStatus(gameState: GameState): {
 // ============================================================================
 
 /**
- * Emit fundraiser completed event
+ * Data structure for fundraiser completion details
+ */
+export interface FundraiserCompletionData {
+  fundraiserId: string;
+  success: boolean;
+  payout: number;
+  expectedPayout: number;
+  participantNames: string[];
+  participantCount: number;
+  successChance: number;
+  successRoll: number;
+  duration: number; // in minutes
+  reputationChange: number;
+  completedAt: number; // timestamp
+}
+
+/**
+ * Emit fundraiser completed event with full details
  */
 function emitFundraiserCompleted(
-  fundraiserId: string,
+  fundraiser: Fundraiser,
   success: boolean,
   payout: number,
-  participantCount: number
+  participants: Resident[]
 ): void {
+  const completionData: FundraiserCompletionData = {
+    fundraiserId: fundraiser.id,
+    success,
+    payout,
+    expectedPayout: fundraiser.expectedPayout,
+    participantNames: participants.map(p => p.name),
+    participantCount: participants.length,
+    successChance: fundraiser.successChance,
+    successRoll: fundraiser.successRoll || 0,
+    duration: fundraiser.duration,
+    reputationChange: success
+      ? FUNDRAISER_CONFIG.REPUTATION_BOOST
+      : FUNDRAISER_CONFIG.FAILURE_REPUTATION_PENALTY,
+    completedAt: Date.now()
+  };
+  
   window.dispatchEvent(new CustomEvent('fundraiser_completed', {
-    detail: { fundraiserId, success, payout, participantCount }
+    detail: completionData
   }));
 }

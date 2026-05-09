@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GameStateManager } from '../systems/GameStateManager';
 import { GameState, Room, Resident, RoomType, StatusBarVisibilityMode } from '../../types';
 import { GRID_CONFIG, COLORS, ROOM_SPECS, VISUAL_CONFIG, STATUS_BAR_CONFIG, STATUS_ICONS } from '../../constants';
+import { getInitials } from '../../utils/helpers';
 import { GameClock, ThrottledUpdater, PauseManager } from '../systems/TimerManager';
 import { checkDayNightTransition } from '../systems/DayNightSystem';
 import { updateAllResidents, updateResidentMovement, updateAllResidentHappiness } from '../systems/ResidentAISystem';
@@ -196,6 +197,7 @@ export class MainScene extends Phaser.Scene {
   private gridGraphics!: Phaser.GameObjects.Graphics;
   private roomGraphics!: Phaser.GameObjects.Graphics;
   private residentSprites: Map<string, Phaser.GameObjects.Arc> = new Map();
+  private residentInitials: Map<string, Phaser.GameObjects.Text> = new Map();
   private roomImages: Map<string, Phaser.GameObjects.Image> = new Map();
   
   // Resident Status UI
@@ -248,6 +250,9 @@ export class MainScene extends Phaser.Scene {
   preload() {
     // Load room images
     this.load.image('rooms/learning_center', 'assets/rooms/learning_center.png');
+    this.load.image('rooms/dormitory', 'assets/rooms/dormitory.png');
+    this.load.image('rooms/cafeteria', 'assets/rooms/cafeteria.png');
+    this.load.image('rooms/fundraser_station', 'assets/rooms/fundraser_station.png');
   }
   
   /**
@@ -773,12 +778,18 @@ export class MainScene extends Phaser.Scene {
       bottom: camera.scrollY + camera.height + padding
     };
     
-    // Remove sprites and status UIs for residents that no longer exist
+    // Remove sprites, initials, and status UIs for residents that no longer exist
     const currentResidentIds = new Set(residents.map(r => r.id));
     for (const [id, sprite] of this.residentSprites.entries()) {
       if (!currentResidentIds.has(id)) {
         this.releaseSprite(sprite);
         this.residentSprites.delete(id);
+      }
+    }
+    for (const [id, initialsText] of this.residentInitials.entries()) {
+      if (!currentResidentIds.has(id)) {
+        initialsText.destroy();
+        this.residentInitials.delete(id);
       }
     }
     for (const [id, statusUI] of this.residentStatusUIs.entries()) {
@@ -802,12 +813,16 @@ export class MainScene extends Phaser.Scene {
                        pixelY <= visibleBounds.bottom;
       
       let sprite = this.residentSprites.get(resident.id);
+      let initialsText = this.residentInitials.get(resident.id);
       let statusUI = this.residentStatusUIs.get(resident.id);
       
       if (!isVisible) {
-        // Hide sprite and status UI if not visible
+        // Hide sprite, initials, and status UI if not visible
         if (sprite) {
           sprite.setVisible(false);
+        }
+        if (initialsText) {
+          initialsText.setVisible(false);
         }
         if (statusUI) {
           statusUI.setVisible(false);
@@ -833,6 +848,21 @@ export class MainScene extends Phaser.Scene {
         this.residentSprites.set(resident.id, sprite);
       }
       
+      // Create initials text if needed
+      if (!initialsText) {
+        const initials = getInitials(resident.name);
+        initialsText = this.add.text(0, 0, initials, {
+          fontSize: '9px',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          color: '#ffffff',
+          resolution: 2
+        });
+        initialsText.setOrigin(0.5, 0.5);
+        initialsText.setDepth(11); // Above residents (10) but below status bars (15)
+        this.residentInitials.set(resident.id, initialsText);
+      }
+      
       // Create status UI if needed
       if (!statusUI && statusBarSettings.enabled) {
         statusUI = new ResidentStatusUI(this);
@@ -843,11 +873,17 @@ export class MainScene extends Phaser.Scene {
       sprite.setVisible(true);
       sprite.setPosition(pixelX, pixelY);
       
+      // Update initials position and visibility
+      initialsText.setVisible(true);
+      initialsText.setPosition(pixelX, pixelY);
+      
       // Update alpha based on state
       if (resident.currentState === "sleeping") {
         sprite.setAlpha(0.5);
+        initialsText.setAlpha(0.5);
       } else {
         sprite.setAlpha(1.0);
+        initialsText.setAlpha(1.0);
       }
       
       // Update status UI visibility and position
@@ -972,6 +1008,12 @@ export class MainScene extends Phaser.Scene {
       sprite.destroy();
     }
     this.residentSprites.clear();
+    
+    // Clean up initials text
+    for (const initialsText of this.residentInitials.values()) {
+      initialsText.destroy();
+    }
+    this.residentInitials.clear();
     
     // Clean up status UIs
     for (const statusUI of this.residentStatusUIs.values()) {

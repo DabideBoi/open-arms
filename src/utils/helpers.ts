@@ -47,3 +47,31 @@ export function randomInt(min: number, max: number): number {
 export function distance(x1: number, y1: number, x2: number, y2: number): number {
   return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
+
+/**
+ * Extract initials from a name (like Google's avatar system)
+ * - For "FirstName LastName": returns "FL" (first letter of each)
+ * - For single name "Name": returns "NA" (first two letters)
+ * - Always returns uppercase, max 2 characters
+ */
+export function getInitials(name: string): string {
+  if (!name || name.trim().length === 0) {
+    return '??';
+  }
+  
+  const parts = name.trim().split(/\s+/);
+  
+  if (parts.length >= 2) {
+    // Multiple names: first letter of first name + first letter of last name
+    const firstInitial = parts[0].charAt(0);
+    const lastInitial = parts[parts.length - 1].charAt(0);
+    return (firstInitial + lastInitial).toUpperCase();
+  } else {
+    // Single name: first two letters
+    const singleName = parts[0];
+    if (singleName.length >= 2) {
+      return singleName.substring(0, 2).toUpperCase();
+    }
+    return singleName.toUpperCase();
+  }
+}

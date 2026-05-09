@@ -42,6 +42,11 @@ export function createResident(
     gridY: spawnY,
     sleepX: null,
     sleepY: null,
+    // Gradual repositioning (for smooth teleport fix)
+    repositionTarget: null,
+    repositionStartTime: null,
+    repositionDuration: 1.0,
+    repathAttempts: 0,
     arrivalDay: currentDay,
     arrivalReason,
     daysInShelter: 0,
@@ -54,7 +59,9 @@ export function createResident(
     isAtRisk: false,
     departureReason: undefined,
     // Fundraiser fatigue tracking (NEW)
-    fundraiserFatigueUntil: null
+    fundraiserFatigueUntil: null,
+    // Fundraiser wander tracking
+    lastWanderTime: 0
   };
   
   // Register in collision detection system

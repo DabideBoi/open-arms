@@ -619,13 +619,16 @@ export function calculateBoundaryForce(
   const currentTileX = Math.floor(x);
   const currentTileY = Math.floor(y);
   if (!isWalkable(grid, currentTileX, currentTileY)) {
+    console.log(`🚨 TELEPORT DEBUG: NPC at (${x.toFixed(2)}, ${y.toFixed(2)}) is on NON-WALKABLE tile (${currentTileX}, ${currentTileY})`);
     // Find nearest walkable tile and push towards it
     const nearest = findNearestWalkableTile(grid, currentTileX, currentTileY);
     if (nearest) {
+      console.log(`🚨 TELEPORT DEBUG: Nearest walkable tile: (${nearest.x}, ${nearest.y})`);
       const dx = nearest.x + 0.5 - x;
       const dy = nearest.y + 0.5 - y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance > 0.01) {
+        console.log(`🚨 TELEPORT DEBUG: Applying strong boundary force, distance: ${distance.toFixed(2)}`);
         force.x += (dx / distance) * BOUNDARY_FORCE_STRENGTH * 2;
         force.y += (dy / distance) * BOUNDARY_FORCE_STRENGTH * 2;
       }
@@ -696,18 +699,22 @@ export function applySocialDistancing(
   const targetTileY = Math.floor(newY);
   
   if (!isWalkable(grid, targetTileX, targetTileY)) {
+    console.log(`🚨 TELEPORT DEBUG: Social distancing target (${targetTileX}, ${targetTileY}) is NOT walkable`);
     // Clamp to current tile if target is not walkable
     const currentTileX = Math.floor(resident.gridX);
     const currentTileY = Math.floor(resident.gridY);
     
     // Try to stay within current tile bounds
     if (isWalkable(grid, currentTileX, currentTileY)) {
+      console.log(`🚨 TELEPORT DEBUG: Clamping to current tile (${currentTileX}, ${currentTileY})`);
       newX = Math.max(currentTileX + 0.1, Math.min(currentTileX + 0.9, newX));
       newY = Math.max(currentTileY + 0.1, Math.min(currentTileY + 0.9, newY));
     } else {
       // Current tile isn't walkable either - find nearest walkable
+      console.log(`🚨 TELEPORT DEBUG: Current tile (${currentTileX}, ${currentTileY}) is ALSO not walkable! Finding nearest walkable...`);
       const nearest = findNearestWalkableTile(grid, currentTileX, currentTileY);
       if (nearest) {
+        console.log(`🚨 TELEPORT DEBUG: TELEPORTING from (${resident.gridX.toFixed(2)}, ${resident.gridY.toFixed(2)}) to (${nearest.x + 0.5}, ${nearest.y + 0.5})`);
         newX = nearest.x + 0.5;
         newY = nearest.y + 0.5;
       }

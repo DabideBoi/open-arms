@@ -34,12 +34,13 @@ export type DepartureReason = 'unhappy' | 'hopeless';
 
 export type GameOverReason = 'bankruptcy' | 'reputation' | 'exodus' | null;
 
-export type Need = 
+export type Need =
   | "food"
   | "bathroom"
   | "learning"
   | "social"
-  | "sleep";
+  | "sleep"
+  | "fundraiser";
 
 export type RoomType = 
   | "dormitory"
@@ -180,6 +181,12 @@ export interface Resident {
   sleepX: number | null;
   sleepY: number | null;
   
+  // Gradual repositioning (for smooth teleport fix)
+  repositionTarget: { x: number; y: number; startX?: number; startY?: number } | null;
+  repositionStartTime: number | null;
+  repositionDuration: number;  // Duration in seconds
+  repathAttempts?: number;     // Number of repath attempts made
+  
   // History
   arrivalDay: number;
   arrivalReason: string;
@@ -198,6 +205,9 @@ export interface Resident {
   
   // Fundraiser fatigue tracking (NEW)
   fundraiserFatigueUntil: number | null;  // Timestamp when fatigue expires (null = not fatigued)
+  
+  // Fundraiser wander tracking
+  lastWanderTime: number;  // Timestamp of last wander position change at fundraiser
 }
 
 // ============================================================================

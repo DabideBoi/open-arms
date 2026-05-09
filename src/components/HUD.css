@@ -138,6 +138,18 @@
   border-color: #8a2be2;
 }
 
+/* Statistics Button */
+.hud-statistics-button {
+  background: rgba(74, 158, 255, 0.25);
+  border-color: #4a9eff;
+}
+
+.hud-statistics-button:hover {
+  background: rgba(74, 158, 255, 0.5);
+  border-color: #6eb8ff;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.5);
+}
+
 /* Bankruptcy Warning Banner */
 .hud-bankruptcy-active {
   border-bottom-color: #ff0000;

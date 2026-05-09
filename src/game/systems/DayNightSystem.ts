@@ -150,6 +150,11 @@ export function wakeUpResidents(gameState: GameState): void {
         }
       }
       
+      // Apply +30 happiness increase from sleep (capped at 100)
+      const previousHappiness = resident.happiness;
+      resident.happiness = Math.min(100, resident.happiness + 30);
+      const happinessGain = resident.happiness - previousHappiness;
+      
       // Clear sleep position lock
       resident.sleepX = null;
       resident.sleepY = null;
@@ -159,7 +164,7 @@ export function wakeUpResidents(gameState: GameState): void {
       resident.currentNeed = null;
       resident.targetRoomId = null;
       
-      console.log(`☀️ ${resident.name} woke up from sleep`);
+      console.log(`☀️ ${resident.name} woke up from sleep (+${happinessGain} happiness)`);
     }
   }
 }

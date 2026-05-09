@@ -64,8 +64,14 @@ export function spawnStressTestResidents(
       unhappyDuration: 0,
       isAtRisk: false,
       departureReason: undefined,
-      // Fundraiser fatigue tracking (NEW)
-      fundraiserFatigueUntil: null
+      // Fundraiser fatigue tracking
+      fundraiserFatigueUntil: null,
+      // Gradual repositioning tracking
+      repositionTarget: null,
+      repositionStartTime: null,
+      repositionDuration: 0,
+      // Fundraiser wander tracking
+      lastWanderTime: 0
     };
     
     gameState.residents.push(resident);

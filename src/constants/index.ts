@@ -27,7 +27,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     maintenanceCost: 25,         // Up from 20
     capacity: 4,
     closesAtNight: false,
-    needsSatisfied: ["sleep"]
+    needsSatisfied: ["sleep"],
+    image: "rooms/dormitory"
   },
   
   cafeteria: {
@@ -38,7 +39,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     maintenanceCost: 50,         // Up from 40
     capacity: 10,
     closesAtNight: true,
-    needsSatisfied: ["food"]
+    needsSatisfied: ["food"],
+    image: "rooms/cafeteria"
   },
   
   learning_center: {
@@ -105,7 +107,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     maintenanceCost: 35,         // Up from 30
     capacity: 4,
     closesAtNight: true,
-    needsSatisfied: []
+    needsSatisfied: [],
+    image: "rooms/fundraser_station"
   }
 };
 
@@ -169,6 +172,38 @@ export const LIFE_METER_CONFIG = {
   GRADUATION_THRESHOLD: 100,
   UPDATE_INTERVAL: 10000
 };
+
+// ============================================================================
+// LIFE Meter Activity Growth Rate Multipliers
+// ============================================================================
+// These multipliers are applied to the base LIFE fill rate depending on
+// what activity the resident is currently doing.
+// Learning (in learning_center/vocational_room) is the primary growth activity.
+
+export const LIFE_ACTIVITY_RATES = {
+  // Learning is the primary activity - full growth rate (100%)
+  // This is the baseline rate defined in PROFILE_SPECS.lifeFillRate
+  LEARNING: 1.0,
+  
+  // Eating provides moderate LIFE growth (50% of learning rate)
+  // Good nutrition contributes to personal development
+  EATING: 0.5,
+  
+  // Sleeping provides passive LIFE growth (25% of learning rate)
+  // Rest and recovery support progress
+  SLEEPING: 0.25,
+  
+  // Idle/other activities provide minimal growth (10% of learning rate)
+  // Just being in the shelter environment provides some benefit
+  IDLE: 0.1,
+  
+  // Social activities (common room) provide small growth (15% of learning rate)
+  // Building social connections supports personal development
+  SOCIAL: 0.15,
+  
+  // Using bathroom - no LIFE growth (0%)
+  BATHROOM: 0
+} as const;
 
 // ============================================================================
 // Happiness Configuration

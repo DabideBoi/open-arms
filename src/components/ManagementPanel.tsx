@@ -12,7 +12,8 @@ import {
   getFundraiserSuccessChance,
   isResidentFatigued,
   getResidentFatigueRemaining,
-  calculateFundraiserFoodCost
+  calculateFundraiserFoodCost,
+  findBestFundraiserStationForGroup
 } from '../game/systems/FundraiserSystem';
 import {
   getTierConfig,
@@ -36,6 +37,9 @@ interface ManagementPanelProps {
   onExpandGrid: (direction: 'north' | 'south' | 'east' | 'west') => void;
   onChangeFoodSetting?: (setting: FoodPortionSetting) => void;
   onUpgradeTier?: () => void;
+  // Controlled mode props for single-menu-at-a-time behavior
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 export const ManagementPanel: React.FC<ManagementPanelProps> = ({
@@ -44,15 +48,26 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
   onCancelFundraiser,
   onExpandGrid,
   onChangeFoodSetting,
-  onUpgradeTier
+  onUpgradeTier,
+  isOpen: controlledIsOpen,
+  onToggle
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  
+  // Support both controlled and uncontrolled modes
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalIsOpen(!internalIsOpen);
+    }
+  };
   const [activeTab, setActiveTab] = useState<'food' | 'fundraisers' | 'expansion' | 'residents' | 'upgrade' | 'finances'>('food');
   const [selectedResidents, setSelectedResidents] = useState<Set<string>>(new Set());
   const [fundraiserTimers, setFundraiserTimers] = useState<Map<string, string>>(new Map());
-  const [cooldownTimer, setCooldownTimer] = useState<string>('Ready');
 
-  // Update fundraiser and cooldown timers
+  // Update fundraiser timers
   useEffect(() => {
     const updateTimers = () => {
       const newTimers = new Map<string, string>();
@@ -66,27 +81,12 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
       });
       
       setFundraiserTimers(newTimers);
-      
-      // Update cooldown timer
-      if (gameState.lastFundraiserEndTime) {
-        const cooldownEnd = gameState.lastFundraiserEndTime + FUNDRAISER_CONFIG.COOLDOWN_DURATION;
-        const cooldownRemaining = Math.max(0, cooldownEnd - now);
-        if (cooldownRemaining > 0) {
-          const minutes = Math.floor(cooldownRemaining / 60000);
-          const seconds = Math.floor((cooldownRemaining % 60000) / 1000);
-          setCooldownTimer(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-        } else {
-          setCooldownTimer('Ready');
-        }
-      } else {
-        setCooldownTimer('Ready');
-      }
     };
     
     updateTimers();
     const interval = setInterval(updateTimers, 1000);
     return () => clearInterval(interval);
-  }, [gameState.activeFundraisers, gameState.lastFundraiserEndTime]);
+  }, [gameState.activeFundraisers]);
 
   // Get available fundraiser stations
   const fundraiserStations = gameState.rooms.filter(r => r.type === 'fundraiser_station' && r.isOpen);
@@ -153,7 +153,18 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
       return;
     }
     
-    onStartFundraiser(fundraiserStations[0].id, Array.from(selectedResidents));
+    // Get selected residents for nearest station calculation
+    const selectedResidentsList = gameState.residents.filter(r => selectedResidents.has(r.id));
+    
+    // Find the best (nearest) fundraiser station for this group of residents
+    const bestStation = findBestFundraiserStationForGroup(selectedResidentsList, fundraiserStations);
+    
+    if (!bestStation) {
+      alert('No accessible fundraiser station found!');
+      return;
+    }
+    
+    onStartFundraiser(bestStation.id, Array.from(selectedResidents));
     setSelectedResidents(new Set());
   };
 
@@ -181,9 +192,9 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
 
   return (
     <div className="management-panel">
-      <button 
+      <button
         className="management-panel-toggle"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
       >
         ⚙️ Management
       </button>
@@ -507,20 +518,10 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                 <p className="empty-message">No active fundraisers</p>
               )}
 
-              {/* Cooldown Status */}
-              <div className={`cooldown-status ${cooldownTimer === 'Ready' ? 'ready' : 'cooling'}`}>
-                <span>⏳ Cooldown: {cooldownTimer}</span>
-                {cooldownTimer !== 'Ready' && (
-                  <span className="cooldown-note">Must wait between fundraisers</span>
-                )}
-              </div>
-
               <h3>Start New Fundraiser</h3>
               
               {fundraiserStations.length === 0 ? (
                 <p className="warning">⚠️ Build a Fundraiser Station first!</p>
-              ) : cooldownTimer !== 'Ready' ? (
-                <p className="warning">⏳ Fundraiser on cooldown. Wait {cooldownTimer}</p>
               ) : (
                 <>
                   <div className="fundraiser-info-box">
@@ -553,22 +554,32 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   <div className="resident-selection">
                     {availableResidents.length === 0 ? (
                       <p className="empty-message">
-                        No available residents 
-                        {gameState.residents.some(r => isResidentFatigued(r)) && 
+                        No available residents
+                        {gameState.residents.some(r => isResidentFatigued(r)) &&
                           ' (some are fatigued)'
                         }
                       </p>
                     ) : (
-                      availableResidents.map(resident => (
-                        <div 
-                          key={resident.id}
-                          className={`resident-select-item ${selectedResidents.has(resident.id) ? 'selected' : ''}`}
-                          onClick={() => handleToggleResident(resident.id)}
-                        >
-                          <span>{getProfileIcon(resident.profile)} {resident.name}</span>
-                          <span>😊 {Math.floor(resident.happiness)}% | 📈 {Math.floor(resident.lifeMeter)}%</span>
-                        </div>
-                      ))
+                      availableResidents.map(resident => {
+                        const fatigued = isResidentFatigued(resident);
+                        const fatigueRemaining = fatigued ? getResidentFatigueRemaining(resident) : 0;
+                        const fatigueMinutes = Math.ceil(fatigueRemaining / 60000);
+                        
+                        return (
+                          <div
+                            key={resident.id}
+                            className={`resident-select-item ${selectedResidents.has(resident.id) ? 'selected' : ''}`}
+                            onClick={() => handleToggleResident(resident.id)}
+                          >
+                            <span>{getProfileIcon(resident.profile)} {resident.name}</span>
+                            <span>
+                              😊 {Math.floor(resident.happiness)}% | 📈 {Math.floor(resident.lifeMeter)}%
+                              {fatigued && <span className="fatigue-badge"> ⏳ {fatigueMinutes}m</span>}
+                              {!fatigued && <span className="ready-badge"> ✓ Ready</span>}
+                            </span>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
 
@@ -589,14 +600,13 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                     </div>
                   )}
 
-                  <button 
+                  <button
                     className="start-fundraiser-button"
                     onClick={handleStartFundraiser}
                     disabled={
-                      selectedResidents.size < FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS || 
+                      selectedResidents.size < FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS ||
                       fundraiserStations.length === 0 ||
-                      gameState.food < calculateFundraiserFoodCost(selectedResidents.size) ||
-                      cooldownTimer !== 'Ready'
+                      gameState.food < calculateFundraiserFoodCost(selectedResidents.size)
                     }
                   >
                     🎪 Start Fundraiser ({selectedResidents.size} residents, {calculateFundraiserFoodCost(selectedResidents.size)} food)
