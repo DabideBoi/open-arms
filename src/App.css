@@ -5,8 +5,8 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #0a0a0a;
+  font-family: var(--font-sans, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+  background: #07090d;
   color: white;
   overflow: hidden;
 }
@@ -17,6 +17,9 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Soft radial backdrop so the letterboxed canvas sits in a room, not a void */
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1a2130 0%, #10141d 45%, #07090d 100%);
 }
 
 .game-container {
@@ -74,6 +77,8 @@ body {
 
 canvas {
   display: block;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+  border-radius: 10px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(148, 163, 184, 0.08);
 }

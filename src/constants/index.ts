@@ -644,32 +644,35 @@ export const VISUAL_CONFIG = {
   TILE_SIZE: 32,
   SPRITE_SCALE: 1.0,
   DAY_AMBIENT_LIGHT: 1.0,
-  NIGHT_AMBIENT_LIGHT: 0.4,
+  NIGHT_AMBIENT_LIGHT: 0.55,
   DAY_COLOR_TINT: 0xFFFFFF,
-  NIGHT_COLOR_TINT: 0x4444AA
+  NIGHT_COLOR_TINT: 0x8891d6
 };
 
 // ============================================================================
-// Colors
+// Colors — cohesive slate/teal base palette with soft, readable accents
 // ============================================================================
 
 export const COLORS = {
-  GRID_LINE: 0x444444,
-  TILE_EMPTY: 0x2a2a2a,
-  TILE_LOCKED: 0x1a1a1a,
-  TILE_ENTRANCE: 0x4a9eff,
-  ROOM_DORMITORY: 0x8b4513,
-  ROOM_CAFETERIA: 0xff8c00,
-  ROOM_LEARNING: 0x4169e1,
-  ROOM_VOCATIONAL: 0x9370db,
-  ROOM_BATHROOM: 0x87ceeb,
-  ROOM_COMMON: 0x32cd32,
-  ROOM_ADMIN: 0x696969,
-  ROOM_FUNDRAISER: 0xffd700,
-  RESIDENT_YOUNG: 0x00ff00,
-  RESIDENT_VETERAN: 0xff0000,
-  RESIDENT_ELDERLY: 0xffff00
+  GRID_LINE: 0x3d465a,
+  TILE_EMPTY: 0x323a4d,        // buildable land — clearly lighter than locked
+  TILE_LOCKED: 0x161a22,       // not-yet-unlocked land
+  TILE_ENTRANCE: 0x22d3ee,     // welcoming doorway (cyan)
+  ROOM_DORMITORY: 0xb07a4a,
+  ROOM_CAFETERIA: 0xf59e0b,
+  ROOM_LEARNING: 0x5b8def,
+  ROOM_VOCATIONAL: 0xa78bfa,
+  ROOM_BATHROOM: 0x67d3e6,
+  ROOM_COMMON: 0x4ade80,
+  ROOM_ADMIN: 0x94a3b8,
+  ROOM_FUNDRAISER: 0xfacc15,
+  RESIDENT_YOUNG: 0x4ade80,
+  RESIDENT_VETERAN: 0xf87171,
+  RESIDENT_ELDERLY: 0xfbbf24
 };
+
+// Background beyond the shelter grid (Phaser canvas clear color)
+export const BACKGROUND_COLOR = 0x0d1017;
 
 // ============================================================================
 // Adjacency Bonuses Configuration

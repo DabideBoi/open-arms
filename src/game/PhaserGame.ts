@@ -15,8 +15,13 @@ export function createPhaserGame(
     width: 1280,
     height: 720,
     parent,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0d1017',
     scene: [MainScene],
+    render: {
+      antialias: true,
+      roundPixels: true,      // snap sprite draws to whole pixels — kills sub-pixel shimmer
+      pixelArt: false
+    },
     physics: {
       default: 'arcade',
       arcade: {

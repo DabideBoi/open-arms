@@ -1,12 +1,12 @@
 :root {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
   line-height: 1.5;
   font-weight: 400;
-  
+
   color-scheme: dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0a0a0a;
-  
+  color: var(--text-1, rgba(255, 255, 255, 0.87));
+  background-color: var(--bg-0, #07090d);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

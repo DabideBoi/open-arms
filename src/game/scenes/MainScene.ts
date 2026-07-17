@@ -392,9 +392,17 @@ export class MainScene extends Phaser.Scene {
     const gridPixelHeight = GRID_CONFIG.TOTAL_HEIGHT * GRID_CONFIG.TILE_SIZE;
     
     camera.setBounds(0, 0, gridPixelWidth, gridPixelHeight);
-    
+
     // Enable camera controls (drag to pan)
     camera.setZoom(1);
+
+    // Center the view on the player's unlocked shelter area so they see their
+    // residents/rooms immediately instead of an empty corner of the map.
+    const state = this.gameStateManager.getState();
+    const ua = state.grid.unlockedArea;
+    const centerX = ((ua.minX + ua.maxX) / 2) * GRID_CONFIG.TILE_SIZE;
+    const centerY = ((ua.minY + ua.maxY) / 2) * GRID_CONFIG.TILE_SIZE;
+    camera.centerOn(centerX, centerY);
     
     // Simple drag controls
     let isDragging = false;
@@ -582,16 +590,19 @@ export class MainScene extends Phaser.Scene {
    */
   private renderGrid(grid: any) {
     this.gridGraphics.clear();
-    
+
     const tileSize = GRID_CONFIG.TILE_SIZE;
-    
+    const ua = grid.unlockedArea;
+
     // Draw tiles
     for (let y = 0; y < grid.height; y++) {
       for (let x = 0; x < grid.width; x++) {
         const tile = grid.tiles[y][x];
         const pixelX = x * tileSize;
         const pixelY = y * tileSize;
-        
+
+        const isUnlocked = ua && x >= ua.minX && x < ua.maxX && y >= ua.minY && y < ua.maxY;
+
         // Choose color based on tile type
         let color = COLORS.TILE_EMPTY;
         if (tile.type === "locked") {
@@ -599,20 +610,38 @@ export class MainScene extends Phaser.Scene {
         } else if (tile.type === "entrance") {
           color = COLORS.TILE_ENTRANCE;
         }
-        
+
         // Apply ambient light
         color = this.applyAmbientLight(color);
-        
+
         // Draw tile background (skip if it's a room, we'll draw those separately)
         if (tile.type !== "room") {
           this.gridGraphics.fillStyle(color, 1);
           this.gridGraphics.fillRect(pixelX, pixelY, tileSize, tileSize);
+
+          // Subtle checkerboard shading on buildable land for readable depth
+          if (isUnlocked && tile.type === "empty" && (x + y) % 2 === 0) {
+            this.gridGraphics.fillStyle(0xffffff, 0.025);
+            this.gridGraphics.fillRect(pixelX, pixelY, tileSize, tileSize);
+          }
         }
-        
-        // Draw grid lines
-        this.gridGraphics.lineStyle(1, COLORS.GRID_LINE, 0.3);
+
+        // Draw grid lines — brighter inside the buildable area, faint outside
+        this.gridGraphics.lineStyle(1, COLORS.GRID_LINE, isUnlocked ? 0.45 : 0.12);
         this.gridGraphics.strokeRect(pixelX, pixelY, tileSize, tileSize);
       }
+    }
+
+    // Frame the buildable area with an accent border so the play space reads clearly
+    if (ua) {
+      const bx = ua.minX * tileSize;
+      const by = ua.minY * tileSize;
+      const bw = (ua.maxX - ua.minX) * tileSize;
+      const bh = (ua.maxY - ua.minY) * tileSize;
+      this.gridGraphics.lineStyle(3, 0x22d3ee, 0.35);
+      this.gridGraphics.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
+      this.gridGraphics.lineStyle(1, 0x22d3ee, 0.15);
+      this.gridGraphics.strokeRect(bx - 4, by - 4, bw + 8, bh + 8);
     }
   }
   
@@ -844,7 +873,9 @@ export class MainScene extends Phaser.Scene {
           color = COLORS.RESIDENT_ELDERLY;
         }
         sprite.setFillStyle(color);
-        
+        // Dark outline gives the token definition against tiles and rooms
+        sprite.setStrokeStyle(2, 0x11151d, 0.85);
+
         this.residentSprites.set(resident.id, sprite);
       }
       

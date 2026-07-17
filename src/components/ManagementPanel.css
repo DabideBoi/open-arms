@@ -6,22 +6,34 @@
   /* Position toggle button above the Build Menu toggle (which is ~60px tall) */
 }
 
+.management-panel {
+  --mgmt: #8b7cf0;
+  --mgmt-strong: #7059e6;
+  --mgmt-glow: rgba(139, 124, 240, 0.35);
+}
+
 .management-panel-toggle {
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  padding: 13px 22px;
+  background: linear-gradient(135deg, var(--mgmt) 0%, var(--mgmt-strong) 100%);
+  color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   cursor: pointer;
-  font-size: 16px;
-  font-weight: bold;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 8px 22px var(--mgmt-glow), var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
 }
 
 .management-panel-toggle:hover {
+  filter: brightness(1.06);
   transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 28px var(--mgmt-glow), var(--shadow-md);
+}
+
+.management-panel-toggle:active {
+  transform: translateY(0);
 }
 
 .management-panel-content {
@@ -30,51 +42,58 @@
   right: 0;
   width: 450px;
   max-height: 600px;
-  background: rgba(30, 30, 40, 0.95);
-  border: 2px solid #667eea;
-  border-radius: 12px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   padding: 20px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
   overflow-y: auto;
 }
 
 .management-tabs {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 20px;
-  border-bottom: 2px solid #444;
-  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
 }
 
 .management-tabs .tab {
   flex: 1;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: none;
-  border-radius: 6px;
+  padding: 9px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all var(--dur) var(--ease);
 }
 
 .management-tabs .tab:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--surface-hover);
+  color: var(--text-1);
 }
 
 .management-tabs .tab.active {
-  background: #667eea;
-  font-weight: bold;
+  background: linear-gradient(135deg, var(--mgmt) 0%, var(--mgmt-strong) 100%);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px var(--mgmt-glow);
 }
 
 .tab-content {
-  color: white;
+  color: var(--text-1);
 }
 
 .tab-content h3 {
   margin: 0 0 15px 0;
-  color: #667eea;
+  color: var(--mgmt);
   font-size: 18px;
+  font-weight: 700;
 }
 
 .tab-content h4 {

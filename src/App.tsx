@@ -39,6 +39,15 @@ function App() {
   const gameStateManagerRef = useRef<GameStateManager | null>(null);
   const mainSceneRef = useRef<MainScene | null>(null);
   const eventSystemRef = useRef<EventSystem | null>(null);
+
+  // React UI throttle: the game loop calls forceUpdate() ~60x/sec. Feeding every
+  // one of those into React state would re-render the whole UI tree at 60fps,
+  // starving Phaser's render loop and causing visible stutter/jitter. The HUD only
+  // needs a few updates per second, so we throttle React updates to ~12fps with a
+  // trailing edge (Phaser keeps rendering at full rate via its own subscription).
+  const REACT_UPDATE_INTERVAL = 80; // ms (~12.5fps)
+  const lastReactUpdateRef = useRef<number>(0);
+  const pendingReactUpdateRef = useRef<number | null>(null);
   
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -127,20 +136,28 @@ function App() {
   const { showTutorial, completeTutorial, skipTutorial } = useTutorial();
   const audioSystem = getAudioSystem();
   
+  // Guard so end-game (victory/defeat) is only handled once per game. This
+  // callback runs on every game-loop notification, and the closure's copies of
+  // showGameOver/isVictory are stale, so without this ref the win/lose SFX would
+  // fire ~60x/sec once the condition is met. Reset in handleRestartGame().
+  const endGameHandledRef = useRef(false);
+
   // Check end game conditions
   const checkEndGameConditions = (state: GameState) => {
-    if (showGameOver) return; // Already showing game over
-    
+    if (endGameHandledRef.current) return; // Already handled this game
+
     // Check victory conditions
     const victory = checkVictoryConditions(state.graduatedCount, state.reputation, state.currentDay);
-    
-    if (victory && !isVictory) {
+
+    if (victory) {
+      endGameHandledRef.current = true;
       setIsVictory(true);
       setShowGameOver(true);
       setGameOverReason(null);
       playSFX('graduation');
-    } else if (state.isGameOver && state.gameOverReason && !showGameOver) {
+    } else if (state.isGameOver && state.gameOverReason) {
       // Game over triggered by GameStateManager
+      endGameHandledRef.current = true;
       setIsVictory(false);
       setShowGameOver(true);
       setGameOverReason(state.gameOverReason);
@@ -153,10 +170,35 @@ function App() {
     if (!gameStateManagerRef.current) {
       gameStateManagerRef.current = new GameStateManager();
       
-      // Subscribe to state changes
+      // Subscribe to state changes (throttled so the 60fps game loop doesn't
+      // re-render the whole React tree every frame).
+      const flushReactUpdate = () => {
+        pendingReactUpdateRef.current = null;
+        lastReactUpdateRef.current = Date.now();
+        const latest = gameStateManagerRef.current?.getState();
+        if (latest) setGameState({ ...latest });
+      };
+
       gameStateManagerRef.current.subscribe((state) => {
-        setGameState({ ...state });
+        // End-game checks are cheap and must react immediately.
         checkEndGameConditions(state);
+
+        const now = Date.now();
+        const elapsed = now - lastReactUpdateRef.current;
+        if (elapsed >= REACT_UPDATE_INTERVAL) {
+          if (pendingReactUpdateRef.current !== null) {
+            clearTimeout(pendingReactUpdateRef.current);
+            pendingReactUpdateRef.current = null;
+          }
+          lastReactUpdateRef.current = now;
+          setGameState({ ...state });
+        } else if (pendingReactUpdateRef.current === null) {
+          // Schedule a trailing update so the final state always renders.
+          pendingReactUpdateRef.current = window.setTimeout(
+            flushReactUpdate,
+            REACT_UPDATE_INTERVAL - elapsed
+          );
+        }
       });
       
       // Set initial state
@@ -301,40 +343,49 @@ function App() {
       window.removeEventListener('game:warning_escalated' as any, handleWarningEscalated);
       window.removeEventListener('fundraiser_completed' as any, handleFundraiserCompleted);
       
+      if (pendingReactUpdateRef.current !== null) {
+        clearTimeout(pendingReactUpdateRef.current);
+        pendingReactUpdateRef.current = null;
+      }
+
       if (gameRef.current) {
         destroyPhaserGame(gameRef.current);
         gameRef.current = null;
       }
-      
+
       audioSystem.destroy();
     };
   }, []);
   
-  // Update event system
+  // Update event system on a stable 1s interval. We read the live state from the
+  // manager ref rather than closing over `gameState`, so this interval is created
+  // once instead of being torn down/recreated on every state change (which would
+  // otherwise clear the timer before it could ever fire).
   useEffect(() => {
-    if (!eventSystemRef.current || !gameState) return;
-    
     const interval = setInterval(() => {
-      eventSystemRef.current!.update(gameState);
+      const es = eventSystemRef.current;
+      const gsm = gameStateManagerRef.current;
+      if (es && gsm) {
+        es.update(gsm.getState());
+      }
     }, 1000);
-    
+
     return () => clearInterval(interval);
-  }, [gameState]);
-  
-  // Update warning system periodically
+  }, []);
+
+  // Update warning system on a stable 5s interval (same rationale as above).
   useEffect(() => {
-    if (!gameStateManagerRef.current || !gameState) return;
-    
     const interval = setInterval(() => {
-      const mutableState = gameStateManagerRef.current?.getMutableState();
+      const gsm = gameStateManagerRef.current;
+      const mutableState = gsm?.getMutableState();
       if (mutableState) {
         warningSystem.updateWarnings(mutableState);
-        gameStateManagerRef.current?.forceUpdate();
+        gsm?.forceUpdate();
       }
     }, 5000); // Check every 5 seconds
-    
+
     return () => clearInterval(interval);
-  }, [gameState, warningSystem]);
+  }, [warningSystem]);
   
   // Update music based on day/night cycle
   useEffect(() => {
@@ -537,6 +588,7 @@ function App() {
     if (gameStateManagerRef.current) {
       // Use the resetGame method to properly reset all state including bankruptcy
       gameStateManagerRef.current.resetGame();
+      endGameHandledRef.current = false;
       setShowGameOver(false);
       setIsVictory(false);
       setGameOverReason(null);

@@ -7,45 +7,54 @@
 }
 
 .build-menu-toggle {
-  background: #4a9eff;
-  color: white;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #06231f;
   border: none;
-  padding: 15px 25px;
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-md);
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s;
+  box-shadow: 0 8px 22px var(--accent-glow), var(--shadow-sm);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
 }
 
 .build-menu-toggle:hover {
-  background: #3a8eef;
+  filter: brightness(1.06);
   transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 28px var(--accent-glow), var(--shadow-md);
+}
+
+.build-menu-toggle:active {
+  transform: translateY(0);
 }
 
 .build-menu-panel {
   position: absolute;
   bottom: 60px;
   right: 0;
-  background: rgba(0, 0, 0, 0.95);
-  border: 2px solid #4a9eff;
-  border-radius: 8px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
   padding: 20px;
   min-width: 300px;
   max-width: 400px;
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 180px); /* keep the panel clear of the top HUD */
   overflow-y: auto;
   overflow-x: visible;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
 }
 
 .build-menu-panel h3 {
   margin: 0 0 15px 0;
-  color: white;
+  color: var(--text-1);
   font-size: 18px;
-  border-bottom: 2px solid #4a9eff;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 10px;
 }
 
@@ -54,11 +63,11 @@
 }
 
 .room-category h4 {
-  color: #4a9eff;
-  font-size: 14px;
+  color: var(--accent);
+  font-size: 12px;
   margin: 0 0 10px 0;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
 }
 
 .room-list {
@@ -73,32 +82,36 @@
 }
 
 .room-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid #4a9eff;
-  color: white;
-  padding: 12px;
-  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  padding: 12px 14px;
+  border-radius: var(--r-md);
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
+  transition: transform var(--dur-fast) var(--ease), background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   width: 100%;
 }
 
 .room-button:hover:not(.disabled) {
-  background: rgba(74, 158, 255, 0.3);
-  transform: translateX(-5px);
+  background: var(--surface-hover);
+  border-color: var(--accent-border);
+  transform: translateX(-4px);
+  box-shadow: -6px 0 18px rgba(0, 0, 0, 0.3);
 }
 
 .room-button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  border-color: #666;
+  border-color: var(--border-subtle);
 }
 
 .room-name {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 14px;
   margin-bottom: 5px;
+  letter-spacing: 0.01em;
 }
 
 .room-info {
@@ -106,33 +119,36 @@
   justify-content: space-between;
   font-size: 12px;
   margin-bottom: 3px;
+  color: var(--text-2);
 }
 
 .room-details {
   font-size: 11px;
-  color: #aaa;
+  color: var(--text-3);
 }
 
 .cost-affordable {
-  color: #4ade80;
+  color: var(--success);
+  font-weight: 600;
 }
 
 .cost-expensive {
-  color: #f87171;
+  color: var(--danger);
+  font-weight: 600;
 }
 
 /* Selected Room Indicator */
 .room-button.selected {
-  background: rgba(74, 158, 255, 0.4);
-  border-color: #fff;
-  box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px var(--accent-glow);
 }
 
 .selected-room-indicator {
-  background: rgba(74, 158, 255, 0.2);
-  border: 1px solid #4a9eff;
-  border-radius: 6px;
-  padding: 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
   margin-bottom: 15px;
   display: flex;
   justify-content: space-between;
@@ -140,8 +156,8 @@
 }
 
 .selected-room-indicator span {
-  color: #4a9eff;
-  font-weight: bold;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .cancel-btn {

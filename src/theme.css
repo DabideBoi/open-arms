@@ -1,0 +1,110 @@
+/* ============================================================================
+   Open Arms — Design Tokens
+   A single source of truth for color, type, spacing, radius, shadow and motion.
+   Components reference these variables so the whole UI reads as one system.
+   ============================================================================ */
+
+:root {
+  /* ---- Typography -------------------------------------------------------- */
+  --font-sans: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+
+  /* ---- Brand / accent ---------------------------------------------------- */
+  /* Teal = hope/welcome (matches the in-game shelter frame). Amber = warmth. */
+  --accent: #2dd4bf;
+  --accent-strong: #14b8a6;
+  --accent-soft: rgba(45, 212, 191, 0.14);
+  --accent-border: rgba(45, 212, 191, 0.45);
+  --accent-glow: rgba(45, 212, 191, 0.35);
+
+  --accent-2: #fbbf24;        /* warm amber secondary */
+  --accent-2-soft: rgba(251, 191, 36, 0.14);
+
+  /* ---- Semantic ---------------------------------------------------------- */
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.15);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.15);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.15);
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.15);
+
+  /* ---- Surfaces (dark, layered) ----------------------------------------- */
+  --bg-0: #07090d;            /* app backdrop */
+  --bg-1: #10141d;            /* base panel */
+  --surface-1: rgba(24, 30, 42, 0.82);
+  --surface-2: rgba(32, 40, 55, 0.9);
+  --surface-3: rgba(44, 54, 72, 0.95);
+  --surface-hover: rgba(56, 68, 90, 0.95);
+  --glass: rgba(16, 21, 31, 0.72);
+  --glass-blur: 14px;
+
+  /* ---- Borders / hairlines ---------------------------------------------- */
+  --border-subtle: rgba(148, 163, 184, 0.12);
+  --border: rgba(148, 163, 184, 0.2);
+  --border-strong: rgba(148, 163, 184, 0.32);
+
+  /* ---- Text -------------------------------------------------------------- */
+  --text-1: #f1f5f9;          /* primary */
+  --text-2: #cbd5e1;          /* secondary */
+  --text-3: #94a3b8;          /* muted / labels */
+  --text-4: #64748b;          /* faint */
+
+  /* ---- Radius ------------------------------------------------------------ */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-pill: 999px;
+
+  /* ---- Spacing ----------------------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  /* ---- Shadows / elevation ---------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 8px 28px var(--accent-glow);
+
+  /* ---- Motion ------------------------------------------------------------ */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 0.14s;
+  --dur: 0.22s;
+}
+
+/* Respect reduced-motion — disable decorative loops/transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Consistent, quiet scrollbars inside panels/modals. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-4);
+  background-clip: content-box;
+}
