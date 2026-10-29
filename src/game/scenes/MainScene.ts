@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameStateManager } from '../systems/GameStateManager';
-import { GameState, Room, Resident, RoomType, StatusBarVisibilityMode } from '../../types';
-import { GRID_CONFIG, COLORS, ROOM_SPECS, VISUAL_CONFIG, STATUS_BAR_CONFIG, STATUS_ICONS } from '../../constants';
+import { GameState, Room, Resident, RoomType, StatusBarVisibilityMode, ResidentState } from '../../types';
+import { GRID_CONFIG, COLORS, ROOM_SPECS, STATUS_BAR_CONFIG, STATUS_ICONS } from '../../constants';
 import { getInitials } from '../../utils/helpers';
 import { GameClock, ThrottledUpdater, PauseManager } from '../systems/TimerManager';
 import { checkDayNightTransition } from '../systems/DayNightSystem';
@@ -183,7 +183,12 @@ class ResidentStatusUI {
   setVisible(visible: boolean): void {
     this.container.setVisible(visible);
   }
-  
+
+  /** Reposition the bars to sit above the (animated) resident head. */
+  follow(x: number, y: number): void {
+    this.container.setPosition(x, y - STATUS_BAR_CONFIG.OFFSET_ABOVE_RESIDENT);
+  }
+
   destroy(): void {
     this.lifeBar.destroy();
     this.happinessBar.destroy();
@@ -192,38 +197,255 @@ class ResidentStatusUI {
   }
 }
 
+/**
+ * ResidentSprite — a fully animated character token.
+ *
+ * Instead of a bare circle snapped to the grid, each resident is a small
+ * container holding a soft drop-shadow, a body, a rim highlight and their
+ * initials. Motion is smoothed on the render side (the logical position only
+ * updates the *target*; the token eases toward it, which rounds off the sharp
+ * corners of grid pathing) and layered with a walk-cycle bob, squash & stretch,
+ * a directional lead, idle breathing, a sleep pose, and spawn / despawn
+ * flourishes. This is what turns "dots on a grid" into "little people".
+ */
+class ResidentSprite {
+  readonly container: Phaser.GameObjects.Container;
+  private shadow: Phaser.GameObjects.Ellipse;
+  private body: Phaser.GameObjects.Arc;
+  private highlight: Phaser.GameObjects.Arc;
+  private initials: Phaser.GameObjects.Text;
+  private readonly radius: number;
+
+  // Position (world pixels)
+  private targetX = 0;
+  private targetY = 0;
+  private renderX = 0;
+  private renderY = 0;
+  private lastX = 0;
+  private lastY = 0;
+
+  // Animation state
+  private bobPhase: number;
+  private breathePhase: number;
+  private moveBlend = 0;       // 0 = idle, 1 = walking (smoothed)
+  private facing = 1;          // -1 left, +1 right
+  private lead = 0;            // smoothed horizontal lean into travel
+  private speed = 0;           // smoothed px/sec
+  private sleepBlend = 0;      // 0 = awake, 1 = curled up asleep
+
+  // Lifecycle
+  private spawnT = 0;          // 0..1 pop-in
+  private dying = false;
+  private dieT = 0;            // 0..1 despawn
+
+  // Per-frame flag the scene reads to kick up footstep dust
+  steppedThisFrame = false;
+
+  private state: ResidentState = 'idle';
+
+  constructor(scene: Phaser.Scene, worldX: number, worldY: number, color: number, initials: string) {
+    this.radius = GRID_CONFIG.TILE_SIZE / 3;
+    const r = this.radius;
+
+    this.shadow = scene.add.ellipse(0, r * 0.98, r * 2.25, r * 0.95, 0x05070b, 0.32);
+    this.body = scene.add.circle(0, 0, r, color);
+    this.body.setStrokeStyle(2, 0x0e1218, 0.9);
+    // Soft top-left rim light gives the token a rounded, lit-from-above feel
+    this.highlight = scene.add.circle(-r * 0.34, -r * 0.42, r * 0.44, 0xffffff, 0.30);
+    this.initials = scene.add.text(0, 0, initials, {
+      fontSize: '9px',
+      fontFamily: 'Inter, Arial, sans-serif',
+      fontStyle: 'bold',
+      color: '#ffffff',
+      resolution: 2,
+    });
+    this.initials.setOrigin(0.5, 0.5);
+
+    this.container = scene.add.container(worldX, worldY, [this.shadow, this.body, this.highlight, this.initials]);
+    this.container.setDepth(10);
+    this.container.setScale(0.001); // grows in via spawn pop
+
+    this.targetX = this.renderX = this.lastX = worldX;
+    this.targetY = this.renderY = this.lastY = worldY;
+    this.bobPhase = Math.random() * Math.PI * 2;
+    this.breathePhase = Math.random() * Math.PI * 2;
+  }
+
+  setColor(color: number): void {
+    this.body.setFillStyle(color);
+  }
+
+  /** Called from render each frame with the resident's authoritative position/state. */
+  setTarget(worldX: number, worldY: number, resident: Resident): void {
+    this.targetX = worldX;
+    this.targetY = worldY;
+    this.state = resident.currentState;
+  }
+
+  setVisible(v: boolean): void {
+    this.container.setVisible(v);
+  }
+
+  beginDespawn(): void {
+    this.dying = true;
+  }
+
+  get isDying(): boolean {
+    return this.dying;
+  }
+
+  get headX(): number {
+    return this.renderX;
+  }
+
+  get headY(): number {
+    return this.renderY;
+  }
+
+  /**
+   * Advance the animation by dt seconds. Returns false once a dying token has
+   * finished its exit and should be destroyed.
+   */
+  animate(dt: number): boolean {
+    const r = this.radius;
+
+    // --- Lifecycle scale (spawn pop / despawn shrink) ---
+    if (this.spawnT < 1) {
+      this.spawnT = Math.min(1, this.spawnT + dt / 0.42);
+    }
+    if (this.dying) {
+      this.dieT = Math.min(1, this.dieT + dt / 0.5);
+      if (this.dieT >= 1) return false;
+    }
+
+    // --- Smooth position toward target (corner-rounding ease) ---
+    const k = 1 - Math.exp(-dt * 16); // frame-rate independent lerp factor
+    this.renderX += (this.targetX - this.renderX) * k;
+    this.renderY += (this.targetY - this.renderY) * k;
+
+    // Instantaneous velocity from the eased position
+    const vx = (this.renderX - this.lastX) / Math.max(dt, 0.0001);
+    const vy = (this.renderY - this.lastY) / Math.max(dt, 0.0001);
+    this.lastX = this.renderX;
+    this.lastY = this.renderY;
+
+    const instSpeed = Math.hypot(vx, vy);
+    this.speed += (instSpeed - this.speed) * Math.min(1, dt * 12);
+
+    const walking = this.state === 'pathfinding' || this.state === 'leaving' || this.speed > 6;
+    const wantMove = walking && this.speed > 3 ? 1 : 0;
+    this.moveBlend += (wantMove - this.moveBlend) * Math.min(1, dt * 9);
+
+    const sleeping = this.state === 'sleeping' ? 1 : 0;
+    this.sleepBlend += (sleeping - this.sleepBlend) * Math.min(1, dt * 6);
+
+    if (Math.abs(vx) > 4) this.facing = vx < 0 ? -1 : 1;
+    const leadTarget = Phaser.Math.Clamp(vx * 0.02, -1.4, 1.4) * this.moveBlend;
+    this.lead += (leadTarget - this.lead) * Math.min(1, dt * 10);
+
+    // --- Phases ---
+    const prevStep = Math.floor(this.bobPhase / Math.PI);
+    this.bobPhase += dt * (9 + Math.min(this.speed, 90) * 0.03);
+    const newStep = Math.floor(this.bobPhase / Math.PI);
+    this.steppedThisFrame = this.moveBlend > 0.55 && newStep !== prevStep && !this.dying;
+    this.breathePhase += dt * 2.3;
+
+    // --- Compose transforms ---
+    const walkHop = -Math.abs(Math.sin(this.bobPhase)) * 3.4 * this.moveBlend;
+    const breathe = Math.sin(this.breathePhase) * 0.025 * (1 - this.moveBlend) * (1 - this.sleepBlend);
+
+    // Walk squash/stretch (foot strike squashes, apex stretches)
+    let sx = 1 - Math.sin(this.bobPhase * 2) * 0.06 * this.moveBlend + breathe;
+    let sy = 1 + Math.sin(this.bobPhase * 2) * 0.06 * this.moveBlend - breathe;
+
+    // Sleep pose: settle down, flatten and slow-breathe
+    const sleepBob = this.sleepBlend * r * 0.28;
+    const sleepBreath = Math.sin(this.breathePhase * 0.5) * 0.03 * this.sleepBlend;
+    sx = sx * (1 - this.sleepBlend) + (1.22 + sleepBreath) * this.sleepBlend;
+    sy = sy * (1 - this.sleepBlend) + (0.62 - sleepBreath) * this.sleepBlend;
+
+    const bodyY = walkHop + sleepBob;
+
+    this.body.setScale(this.facing * sx, sy);
+    this.body.y = bodyY;
+    this.highlight.setScale(sx, sy);
+    this.highlight.y = bodyY;
+    this.highlight.x = -r * 0.34 + this.lead * 0.4;
+    this.initials.y = bodyY * 0.5; // initials ride a little, stay legible
+    this.body.x = this.lead;
+    this.initials.x = this.lead;
+
+    // Shadow shrinks & fades as the body lifts off the ground
+    const lift = -walkHop / 3.4; // 0..1
+    const shadowScale = 1 - lift * 0.28 + this.sleepBlend * 0.15;
+    this.shadow.setScale(shadowScale, shadowScale);
+    this.shadow.setAlpha(0.32 - lift * 0.12);
+
+    // Lifecycle scale + alpha
+    const spawnScale = ResidentSprite.backOut(this.spawnT);
+    const dieScale = this.dying ? 1 - this.dieT : 1;
+    const dieLift = this.dying ? this.dieT * 26 : 0;
+    this.container.setScale(spawnScale * dieScale);
+    this.container.setPosition(this.renderX, this.renderY - dieLift);
+    this.container.setAlpha((this.dying ? 1 - this.dieT : 1) * (1 - this.sleepBlend * 0.35));
+
+    return true;
+  }
+
+  destroy(): void {
+    this.container.destroy(); // destroys children too
+  }
+
+  // Back-out easing for a lively, slightly overshooting spawn
+  private static backOut(t: number): number {
+    const s = 1.70158;
+    const p = t - 1;
+    return p * p * ((s + 1) * p + s) + 1;
+  }
+}
+
 export class MainScene extends Phaser.Scene {
   private gameStateManager!: GameStateManager;
   private gridGraphics!: Phaser.GameObjects.Graphics;
   private roomGraphics!: Phaser.GameObjects.Graphics;
-  private residentSprites: Map<string, Phaser.GameObjects.Arc> = new Map();
-  private residentInitials: Map<string, Phaser.GameObjects.Text> = new Map();
+  private roomFxGraphics!: Phaser.GameObjects.Graphics;  // animated room effects (fundraiser glow, occupancy pulse)
+  private residentViews: Map<string, ResidentSprite> = new Map();
   private roomImages: Map<string, Phaser.GameObjects.Image> = new Map();
-  
+  private knownRoomIds: Set<string> = new Set();          // to detect freshly-placed rooms
+  private roomsSeeded: boolean = false;                    // suppress placement FX on first render
+
   // Resident Status UI
   private residentStatusUIs: Map<string, ResidentStatusUI> = new Map();
   private hoveredResidentId: string | null = null;
-  
+
   // Game systems
   private gameClock!: GameClock;
   private throttledUpdater!: ThrottledUpdater;
   private pauseManager!: PauseManager;
   private autoSaveManager!: AutoSaveManager;
-  
-  // Visual effects
+
+  // Visual effects — lighting is interpolated for smooth day/night transitions
   private ambientLight: number = 1.0;
   private colorTint: number = 0xFFFFFF;
-  
+  private nightBlend: number = 0;        // 0 = full day, 1 = full night (smoothed)
+  private nightTarget: number = 0;
+  private nightOverlay!: Phaser.GameObjects.Rectangle;
+  private vignette!: Phaser.GameObjects.Image;
+  private entranceGlow: Phaser.GameObjects.Image | null = null;
+
+  // Particle emitters (juice)
+  private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private heartEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private moteEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private animClock: number = 0;         // seconds accumulator for cyclic effects
+
   // Optimization: Dirty flags
   private gridDirty: boolean = true;
   private roomsDirty: boolean = true;
   private lastRoomCount: number = 0;
   private lastPhase: "day" | "night" = "day";
-  
-  // Optimization: Object pooling
-  private spritePool: Phaser.GameObjects.Arc[] = [];
-  private readonly POOL_SIZE = 50;
-  
+
   // Optimization: Performance monitoring
   private performanceStats = {
     fps: 60,
@@ -282,13 +504,17 @@ export class MainScene extends Phaser.Scene {
     
     // Create graphics objects
     this.gridGraphics = this.add.graphics();
+    this.gridGraphics.setDepth(0);
     this.roomGraphics = this.add.graphics();
+    this.roomGraphics.setDepth(1);
+    this.roomFxGraphics = this.add.graphics();
+    this.roomFxGraphics.setDepth(9); // animated room glows, just under residents (10)
     this.placementPreview = this.add.graphics();
     this.placementPreview.setDepth(100); // Render on top
-    
-    // Initialize sprite pool
-    this.initializeSpritePool();
-    
+
+    // Build reusable textures, lighting overlays and particle systems
+    this.createVisualFx();
+
     // Initialize spatial grid for pathfinding
     const initialState = this.gameStateManager.getState();
     updateSpatialGrid(initialState.rooms);
@@ -327,7 +553,9 @@ export class MainScene extends Phaser.Scene {
     
     // Set up eating event listener for visual feedback
     window.addEventListener('resident_ate_food', this.handleResidentAteFood as EventListener);
-    
+    // Celebrate graduations with a burst of light
+    window.addEventListener('resident_graduated', this.handleResidentGraduated as EventListener);
+
     // Start periodic auto-save
     this.autoSaveManager.startPeriodicSave(this.gameStateManager.getMutableState());
     
@@ -336,49 +564,182 @@ export class MainScene extends Phaser.Scene {
     
     // Initial render
     this.renderGame(initialState);
-    
+
+    // Place ambient effects that depend on the grid layout
+    this.createEntranceGlow(initialState.grid);
+    this.positionAmbientMotes();
+
     // Start game clock
     this.gameClock.start((deltaTime) => this.updateGameSystems(deltaTime));
-    
-    // Apply initial day/night visuals
-    this.applyPhaseVisuals(initialState.currentPhase);
+
+    // Apply initial day/night visuals (snap to phase, no transition on load)
+    this.applyPhaseVisuals(initialState.currentPhase, true);
   }
   
   /**
-   * Initialize sprite pool for object pooling
+   * Build reusable soft textures, the day/night lighting overlays and the
+   * particle emitters that carry most of the "juice".
    */
-  private initializeSpritePool(): void {
-    for (let i = 0; i < this.POOL_SIZE; i++) {
-      const sprite = this.add.circle(0, 0, GRID_CONFIG.TILE_SIZE / 3, 0xffffff);
-      sprite.setVisible(false);
-      sprite.setDepth(10); // Render residents above room images
-      this.spritePool.push(sprite);
-    }
+  private createVisualFx(): void {
+    // --- Soft radial dot (used for sparks, motes, glows) ---
+    this.makeSoftCircleTexture('soft-dot', 64);
+    // --- Heart glyph for care/eating feedback ---
+    this.makeHeartTexture('heart', 48);
+
+    const camW = this.scale.width;
+    const camH = this.scale.height;
+    const worldW = GRID_CONFIG.TOTAL_WIDTH * GRID_CONFIG.TILE_SIZE;
+    const worldH = GRID_CONFIG.TOTAL_HEIGHT * GRID_CONFIG.TILE_SIZE;
+
+    // --- Night wash: a cool rectangle over the world that fades in at night ---
+    this.nightOverlay = this.add.rectangle(worldW / 2, worldH / 2, worldW + 400, worldH + 400, 0x0a1533, 0);
+    this.nightOverlay.setDepth(6); // above ground & rooms, below residents (10)
+
+    // --- Vignette: screen-fixed radial darkening for cinematic framing ---
+    this.makeVignetteTexture('vignette', camW, camH);
+    this.vignette = this.add.image(camW / 2, camH / 2, 'vignette');
+    this.vignette.setScrollFactor(0);
+    this.vignette.setDepth(70);
+    this.vignette.setAlpha(0.55);
+
+    // --- Ambient dust motes drifting across the shelter ---
+    this.moteEmitter = this.add.particles(0, 0, 'soft-dot', {
+      x: { min: 0, max: worldW },
+      y: { min: 0, max: worldH },
+      scale: { min: 0.05, max: 0.16 },
+      // Fade each mote in and out over its lifetime for a gentle shimmer
+      alpha: (_p: any, _k: string, t: number) => Math.sin(t * Math.PI) * 0.4,
+      lifespan: 9000,
+      frequency: 420,
+      quantity: 1,
+      speedX: { min: -6, max: 6 },
+      speedY: { min: -10, max: -2 },
+      blendMode: 'ADD',
+      tint: 0x9fd4ff,
+    });
+    this.moteEmitter.setDepth(8);
+
+    // --- Spark burst (spawns, graduations, fundraiser wins) ---
+    this.sparkEmitter = this.add.particles(0, 0, 'soft-dot', {
+      lifespan: 780,
+      speed: { min: 40, max: 150 },
+      scale: { start: 0.42, end: 0 },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
+      gravityY: 60,
+      blendMode: 'ADD',
+      emitting: false,
+    });
+    this.sparkEmitter.setDepth(30);
+
+    // --- Footstep dust (kicked up while walking) ---
+    this.dustEmitter = this.add.particles(0, 0, 'soft-dot', {
+      lifespan: 460,
+      speed: { min: 4, max: 20 },
+      scale: { start: 0.22, end: 0 },
+      alpha: { start: 0.5, end: 0 },
+      tint: 0x9a8f7d,
+      emitting: false,
+    });
+    this.dustEmitter.setDepth(9);
+
+    // --- Hearts (eating / care) ---
+    this.heartEmitter = this.add.particles(0, 0, 'heart', {
+      lifespan: 1300,
+      speedY: { min: -46, max: -26 },
+      speedX: { min: -14, max: 14 },
+      scale: { start: 0.6, end: 0.1 },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: -12, max: 12 },
+      tint: [0xff8fb0, 0xffd166, 0x8ce0a0],
+      emitting: false,
+    });
+    this.heartEmitter.setDepth(31);
   }
-  
-  /**
-   * Acquire sprite from pool
-   */
-  private acquireSprite(): Phaser.GameObjects.Arc {
-    const sprite = this.spritePool.pop();
-    if (sprite) {
-      sprite.setVisible(true);
-      return sprite;
-    }
-    // Pool exhausted, create new sprite
-    return this.add.circle(0, 0, GRID_CONFIG.TILE_SIZE / 3, 0xffffff);
+
+  /** Generate a soft-edged radial dot texture. */
+  private makeSoftCircleTexture(key: string, size: number): void {
+    if (this.textures.exists(key)) return;
+    const tex = this.textures.createCanvas(key, size, size);
+    if (!tex) return;
+    const ctx = tex.getContext();
+    const r = size / 2;
+    const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.4, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    tex.refresh();
   }
-  
-  /**
-   * Release sprite back to pool
-   */
-  private releaseSprite(sprite: Phaser.GameObjects.Arc): void {
-    sprite.setVisible(false);
-    if (this.spritePool.length < this.POOL_SIZE) {
-      this.spritePool.push(sprite);
-    } else {
-      sprite.destroy();
+
+  /** Generate a small heart glyph texture. */
+  private makeHeartTexture(key: string, size: number): void {
+    if (this.textures.exists(key)) return;
+    const tex = this.textures.createCanvas(key, size, size);
+    if (!tex) return;
+    const ctx = tex.getContext();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    const s = size;
+    ctx.moveTo(s * 0.5, s * 0.86);
+    ctx.bezierCurveTo(s * 0.05, s * 0.55, s * 0.18, s * 0.12, s * 0.5, s * 0.34);
+    ctx.bezierCurveTo(s * 0.82, s * 0.12, s * 0.95, s * 0.55, s * 0.5, s * 0.86);
+    ctx.closePath();
+    ctx.fill();
+    tex.refresh();
+  }
+
+  /** Generate a screen-sized vignette (transparent center, dark edges). */
+  private makeVignetteTexture(key: string, w: number, h: number): void {
+    if (this.textures.exists(key)) return;
+    const tex = this.textures.createCanvas(key, w, h);
+    if (!tex) return;
+    const ctx = tex.getContext();
+    const cx = w / 2;
+    const cy = h / 2;
+    const grad = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.32, cx, cy, Math.max(w, h) * 0.72);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.7, 'rgba(4,6,12,0.28)');
+    grad.addColorStop(1, 'rgba(2,3,8,0.82)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    tex.refresh();
+  }
+
+  /** Position the drifting motes over the currently-unlocked shelter area. */
+  private positionAmbientMotes(): void {
+    if (!this.moteEmitter) return;
+    const ua = this.gameStateManager.getState().grid.unlockedArea;
+    const t = GRID_CONFIG.TILE_SIZE;
+    this.moteEmitter.setPosition(0, 0);
+    // Constrain emission zone to the unlocked area for a lived-in feel
+    this.moteEmitter.setEmitZone({
+      type: 'random',
+      source: new Phaser.Geom.Rectangle(ua.minX * t, ua.minY * t, (ua.maxX - ua.minX) * t, (ua.maxY - ua.minY) * t),
+    } as any);
+  }
+
+  /** Create a gentle pulsing glow on the entrance tile. */
+  private createEntranceGlow(grid: any): void {
+    let ex = -1;
+    let ey = -1;
+    for (let y = 0; y < grid.height && ex < 0; y++) {
+      for (let x = 0; x < grid.width; x++) {
+        if (grid.tiles[y][x].type === 'entrance') {
+          ex = x;
+          ey = y;
+          break;
+        }
+      }
     }
+    if (ex < 0) return;
+    const t = GRID_CONFIG.TILE_SIZE;
+    this.entranceGlow = this.add.image(ex * t + t / 2, ey * t + t / 2, 'soft-dot');
+    this.entranceGlow.setBlendMode(Phaser.BlendModes.ADD);
+    this.entranceGlow.setTint(0x22d3ee);
+    this.entranceGlow.setDepth(2);
+    this.entranceGlow.setScale(t / 22);
   }
   
   /**
@@ -548,25 +909,38 @@ export class MainScene extends Phaser.Scene {
    * Render the entire game state (with dirty flag optimization)
    */
   private renderGame(state: GameState) {
-    // Check if grid needs redraw
-    if (this.gridDirty || state.currentPhase !== this.lastPhase) {
+    // Guard against being called before create() finishes wiring the camera, or
+    // on a scene instance that is being torn down (Phaser restarts this scene
+    // once at boot to inject game state).
+    if (!this.gameStateManager || !this.cameras || !this.cameras.main) {
+      return;
+    }
+
+    // Day/night is now a smooth lighting transition (see update()), so the grid
+    // itself only needs redrawing when its structure actually changes.
+    if (this.gridDirty) {
       this.renderGrid(state.grid);
       this.gridDirty = false;
     }
-    
-    // Check if rooms need redraw
+
+    // Rooms still redraw on a phase flip because closed rooms dim their alpha.
     if (this.roomsDirty || state.rooms.length !== this.lastRoomCount || state.currentPhase !== this.lastPhase) {
       this.renderRooms(state.rooms);
       this.roomsDirty = false;
       this.lastRoomCount = state.rooms.length;
-      
+
       // Update spatial grid when rooms change
       updateSpatialGrid(state.rooms);
     }
-    
+
+    // Kick off a smooth dawn / dusk when the phase changes
+    if (state.currentPhase !== this.lastPhase) {
+      this.applyPhaseVisuals(state.currentPhase);
+    }
+
     // Always render residents (they move constantly)
     this.renderResidents(state.residents);
-    
+
     // Update last phase
     this.lastPhase = state.currentPhase;
   }
@@ -757,12 +1131,12 @@ export class MainScene extends Phaser.Scene {
         this.roomGraphics.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
       }
       
-      // Draw room border (for both image and color modes)
+      // Draw room border (for both image and color modes). Active fundraisers
+      // get their animated glow from roomFxGraphics in update(); here we just
+      // draw a steady, slightly brighter gold outline.
       const hasActiveFundraiser = gameState.activeFundraisers?.some(f => f.stationId === room.id);
       if (hasActiveFundraiser) {
-        // Pulsing border for active fundraisers
-        const pulseAlpha = 0.5 + Math.sin(Date.now() / 500) * 0.3;
-        this.roomGraphics.lineStyle(3, 0xffd700, pulseAlpha);
+        this.roomGraphics.lineStyle(3, 0xffd700, 0.75);
       } else {
         this.roomGraphics.lineStyle(2, 0xffffff, room.isOpen ? 0.5 : 0.2);
       }
@@ -787,146 +1161,125 @@ export class MainScene extends Phaser.Scene {
         this.roomGraphics.fillRect(barX, barY, barWidth * Math.min(occupancyPercent, 1), barHeight);
       }
     }
+
+    // Detect freshly-placed rooms and give them a satisfying "stamp".
+    if (this.roomsSeeded) {
+      for (const room of rooms) {
+        if (!this.knownRoomIds.has(room.id)) {
+          this.playRoomPlacement(room);
+        }
+      }
+    }
+    this.knownRoomIds = new Set(rooms.map(r => r.id));
+    this.roomsSeeded = true;
   }
-  
+
+  /** A satisfying sparkle + light flash when a room is placed. */
+  private playRoomPlacement(room: Room): void {
+    const t = GRID_CONFIG.TILE_SIZE;
+    const cx = (room.gridX + room.width / 2) * t;
+    const cy = (room.gridY + room.height / 2) * t;
+
+    if (this.sparkEmitter) {
+      this.sparkEmitter.setParticleTint(0xffe08a);
+      this.sparkEmitter.emitParticleAt(cx, cy, 16);
+    }
+
+    const flash = this.add.image(cx, cy, 'soft-dot');
+    flash.setBlendMode(Phaser.BlendModes.ADD);
+    flash.setTint(0xffe08a);
+    flash.setDepth(8);
+    flash.setScale((Math.max(room.width, room.height) * t) / 40);
+    this.tweens.add({
+      targets: flash,
+      scale: flash.scale * 2.2,
+      alpha: 0,
+      duration: 420,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  /** Resolve a resident's body colour from their profile. */
+  private residentColor(resident: Resident): number {
+    if (resident.profile === 'veteran') return COLORS.RESIDENT_VETERAN;
+    if (resident.profile === 'elderly') return COLORS.RESIDENT_ELDERLY;
+    return COLORS.RESIDENT_YOUNG;
+  }
+
   /**
-   * Render all residents (with culling and object pooling)
+   * Reconcile resident sprites with game state: spawn newcomers (with an
+   * arrival sparkle), retire the departed (with a graceful fade), refresh
+   * status bars, and hand off per-frame motion to update(). Culling keeps
+   * offscreen tokens cheap.
    */
   private renderResidents(residents: Resident[]) {
     const tileSize = GRID_CONFIG.TILE_SIZE;
     const camera = this.cameras.main;
     const gameState = this.gameStateManager.getState();
     const statusBarSettings = gameState.statusBarSettings;
-    
-    // Calculate visible bounds with padding
-    const padding = tileSize * 2;
-    const visibleBounds = {
+
+    const padding = tileSize * 3;
+    const vb = {
       left: camera.scrollX - padding,
       right: camera.scrollX + camera.width + padding,
       top: camera.scrollY - padding,
-      bottom: camera.scrollY + camera.height + padding
+      bottom: camera.scrollY + camera.height + padding,
     };
-    
-    // Remove sprites, initials, and status UIs for residents that no longer exist
-    const currentResidentIds = new Set(residents.map(r => r.id));
-    for (const [id, sprite] of this.residentSprites.entries()) {
-      if (!currentResidentIds.has(id)) {
-        this.releaseSprite(sprite);
-        this.residentSprites.delete(id);
+
+    const currentIds = new Set(residents.map(r => r.id));
+
+    // Residents that left the game → play a graceful exit (kept alive by
+    // update() until the animation finishes, then destroyed there).
+    for (const [id, view] of this.residentViews.entries()) {
+      if (!currentIds.has(id) && !view.isDying) {
+        view.beginDespawn();
       }
     }
-    for (const [id, initialsText] of this.residentInitials.entries()) {
-      if (!currentResidentIds.has(id)) {
-        initialsText.destroy();
-        this.residentInitials.delete(id);
-      }
-    }
+    // Status bars only belong to living residents
     for (const [id, statusUI] of this.residentStatusUIs.entries()) {
-      if (!currentResidentIds.has(id)) {
+      if (!currentIds.has(id)) {
         statusUI.destroy();
         this.residentStatusUIs.delete(id);
       }
     }
-    
+
     let visibleCount = 0;
-    
-    // Create or update sprites for each resident
+
     for (const resident of residents) {
       const pixelX = resident.gridX * tileSize + tileSize / 2;
       const pixelY = resident.gridY * tileSize + tileSize / 2;
-      
-      // Culling: Check if resident is visible
-      const isVisible = pixelX >= visibleBounds.left &&
-                       pixelX <= visibleBounds.right &&
-                       pixelY >= visibleBounds.top &&
-                       pixelY <= visibleBounds.bottom;
-      
-      let sprite = this.residentSprites.get(resident.id);
-      let initialsText = this.residentInitials.get(resident.id);
-      let statusUI = this.residentStatusUIs.get(resident.id);
-      
-      if (!isVisible) {
-        // Hide sprite, initials, and status UI if not visible
-        if (sprite) {
-          sprite.setVisible(false);
-        }
-        if (initialsText) {
-          initialsText.setVisible(false);
-        }
-        if (statusUI) {
-          statusUI.setVisible(false);
-        }
-        continue;
-      }
-      
-      visibleCount++;
-      
-      if (!sprite) {
-        // Acquire sprite from pool
-        sprite = this.acquireSprite();
-        
-        // Set color based on profile
-        let color = COLORS.RESIDENT_YOUNG;
-        if (resident.profile === "veteran") {
-          color = COLORS.RESIDENT_VETERAN;
-        } else if (resident.profile === "elderly") {
-          color = COLORS.RESIDENT_ELDERLY;
-        }
-        sprite.setFillStyle(color);
-        // Dark outline gives the token definition against tiles and rooms
-        sprite.setStrokeStyle(2, 0x11151d, 0.85);
+      const isVisible =
+        pixelX >= vb.left && pixelX <= vb.right && pixelY >= vb.top && pixelY <= vb.bottom;
 
-        this.residentSprites.set(resident.id, sprite);
+      let view = this.residentViews.get(resident.id);
+      if (!view) {
+        view = new ResidentSprite(this, pixelX, pixelY, this.residentColor(resident), getInitials(resident.name));
+        this.residentViews.set(resident.id, view);
+        if (isVisible) {
+          // Arrival flourish
+          this.sparkEmitter.setParticleTint(0x9fe8ff);
+          this.sparkEmitter.emitParticleAt(pixelX, pixelY, 9);
+        }
       }
-      
-      // Create initials text if needed
-      if (!initialsText) {
-        const initials = getInitials(resident.name);
-        initialsText = this.add.text(0, 0, initials, {
-          fontSize: '9px',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          color: '#ffffff',
-          resolution: 2
-        });
-        initialsText.setOrigin(0.5, 0.5);
-        initialsText.setDepth(11); // Above residents (10) but below status bars (15)
-        this.residentInitials.set(resident.id, initialsText);
-      }
-      
-      // Create status UI if needed
+
+      view.setTarget(pixelX, pixelY, resident);
+      view.setVisible(isVisible);
+      if (isVisible) visibleCount++;
+
+      // Status bars: content refresh here, precise positioning in update()
+      let statusUI = this.residentStatusUIs.get(resident.id);
       if (!statusUI && statusBarSettings.enabled) {
         statusUI = new ResidentStatusUI(this);
         this.residentStatusUIs.set(resident.id, statusUI);
       }
-      
-      // Update sprite
-      sprite.setVisible(true);
-      sprite.setPosition(pixelX, pixelY);
-      
-      // Update initials position and visibility
-      initialsText.setVisible(true);
-      initialsText.setPosition(pixelX, pixelY);
-      
-      // Update alpha based on state
-      if (resident.currentState === "sleeping") {
-        sprite.setAlpha(0.5);
-        initialsText.setAlpha(0.5);
-      } else {
-        sprite.setAlpha(1.0);
-        initialsText.setAlpha(1.0);
-      }
-      
-      // Update status UI visibility and position
       if (statusUI) {
-        const shouldShowBar = this.shouldShowStatusBar(resident, statusBarSettings);
-        statusUI.setVisible(shouldShowBar);
-        if (shouldShowBar) {
-          statusUI.update(resident, pixelX, pixelY);
-        }
+        const show = isVisible && this.shouldShowStatusBar(resident, statusBarSettings);
+        statusUI.setVisible(show);
+        if (show) statusUI.update(resident, view.headX, view.headY);
       }
     }
-    
+
     this.performanceStats.visibleResidents = visibleCount;
   }
   
@@ -989,85 +1342,186 @@ export class MainScene extends Phaser.Scene {
   }
   
   /**
-   * Apply phase visuals (day/night)
+   * Set the day/night lighting target. The actual transition is eased every
+   * frame in update() (see updateLighting) for a smooth dawn / dusk. Pass
+   * snap=true to jump straight to the phase (used on initial load).
    */
-  private applyPhaseVisuals(phase: "day" | "night"): void {
-    if (phase === "day") {
-      this.ambientLight = VISUAL_CONFIG.DAY_AMBIENT_LIGHT;
-      this.colorTint = VISUAL_CONFIG.DAY_COLOR_TINT;
-    } else {
-      this.ambientLight = VISUAL_CONFIG.NIGHT_AMBIENT_LIGHT;
-      this.colorTint = VISUAL_CONFIG.NIGHT_COLOR_TINT;
+  private applyPhaseVisuals(phase: "day" | "night", snap: boolean = false): void {
+    this.nightTarget = phase === "night" ? 1 : 0;
+    if (snap) {
+      this.nightBlend = this.nightTarget;
     }
-    
-    // Force re-render
-    this.renderGame(this.gameStateManager.getState());
   }
-  
+
   /**
-   * Apply ambient light to a color
+   * Apply ambient light to a color (kept for grid/room fallback rendering).
    */
   private applyAmbientLight(color: number): number {
     const r = (color >> 16) & 0xFF;
     const g = (color >> 8) & 0xFF;
     const b = color & 0xFF;
-    
+
     const newR = Math.floor(r * this.ambientLight);
     const newG = Math.floor(g * this.ambientLight);
     const newB = Math.floor(b * this.ambientLight);
-    
+
     return (newR << 16) | (newG << 8) | newB;
   }
-  
-  update(time: number, delta: number) {
-    // Main update is handled by GameClock
-    // This Phaser update is kept for compatibility
+
+  /**
+   * Phaser render loop — drives all purely-visual animation at the display
+   * refresh rate, independent of the fixed-step game clock. This is what makes
+   * the whole thing feel alive: eased lighting, breathing/walking characters,
+   * footstep dust and animated room effects.
+   */
+  update(_time: number, delta: number) {
+    // Only animate once the scene is fully initialised and rendering
+    if (!this.gameStateManager || !this.cameras || !this.cameras.main) {
+      return;
+    }
+    const dt = Math.min(delta, 60) / 1000; // clamp big frame gaps (tab refocus)
+    this.animClock += dt;
+    this.updateLighting(dt);
+    this.animateResidents(dt);
+    this.updateRoomFx();
   }
-  
+
+  /** Ease day/night lighting and apply it to the overlay, vignette and rooms. */
+  private updateLighting(dt: number): void {
+    if (this.nightBlend !== this.nightTarget) {
+      this.nightBlend += (this.nightTarget - this.nightBlend) * Math.min(1, dt * 1.7);
+      if (Math.abs(this.nightTarget - this.nightBlend) < 0.002) this.nightBlend = this.nightTarget;
+    }
+
+    const b = this.nightBlend;
+    if (this.nightOverlay) this.nightOverlay.setAlpha(0.46 * b);
+    if (this.vignette) this.vignette.setAlpha(0.5 + 0.24 * b);
+
+    // Cool the room tint toward moonlight as night falls
+    this.colorTint = MainScene.lerpColor(0xffffff, 0x8f9bd6, b);
+    for (const image of this.roomImages.values()) {
+      image.setTint(this.colorTint);
+    }
+
+    // Entrance beacon breathes; warmer/brighter at night
+    if (this.entranceGlow) {
+      const breath = Math.sin(this.animClock * 2.1);
+      this.entranceGlow.setAlpha(Phaser.Math.Clamp(0.38 + breath * 0.16 + b * 0.28, 0, 1));
+      const base = GRID_CONFIG.TILE_SIZE / 22;
+      this.entranceGlow.setScale(base * (1 + breath * 0.07 + b * 0.16));
+    }
+  }
+
+  /** Animate every resident token and keep its status bar glued to its head. */
+  private animateResidents(dt: number): void {
+    const cam = this.cameras.main;
+    for (const [id, view] of this.residentViews.entries()) {
+      const alive = view.animate(dt);
+      if (!alive) {
+        view.destroy();
+        this.residentViews.delete(id);
+        const ui = this.residentStatusUIs.get(id);
+        if (ui) {
+          ui.destroy();
+          this.residentStatusUIs.delete(id);
+        }
+        continue;
+      }
+
+      // Footstep dust while walking (only when on-screen)
+      if (view.steppedThisFrame && this.dustEmitter && cam.worldView.contains(view.headX, view.headY)) {
+        this.dustEmitter.emitParticleAt(
+          view.headX + (Math.random() * 6 - 3),
+          view.headY + GRID_CONFIG.TILE_SIZE / 3,
+          1
+        );
+      }
+
+      const ui = this.residentStatusUIs.get(id);
+      if (ui) ui.follow(view.headX, view.headY);
+    }
+  }
+
+  /** Draw animated glows around rooms hosting active fundraisers. */
+  private updateRoomFx(): void {
+    if (!this.roomFxGraphics) return;
+    this.roomFxGraphics.clear();
+
+    const gameState = this.gameStateManager.getState();
+    const active = gameState.activeFundraisers;
+    if (!active || active.length === 0) return;
+
+    const t = GRID_CONFIG.TILE_SIZE;
+    const g = this.roomFxGraphics;
+
+    for (const f of active) {
+      const room = gameState.rooms.find(r => r.id === f.stationId);
+      if (!room) continue;
+
+      const cx = (room.gridX + room.width / 2) * t;
+      const cy = (room.gridY + room.height / 2) * t;
+      const baseR = Math.max(room.width, room.height) * t * 0.55;
+
+      // Two outward-rippling rings
+      const span = 46;
+      for (let i = 0; i < 2; i++) {
+        const prog = ((this.animClock * 34 + i * (span / 2)) % span) / span;
+        const rr = baseR + prog * span;
+        const a = (1 - prog) * 0.35;
+        g.lineStyle(3, 0xffd54a, a);
+        g.strokeCircle(cx, cy, rr);
+      }
+
+      // Breathing outline hugging the station
+      const pulse = 0.45 + Math.sin(this.animClock * 3) * 0.3;
+      g.lineStyle(3, 0xffe08a, pulse);
+      g.strokeRoundedRect(room.gridX * t + 2, room.gridY * t + 2, room.width * t - 4, room.height * t - 4, 6);
+    }
+  }
+
+  /** Linearly interpolate between two 0xRRGGBB colours. */
+  private static lerpColor(a: number, b: number, t: number): number {
+    const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+    const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+    const r = Math.round(ar + (br - ar) * t);
+    const g = Math.round(ag + (bg - ag) * t);
+    const bl = Math.round(ab + (bb - ab) * t);
+    return (r << 16) | (g << 8) | bl;
+  }
+
   /**
    * Clean up on scene shutdown
    */
   shutdown() {
     this.gameClock.stop();
     this.autoSaveManager.stopPeriodicSave();
-    
+
     // Force final save
     this.autoSaveManager.forceSave(this.gameStateManager.getMutableState());
-    
-    // Clean up sprites
-    for (const sprite of this.residentSprites.values()) {
-      sprite.destroy();
+
+    // Clean up resident tokens
+    for (const view of this.residentViews.values()) {
+      view.destroy();
     }
-    this.residentSprites.clear();
-    
-    // Clean up initials text
-    for (const initialsText of this.residentInitials.values()) {
-      initialsText.destroy();
-    }
-    this.residentInitials.clear();
-    
+    this.residentViews.clear();
+
     // Clean up status UIs
     for (const statusUI of this.residentStatusUIs.values()) {
       statusUI.destroy();
     }
     this.residentStatusUIs.clear();
-    
+
     // Clean up room images
     for (const image of this.roomImages.values()) {
       image.destroy();
     }
     this.roomImages.clear();
-    
-    // Clean up sprite pool
-    for (const sprite of this.spritePool) {
-      sprite.destroy();
-    }
-    this.spritePool = [];
-    
+
     // Remove event listeners
     window.removeEventListener('blur', this.handleBlur);
     window.removeEventListener('focus', this.handleFocus);
     window.removeEventListener('resident_ate_food', this.handleResidentAteFood as EventListener);
+    window.removeEventListener('resident_graduated', this.handleResidentGraduated as EventListener);
   }
   
   private handleBlur = () => {
@@ -1080,33 +1534,46 @@ export class MainScene extends Phaser.Scene {
   };
   
   private handleResidentAteFood = (event: CustomEvent) => {
-    const { residentId, residentName } = event.detail;
-    
-    // Find the resident sprite
-    const sprite = this.residentSprites.get(residentId);
-    if (!sprite) return;
-    
-    // Create a food icon (🍽️) above the resident
-    const text = this.add.text(sprite.x, sprite.y - 20, '🍽️', {
-      fontSize: '20px',
-      color: '#ffffff'
-    });
-    text.setDepth(20);
-    text.setOrigin(0.5, 0.5);
-    
-    // Animate the icon: fade in, float up, fade out
+    const { residentId } = event.detail;
+    const view = this.residentViews.get(residentId);
+    if (!view) return;
+
+    // A little rising heart at the resident's head
+    if (this.heartEmitter) {
+      this.heartEmitter.emitParticleAt(view.headX, view.headY - GRID_CONFIG.TILE_SIZE / 3, 1);
+    }
+  };
+
+  private handleResidentGraduated = (event: CustomEvent) => {
+    const { residentId } = event.detail;
+    const view = this.residentViews.get(residentId);
+    // The resident is about to be removed from state; celebrate at their spot
+    // (fall back to screen centre if the token is already gone).
+    const x = view ? view.headX : this.cameras.main.midPoint.x;
+    const y = view ? view.headY : this.cameras.main.midPoint.y;
+
+    if (this.sparkEmitter) {
+      this.sparkEmitter.setParticleTint(0xffd166);
+      this.sparkEmitter.emitParticleAt(x, y, 26);
+    }
+    if (this.heartEmitter) {
+      this.heartEmitter.emitParticleAt(x, y, 6);
+    }
+
+    // Expanding golden ring
+    const ring = this.add.image(x, y, 'soft-dot');
+    ring.setBlendMode(Phaser.BlendModes.ADD);
+    ring.setTint(0xffe08a);
+    ring.setDepth(32);
+    ring.setScale(0.3);
     this.tweens.add({
-      targets: text,
-      y: text.y - 30,
+      targets: ring,
+      scale: 3.4,
       alpha: 0,
-      duration: 2000,
-      ease: 'Power2',
-      onComplete: () => {
-        text.destroy();
-      }
+      duration: 700,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
     });
-    
-    console.log(`🍽️ Visual feedback: ${residentName} ate food`);
   };
   
   /**

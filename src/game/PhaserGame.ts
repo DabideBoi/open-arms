@@ -16,11 +16,18 @@ export function createPhaserGame(
     height: 720,
     parent,
     backgroundColor: '#0d1017',
-    scene: [MainScene],
+    // Scene is added explicitly (with game state) after boot — see below.
     render: {
       antialias: true,
-      roundPixels: true,      // snap sprite draws to whole pixels — kills sub-pixel shimmer
-      pixelArt: false
+      antialiasGL: true,
+      roundPixels: false,     // allow sub-pixel positions so slow, smooth motion doesn't stair-step
+      pixelArt: false,
+      powerPreference: 'high-performance'
+    },
+    fps: {
+      target: 60,
+      min: 30,
+      smoothStep: true
     },
     physics: {
       default: 'arcade',
@@ -36,14 +43,15 @@ export function createPhaserGame(
   };
   
   const game = new Phaser.Game(config);
-  
-  // The scene auto-starts from config, but we need to restart it with data
-  // Wait a tick for the scene to be added, then restart with gameStateManager
-  setTimeout(() => {
-    game.scene.stop('MainScene');
-    game.scene.start('MainScene', { gameStateManager });
-  }, 0);
-  
+
+  // Add and start the scene once, WITH the game state, instead of letting it
+  // auto-start data-less and then restarting it. This avoids a throwaway
+  // data-less create() (and its duplicate asset preload) and, crucially, means
+  // there's no deferred restart that could fire against an already-destroyed
+  // game (React StrictMode double-mounts in dev), which previously spawned a
+  // camera-less "zombie" scene that spammed errors every frame.
+  game.scene.add('MainScene', MainScene, true, { gameStateManager });
+
   return game;
 }
 
