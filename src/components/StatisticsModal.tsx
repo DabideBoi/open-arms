@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, FoodPortionSetting } from '../types';
 import { getDecayRateInfo } from '../game/systems/ReputationSystem';
+import { roomKind } from '../constants';
 import './StatisticsModal.css';
+import { formatMoney } from '../utils/helpers';
 
 interface StatisticsModalProps {
   isOpen: boolean;
   onClose: () => void;
   gameState: GameState;
   onChangeFoodSetting?: (setting: FoodPortionSetting) => void;
+  embedded?: boolean; // render inline (Reports panel) instead of as a modal
 }
 
 /**
  * Statistics Modal - displays detailed game statistics
- * Includes: decay rate, graduated count, daily net income/expenses, food portions
+ * Includes: decay rate, graduated count, daily net income/expenses, food deliveries
  */
 export const StatisticsModal: React.FC<StatisticsModalProps> = ({
   isOpen,
   onClose,
   gameState,
-  onChangeFoodSetting
+  onChangeFoodSetting,
+  embedded = false
 }) => {
   const [dailyIncome, setDailyIncome] = useState(0);
   const [dailyExpenses, setDailyExpenses] = useState(0);
@@ -67,12 +71,12 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
   // Get food setting description
   const getFoodDescription = (setting: FoodPortionSetting): string => {
     const descriptions: Record<FoodPortionSetting, string> = {
-      premium: 'Premium portions - Highest cost, maximum happiness',
-      generous: 'Generous portions - High cost, very happy residents',
-      large: 'Large portions - Higher cost, happier residents',
-      standard: 'Standard portions - Balanced approach',
-      small: 'Small portions - Lower cost, less happiness',
-      minimal: 'Minimal portions - Very low cost, unhappy residents',
+      premium: 'Premium deliveries - Highest cost, maximum health, fastest food',
+      generous: 'Generous deliveries - High cost, very healthy residents, faster food',
+      large: 'Large deliveries - Higher cost, healthier residents, faster food',
+      standard: 'Standard deliveries - Balanced approach',
+      small: 'Small deliveries - Lower cost, less health, slower food',
+      minimal: 'Minimal deliveries - Very low cost, unhealthy residents, slowest food',
       none: 'No food - Saves money but residents suffer'
     };
     return descriptions[setting];
@@ -81,10 +85,6 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
   // Calculate decay protection sources
   const getProtectionSources = (): string[] => {
     const sources: string[] = [];
-    
-    // Check for learning center
-    const hasLearningCenter = gameState.rooms.some(r => r.type === 'learning_center');
-    if (hasLearningCenter) sources.push('Learning Center');
     
     // Check for admin office
     const hasAdminOffice = gameState.rooms.some(r => r.type === 'admin_office');
@@ -95,10 +95,10 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
       sources.push('Active Fundraisers');
     }
     
-    // Check high-happiness residents
-    const happyResidents = gameState.residents.filter(r => r.happiness >= 80).length;
-    if (happyResidents > 0) {
-      sources.push(`${happyResidents} Happy Residents`);
+    // Check high-health residents
+    const healthyResidents = gameState.residents.filter(r => r.health >= 80).length;
+    if (healthyResidents > 0) {
+      sources.push(`${healthyResidents} Healthy Residents`);
     }
     
     return sources;
@@ -111,8 +111,8 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
 
   return (
     <>
-      <div className="statistics-modal-overlay" onClick={onClose} />
-      <div className="statistics-modal">
+      {!embedded && <div className="statistics-modal-overlay" onClick={onClose} />}
+      <div className={`statistics-modal${embedded ? ' embedded' : ''}`}>
         <button className="statistics-close-button" onClick={onClose}>×</button>
         
         <h2>📊 Statistics</h2>
@@ -236,7 +236,7 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
           <div className="statistics-content">
             <div className="finance-stats">
               <div className="stat-card income">
-                <span className="stat-value">+${dailyIncome.toLocaleString()}</span>
+                <span className="stat-value">+{formatMoney(dailyIncome)}</span>
                 <span className="stat-label">Today's Income</span>
               </div>
               <div className="stat-card expenses">
@@ -245,7 +245,7 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
               </div>
               <div className={`stat-card net ${dailyNet >= 0 ? 'positive' : 'negative'}`}>
                 <span className="stat-value">
-                  {dailyNet >= 0 ? '+' : ''}${dailyNet.toLocaleString()}
+                  {dailyNet >= 0 ? '+' : ''}{formatMoney(dailyNet)}
                 </span>
                 <span className="stat-label">Today's Net</span>
               </div>
@@ -258,7 +258,7 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
                   <div className="breakdown-item">
                     <span>Last Day Net:</span>
                     <span style={{ color: lastDayNetIncome >= 0 ? '#66cc00' : '#ff6600' }}>
-                      {lastDayNetIncome >= 0 ? '+' : ''}${lastDayNetIncome.toLocaleString()}
+                      {lastDayNetIncome >= 0 ? '+' : ''}{formatMoney(lastDayNetIncome)}
                     </span>
                   </div>
                 </div>
@@ -270,12 +270,12 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
                   <div className="breakdown-item">
                     <span>Money:</span>
                     <span style={{ color: gameState.money >= 0 ? '#66cc00' : '#ff6600' }}>
-                      ${gameState.money.toLocaleString()}
+                      {formatMoney(gameState.money)}
                     </span>
                   </div>
                   <div className="breakdown-item">
                     <span>Total Earned:</span>
-                    <span>+${(gameState.totalMoneyEarned || 0).toLocaleString()}</span>
+                    <span>+{formatMoney((gameState.totalMoneyEarned || 0))}</span>
                   </div>
                 </div>
               </div>
@@ -285,12 +285,12 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
         
         {/* Food Portions Section */}
         <div className="statistics-section">
-          <h3>🍽️ Food Portions</h3>
+          <h3>🍽️ Food Deliveries</h3>
           <div className="statistics-content">
             <div className="food-current">
               <span className="food-icon">{getFoodIcon(gameState.foodPortionSetting)}</span>
               <div className="food-info">
-                <span className="food-setting">{gameState.foodPortionSetting.charAt(0).toUpperCase() + gameState.foodPortionSetting.slice(1)} Portions</span>
+                <span className="food-setting">{gameState.foodPortionSetting.charAt(0).toUpperCase() + gameState.foodPortionSetting.slice(1)} Deliveries</span>
                 <span className="food-description">{getFoodDescription(gameState.foodPortionSetting)}</span>
               </div>
             </div>
@@ -302,7 +302,7 @@ export const StatisticsModal: React.FC<StatisticsModalProps> = ({
               </div>
               <div className="detail-row">
                 <span className="detail-label">Cafeterias:</span>
-                <span className="detail-value">{gameState.rooms.filter(r => r.type === 'cafeteria').length}</span>
+                <span className="detail-value">{gameState.rooms.filter(r => roomKind(r.type) === 'cafeteria').length}</span>
               </div>
             </div>
             

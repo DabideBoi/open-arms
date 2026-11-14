@@ -1,7 +1,8 @@
 import { GameState, FoodPortionSetting, FoodPortionTier, Room } from '../../types';
-import { FOOD_CONFIG, FOOD_PORTIONS, FoodPortionConfig } from '../../constants';
+import { FOOD_CONFIG, FOOD_PORTIONS, FoodPortionConfig, roomKind } from '../../constants';
 import { modifyReputation } from './ReputationSystem';
 import { recordExpense } from './DonationSystem';
+import { formatMoney } from '../../utils/helpers';
 
 /**
  * FoodSystem - Manages food resource generation and consumption
@@ -20,6 +21,11 @@ import { recordExpense } from './DonationSystem';
  */
 const cafeteriaGenerationTimers = new Map<string, number>();
 
+/** Push generation timers forward after a pause so cafeterias don't burst on resume. */
+export function shiftCafeteriaTimers(ms: number): void {
+  cafeteriaGenerationTimers.forEach((t, id) => cafeteriaGenerationTimers.set(id, t + ms));
+}
+
 /**
  * Initialize food generation for a cafeteria
  */
@@ -35,12 +41,23 @@ export function removeCafeteriaGeneration(cafeteriaId: string): void {
 }
 
 /**
+ * How fast cafeterias produce food for the current delivery setting
+ * ('large' is a legacy alias of 'generous'; 'none' still trickles so food can't hit a dead end)
+ */
+export function getFoodGenerationMultiplier(gameState: GameState): number {
+  const setting = gameState.foodPortionSetting;
+  if (setting === 'none') return 0.3;
+  return FOOD_PORTIONS[setting === 'large' ? 'generous' : setting]?.generationMultiplier ?? 1;
+}
+
+/**
  * Update food generation for all cafeterias
  * Called from game loop
  */
 export function updateFoodGeneration(gameState: GameState): void {
   const now = Date.now();
-  const cafeterias = gameState.rooms.filter(room => room.type === 'cafeteria');
+  const cafeterias = gameState.rooms.filter(room => roomKind(room.type) === 'cafeteria');
+  const multiplier = getFoodGenerationMultiplier(gameState);
   
   for (const cafeteria of cafeterias) {
     // Initialize timer if not exists
@@ -52,8 +69,8 @@ export function updateFoodGeneration(gameState: GameState): void {
     const lastGeneration = cafeteriaGenerationTimers.get(cafeteria.id)!;
     const timeSinceLastGeneration = now - lastGeneration;
     
-    // Check if enough time has passed
-    if (timeSinceLastGeneration >= FOOD_CONFIG.GENERATION_INTERVAL) {
+    // Check if enough time has passed (bigger deliveries produce food faster)
+    if (timeSinceLastGeneration >= FOOD_CONFIG.GENERATION_INTERVAL / multiplier) {
       // Generate food
       gameState.food += FOOD_CONFIG.GENERATION_AMOUNT;
       
@@ -86,8 +103,8 @@ export function getTimeUntilNextGeneration(cafeteriaId: string): number {
  * Get total food generation rate (food per minute)
  */
 export function getFoodGenerationRate(gameState: GameState): number {
-  const cafeteriaCount = gameState.rooms.filter(room => room.type === 'cafeteria').length;
-  const generationsPerMinute = 60000 / FOOD_CONFIG.GENERATION_INTERVAL; // 4 per minute (60s / 15s)
+  const cafeteriaCount = gameState.rooms.filter(room => roomKind(room.type) === 'cafeteria').length;
+  const generationsPerMinute = (60000 / FOOD_CONFIG.GENERATION_INTERVAL) * getFoodGenerationMultiplier(gameState); // 4/min at standard
   return cafeteriaCount * FOOD_CONFIG.GENERATION_AMOUNT * generationsPerMinute;
 }
 
@@ -174,38 +191,37 @@ export function processDailyFood(gameState: GameState): void {
     return;
   }
   
-  const portionSetting = gameState.foodPortionSetting;
-  const cost = calculateFoodCost(residentCount, portionSetting);
+  let portionSetting = gameState.foodPortionSetting;
+  let cost = calculateFoodCost(residentCount, portionSetting);
   
   // Check if affordable
   if (gameState.money < cost) {
-    // Auto-downgrade to affordable tier
+    // Auto-downgrade once. getAffordableFoodTier always returns a tier we can pay for
+    // (at worst 'none', cost 0), so no retry is needed, even when money is negative.
     const affordableTier = getAffordableFoodTier(gameState.money, residentCount);
-    
     if (affordableTier !== portionSetting) {
       console.log(`⚠️ Insufficient funds for ${portionSetting} portions. Downgraded to ${affordableTier}.`);
-      
       emitFoodDowngrade(portionSetting, affordableTier);
-      gameState.foodPortionSetting = affordableTier;
     }
-    
-    // Process with new tier
-    processDailyFood(gameState);
-    return;
+    gameState.foodPortionSetting = affordableTier;
+    portionSetting = affordableTier;
+    cost = calculateFoodCost(residentCount, portionSetting);
   }
   
-  // Deduct cost
+  // Deduct cost (0 for 'none', so debt can't be made worse here)
   gameState.money -= cost;
   
   // Record food expense to financial history
-  recordExpense(gameState, cost, 'food', `Daily food (${portionSetting}) for ${residentCount} residents`);
+  if (cost > 0) {
+    recordExpense(gameState, cost, 'food', `Daily food (${portionSetting}) for ${residentCount} residents`);
+  }
   
   // Get effects from the new FOOD_PORTIONS config
   const portionConfig = getPortionEffects(portionSetting);
   
   for (const resident of gameState.residents) {
-    resident.happiness = Math.max(0, Math.min(100, 
-      resident.happiness + portionConfig.happiness
+    resident.health = Math.max(0, Math.min(100, 
+      resident.health + portionConfig.health
     ));
   }
   
@@ -214,12 +230,12 @@ export function processDailyFood(gameState: GameState): void {
     modifyReputation(
       gameState,
       portionConfig.reputation,
-      `Daily food: ${portionSetting} portions`
+      `Daily food: ${portionSetting} deliveries`
     );
   }
   
   const costPerResident = portionConfig.cost;
-  console.log(`🍽️ Daily food: ${residentCount} residents × $${costPerResident} = $${cost}`);
+  console.log(`🍽️ Daily food: ${residentCount} residents × ${formatMoney(costPerResident)} = ${formatMoney(cost)}`);
   
   // Emit event
   emitFoodProcessed(portionSetting, cost, residentCount);
@@ -228,7 +244,7 @@ export function processDailyFood(gameState: GameState): void {
 /**
  * Get portion effects mapping setting to new config
  */
-function getPortionEffects(setting: FoodPortionSetting): { happiness: number; reputation: number; cost: number } {
+function getPortionEffects(setting: FoodPortionSetting): { health: number; reputation: number; cost: number } {
   // Map legacy settings to new tiers
   const tierMapping: Record<FoodPortionSetting, FoodPortionTier | 'none'> = {
     'premium': 'premium',
@@ -243,12 +259,12 @@ function getPortionEffects(setting: FoodPortionSetting): { happiness: number; re
   const tier = tierMapping[setting];
   
   if (tier === 'none') {
-    return { happiness: -15, reputation: -5, cost: 0 };
+    return { health: -15, reputation: -5, cost: 0 };
   }
   
   const config = FOOD_PORTIONS[tier as FoodPortionTier];
   return {
-    happiness: config.happiness,
+    health: config.health,
     reputation: config.reputation,
     cost: config.cost
   };
@@ -312,7 +328,7 @@ export function changeFoodSetting(
   if (cost > gameState.money) {
     return {
       success: false,
-      message: `Cannot afford ${newSetting} portions (need $${cost}, have $${gameState.money})`
+      message: `Cannot afford ${newSetting} deliveries (need ${formatMoney(cost)}, have ${formatMoney(gameState.money)})`
     };
   }
   
@@ -324,12 +340,12 @@ export function changeFoodSetting(
   // Add warning for below-standard choices
   let warning: string | undefined;
   if (newSetting === 'small' || newSetting === 'minimal' || newSetting === 'none') {
-    warning = `⚠️ Warning: Below-standard food will reduce happiness and LIFE progression!`;
+    warning = `⚠️ Warning: Below-standard food will reduce health and LIFE progression!`;
   }
   
   return {
     success: true,
-    message: `Food setting changed to ${newSetting} portions`,
+    message: `Food deliveries set to ${newSetting}`,
     warning
   };
 }
@@ -371,7 +387,7 @@ export function getFoodSettingDisplay(setting: FoodPortionSetting): {
   icon: string;
   description: string;
   costPerResident: number;
-  happinessChange: number;
+  healthChange: number;
   reputationChange: number;
   lifeFillModifier: number;
   isBelowStandard: boolean;
@@ -381,78 +397,78 @@ export function getFoodSettingDisplay(setting: FoodPortionSetting): {
     icon: string;
     description: string;
     costPerResident: number;
-    happinessChange: number;
+    healthChange: number;
     reputationChange: number;
     lifeFillModifier: number;
     isBelowStandard: boolean;
   }> = {
     premium: {
-      label: 'Premium Dining',
+      label: 'Premium Deliveries',
       icon: '🥂',
       description: FOOD_PORTIONS.premium.description,
       costPerResident: FOOD_PORTIONS.premium.cost,
-      happinessChange: FOOD_PORTIONS.premium.happiness,
+      healthChange: FOOD_PORTIONS.premium.health,
       reputationChange: FOOD_PORTIONS.premium.reputation,
       lifeFillModifier: FOOD_PORTIONS.premium.lifeFillModifier,
       isBelowStandard: false
     },
     generous: {
-      label: 'Generous Portions',
+      label: 'Generous Deliveries',
       icon: '🍽️',
       description: FOOD_PORTIONS.generous.description,
       costPerResident: FOOD_PORTIONS.generous.cost,
-      happinessChange: FOOD_PORTIONS.generous.happiness,
+      healthChange: FOOD_PORTIONS.generous.health,
       reputationChange: FOOD_PORTIONS.generous.reputation,
       lifeFillModifier: FOOD_PORTIONS.generous.lifeFillModifier,
       isBelowStandard: false
     },
     large: {
       // Legacy support - maps to generous
-      label: 'Generous Portions',
+      label: 'Generous Deliveries',
       icon: '🍽️',
       description: FOOD_PORTIONS.generous.description,
       costPerResident: FOOD_PORTIONS.generous.cost,
-      happinessChange: FOOD_PORTIONS.generous.happiness,
+      healthChange: FOOD_PORTIONS.generous.health,
       reputationChange: FOOD_PORTIONS.generous.reputation,
       lifeFillModifier: FOOD_PORTIONS.generous.lifeFillModifier,
       isBelowStandard: false
     },
     standard: {
-      label: 'Standard Portions',
+      label: 'Standard Deliveries',
       icon: '🍲',
       description: FOOD_PORTIONS.standard.description,
       costPerResident: FOOD_PORTIONS.standard.cost,
-      happinessChange: FOOD_PORTIONS.standard.happiness,
+      healthChange: FOOD_PORTIONS.standard.health,
       reputationChange: FOOD_PORTIONS.standard.reputation,
       lifeFillModifier: FOOD_PORTIONS.standard.lifeFillModifier,
       isBelowStandard: false
     },
     small: {
-      label: 'Small Portions',
+      label: 'Small Deliveries',
       icon: '🥄',
       description: FOOD_PORTIONS.small.description,
       costPerResident: FOOD_PORTIONS.small.cost,
-      happinessChange: FOOD_PORTIONS.small.happiness,
+      healthChange: FOOD_PORTIONS.small.health,
       reputationChange: FOOD_PORTIONS.small.reputation,
       lifeFillModifier: FOOD_PORTIONS.small.lifeFillModifier,
       isBelowStandard: true
     },
     minimal: {
-      label: 'Minimal Rations',
+      label: 'Minimal Deliveries',
       icon: '🍞',
       description: FOOD_PORTIONS.minimal.description,
       costPerResident: FOOD_PORTIONS.minimal.cost,
-      happinessChange: FOOD_PORTIONS.minimal.happiness,
+      healthChange: FOOD_PORTIONS.minimal.health,
       reputationChange: FOOD_PORTIONS.minimal.reputation,
       lifeFillModifier: FOOD_PORTIONS.minimal.lifeFillModifier,
       isBelowStandard: true
     },
     none: {
-      label: 'No Food',
+      label: 'No Deliveries',
       icon: '❌',
-      description: 'No meals provided. Severely impacts everything.',
+      description: 'No supplies delivered. Severely impacts everything.',
       costPerResident: 0,
-      happinessChange: -15,
+      healthChange: -15,
       reputationChange: -5,
       lifeFillModifier: 0.3,
       isBelowStandard: true

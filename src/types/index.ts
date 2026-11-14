@@ -11,6 +11,7 @@ export type DisasterUrgency = "immediate" | "24hours" | "week";
 export type DisasterEventType =
   | "house_fire"
   | "winter_storm"
+  | "earthquake"
   | "factory_closure"
   | "domestic_violence"
   | "hospital_discharge"
@@ -18,7 +19,7 @@ export type DisasterEventType =
 
 export type ResidentProfile =
   | "young_adult"
-  | "veteran"
+  | "adult"
   | "elderly";
 
 export type ResidentState =
@@ -30,14 +31,14 @@ export type ResidentState =
   | "sleeping"
   | "leaving";
 
-export type DepartureReason = 'unhappy' | 'hopeless';
+export type DepartureReason = 'unhealthy' | 'hopeless';
 
 export type GameOverReason = 'bankruptcy' | 'reputation' | 'exodus' | null;
 
 export type Need =
   | "food"
   | "bathroom"
-  | "learning"
+  | "health"
   | "social"
   | "sleep"
   | "fundraiser";
@@ -45,12 +46,21 @@ export type Need =
 export type RoomType = 
   | "dormitory"
   | "cafeteria"
-  | "learning_center"
-  | "vocational_room"
+  | "clinic"
   | "bathroom"
   | "admin_office"
   | "common_room"
-  | "fundraiser_station";
+  | "fundraiser_station"
+  // Decorations (1×1): no use of their own, boost the rooms next to them
+  | "potted_plant"
+  | "fountain"
+  // Higher-tier versions of existing rooms (see RoomSpec.baseType)
+  | "large_dormitory"
+  | "medical_center"
+  | "dining_hall"
+  // Service rooms (social, like common_room)
+  | "library"
+  | "garden";
 
 export type TileType = 
   | "empty"
@@ -81,7 +91,7 @@ export type WarningType =
   | 'maintenance_due'
   | 'operating_costs_due'
   // Resident Warnings
-  | 'unhappy_resident'
+  | 'unhealthy_resident'
   | 'at_risk_resident'
   | 'overcrowded'
   | 'hungry_residents'
@@ -157,13 +167,16 @@ export interface PathNode {
 // Resident Data Model
 // ============================================================================
 
+export type Gender = 'male' | 'female';
+
 export interface Resident {
   id: string;
   name: string;
+  gender?: Gender; // missing on old saves; treated as 'any' room-wise
   profile: ResidentProfile;
   
   // Stats
-  happiness: number;        // 0-100
+  health: number;        // 0-100
   lifeMeter: number;        // 0-100
   
   // State
@@ -172,6 +185,8 @@ export interface Resident {
   targetRoomId: string | null;
   path: PathNode[] | null;
   pathIndex: number;
+  seat?: PathNode | null; // claimed bed/chair tile in targetRoomId (dormitory, cafeteria)
+  bed?: { roomId: string; x: number; y: number } | null; // the resident's own bed: same one every night
   
   // Position
   gridX: number;
@@ -186,6 +201,7 @@ export interface Resident {
   repositionStartTime: number | null;
   repositionDuration: number;  // Duration in seconds
   repathAttempts?: number;     // Number of repath attempts made
+  blockedFor?: number;         // Seconds spent stuck behind another resident while walking
   
   // History
   arrivalDay: number;
@@ -193,13 +209,13 @@ export interface Resident {
   daysInShelter: number;
   
   // Timers
-  lastHappinessUpdate: number;
+  lastHealthUpdate: number;
   lastNeedCheck: number;
   lastLifeUpdate: number;
   lastMealTime: number;        // Timestamp of last meal
   
   // Departure tracking
-  unhappyDuration: number;     // Time spent below happiness threshold (ms)
+  unhealthyDuration: number;     // Time spent below health threshold (ms)
   isAtRisk: boolean;           // True if at risk of leaving
   departureReason?: DepartureReason; // Why they're leaving (if leaving)
   
@@ -215,14 +231,14 @@ export interface Resident {
 // ============================================================================
 
 export interface AdjacencyBonusConfig {
-  happiness: number;           // Flat happiness bonus/penalty
+  health: number;           // Flat health bonus/penalty
   lifeFillModifier: number;    // Percentage modifier (0.1 = +10%)
   maintenanceReduction: number; // Percentage reduction (0.1 = -10% cost, negative = more cost)
   description: string;         // Tooltip description
 }
 
 export interface RoomAdjacencyBonuses {
-  happiness: number;
+  health: number;
   lifeFillModifier: number;
   maintenanceReduction: number;
   adjacentRoomIds: string[];   // IDs of rooms providing bonuses
@@ -255,8 +271,8 @@ export interface Room {
   // Adjacency bonuses (calculated dynamically)
   adjacencyBonuses: RoomAdjacencyBonuses;
   
-  // Visual
-  image?: string;  // Optional image path/key for room tile
+  // Dormitory only: who may sleep here (missing = any)
+  gender?: Gender | 'any';
 }
 
 export interface RoomSpec {
@@ -268,7 +284,15 @@ export interface RoomSpec {
   capacity: number;
   closesAtNight: boolean;
   needsSatisfied: Need[];
-  image?: string;  // Optional default image path/key for this room type
+  baseType?: RoomType;      // behaves as this room (upgrades, service rooms)
+  bonus?: RoomEffect;       // for residents using this room
+  aura?: RoomEffect;        // decorations: for residents using adjacent rooms
+  isDecoration?: boolean;
+}
+
+export interface RoomEffect {
+  health: number;           // same scale as AdjacencyBonusConfig.health
+  lifeFillModifier: number; // 0.1 = +10% LIFE fill
 }
 
 // ============================================================================
@@ -283,7 +307,7 @@ export interface Fundraiser {
   completesAt: number;            // Timestamp
   assignedResidents: string[];    // Resident IDs
   expectedPayout: number;         // Calculated payout
-  successChance: number;          // Success probability (0-1) based on avg happiness (NEW)
+  successChance: number;          // Success probability (0-1) based on avg health (NEW)
   successRoll?: number;           // The random roll used to determine success (NEW)
 }
 
@@ -300,7 +324,8 @@ export interface DisasterEventConfig {
   reputationGainAccept: number;
   reputationLossDecline: number;
   donationBonus: number;
-  happinessImpact: number;
+  healthImpact: number;
+  naturalDisaster?: boolean;      // Damages buildings; player pays repair costs immediately
   maintenanceSurge?: number;      // Multiplier for maintenance during event
   lifeBoost?: boolean;            // These residents are motivated
   securityRequired?: boolean;     // Extra security costs
@@ -424,7 +449,7 @@ export interface GameState {
 export interface ResidentProfileSpec {
   profile: ResidentProfile;
   lifeFillRate: number;
-  happinessDecayRate: number;
+  healthDecayRate: number;
   fundraiserEfficiency: number;
   graduationBonus: number;
   displayName: string;

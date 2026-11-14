@@ -2,16 +2,16 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import { createPhaserGame, destroyPhaserGame } from './game/PhaserGame';
 import { GameStateManager, createInitialGameState } from './game/systems/GameStateManager';
-import { placeRoom, expandGrid } from './game/systems/GridSystem';
-import { startFundraiser, cancelFundraiser, FundraiserCompletionData } from './game/systems/FundraiserSystem';
+import { placeRoom, expandGrid, demolishRoom } from './game/systems/GridSystem';
+import { startRandomFundraiser, cancelFundraiser, FundraiserCompletionData } from './game/systems/FundraiserSystem';
 import { EventSystem, GameEvent, EventType } from './game/systems/EventSystem';
 import { getAudioSystem, playSFX } from './game/systems/AudioSystem';
 import { saveGame } from './game/systems/SaveLoadSystem';
 import { transitionToDay, transitionToNight } from './game/systems/DayNightSystem';
-import { initializeCafeteriaGeneration, changeFoodSetting } from './game/systems/FoodSystem';
+import { initializeCafeteriaGeneration, removeCafeteriaGeneration, changeFoodSetting } from './game/systems/FoodSystem';
 import { performUpgrade } from './game/systems/TierSystem';
 import { getWarningSystem } from './game/systems/WarningSystem';
-import { setDevTimersEnabled, isDevTimersEnabled } from './constants';
+import { setDevTimersEnabled, isDevTimersEnabled, roomKind } from './constants';
 import { HUD } from './components/HUD';
 import { BuildMenu } from './components/BuildMenu';
 import { ManagementPanel } from './components/ManagementPanel';
@@ -23,12 +23,15 @@ import { GameOverModal, checkVictoryConditions } from './components/GameOverModa
 import { PerformanceMonitor } from './components/PerformanceMonitor';
 import { DevModeMenu } from './components/DevModeMenu';
 import { MoneyAnimationOverlay } from './components/MoneyAnimations';
-import { WarningPanel } from './components/WarningPanel';
-import { StatisticsModal } from './components/StatisticsModal';
+import { Toolbar, ToolbarPanel } from './components/Toolbar';
+import { ReportsPanel, ReportsTab } from './components/ReportsPanel';
+import { ResidentCard } from './components/ResidentCard';
 import { FundraiserCompleteModal } from './components/FundraiserCompleteModal';
-import { GameState, RoomType, GameOverReason, Warning, FoodPortionSetting } from './types';
+import { GameState, RoomType, GameOverReason, Warning, FoodPortionSetting, Gender } from './types';
 import { MainScene } from './game/scenes/MainScene';
 import './App.css';
+import { formatMoney } from './utils/helpers';
+import './skin.css'; // last, so it overrides the per-component styles
 
 /**
  * Main App component
@@ -58,24 +61,27 @@ function App() {
   const [isVictory, setIsVictory] = useState(false);
   const [gameOverReason, setGameOverReason] = useState<GameOverReason>(null);
   const [selectedRoomType, setSelectedRoomType] = useState<RoomType | null>(null);
+  const dormGenderRef = useRef<Gender | 'any'>('any'); // chosen in BuildMenu, applied when a dormitory is placed
+  const [selectedResidentId, setSelectedResidentId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showDevMode, setShowDevMode] = useState(false);
   const [devTimersEnabled, setDevTimersEnabledState] = useState(isDevTimersEnabled());
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [managementPanelTab, setManagementPanelTab] = useState<string>('residents');
   const [showBuildMenu, setShowBuildMenu] = useState(false);
-  const [showWarningPanel, setShowWarningPanel] = useState(false);
-  const [showStatistics, setShowStatistics] = useState(false);
+  const [showReports, setShowReports] = useState(false);
+  const [reportsTab, setReportsTab] = useState<ReportsTab>('alerts');
   const [fundraiserCompletionData, setFundraiserCompletionData] = useState<FundraiserCompletionData | null>(null);
   
   // Menu types that are mutually exclusive (only one can be open at a time)
   // Settings modal is a full overlay, so it's treated separately
-  type MenuType = 'build' | 'management' | 'warning' | 'devMode' | null;
+  type MenuType = 'build' | 'management' | 'reports' | 'devMode' | null;
   
   // Close all side menus (not modals like Settings)
   const closeAllSideMenus = useCallback(() => {
     setShowBuildMenu(false);
     setShowManagementPanel(false);
-    setShowWarningPanel(false);
+    setShowReports(false);
     setShowDevMode(false);
   }, []);
   
@@ -89,8 +95,8 @@ function App() {
       case 'management':
         setShowManagementPanel(true);
         break;
-      case 'warning':
-        setShowWarningPanel(true);
+      case 'reports':
+        setShowReports(true);
         break;
       case 'devMode':
         setShowDevMode(true);
@@ -115,13 +121,12 @@ function App() {
     }
   }, [showManagementPanel, openMenu]);
   
-  const handleToggleWarningPanel = useCallback(() => {
-    if (showWarningPanel) {
-      setShowWarningPanel(false);
-    } else {
-      openMenu('warning');
-    }
-  }, [showWarningPanel, openMenu]);
+  // The toolbar opens one panel at a time; pressing the active one closes it
+  const handleToolbarSelect = useCallback((panel: ToolbarPanel) => {
+    const isOpen = panel === 'build' ? showBuildMenu : panel === 'management' ? showManagementPanel : showReports;
+    if (isOpen) closeAllSideMenus();
+    else openMenu(panel);
+  }, [showBuildMenu, showManagementPanel, showReports, closeAllSideMenus, openMenu]);
   
   const handleToggleDevMode = useCallback(() => {
     if (showDevMode) {
@@ -227,6 +232,13 @@ function App() {
               const scene = gameRef.current?.scene.getScene('MainScene') as MainScene;
               if (scene && scene.sys) {
                 mainSceneRef.current = scene;
+                // Keep React's pause flag in sync (blur/focus also pause) and freeze event timers.
+                const pm = scene.getPauseManager();
+                pm.onPause(() => setIsPaused(true));
+                pm.onResume((pausedMs) => {
+                  eventSystemRef.current?.shiftTimers(pausedMs);
+                  setIsPaused(false);
+                });
               } else {
                 setTimeout(checkScene, 50);
               }
@@ -271,11 +283,6 @@ function App() {
       playSFX('event');
     };
     
-    const handleAddResidents = (event: CustomEvent) => {
-      const { count } = event.detail;
-      addNotification(`${count} new residents arrived!`, 'info');
-    };
-    
     // Handle game over event from GameStateManager
     const handleGameOver = (event: CustomEvent) => {
       const { reason, message, stats } = event.detail;
@@ -317,27 +324,22 @@ function App() {
       
       // Also show a notification
       if (completionData.success) {
-        addNotification(`🎉 Fundraiser complete! Raised $${completionData.payout.toLocaleString()}`, 'success');
+        addNotification(`🎉 Fundraiser complete! Raised ${formatMoney(completionData.payout)}`, 'success');
       } else {
         addNotification(`😔 Fundraiser failed. No money raised.`, 'warning');
       }
     };
     
     window.addEventListener('game:event_triggered' as any, handleEventTriggered);
-    window.addEventListener('game:add_residents' as any, handleAddResidents);
     window.addEventListener('game:game_over' as any, handleGameOver);
     window.addEventListener('game:warning_critical' as any, handleCriticalWarning);
     window.addEventListener('game:warning_escalated' as any, handleWarningEscalated);
     window.addEventListener('fundraiser_completed' as any, handleFundraiserCompleted);
     
-    // Start background music
-    audioSystem.updateMusicForPhase('day');
-    
     // Cleanup on unmount
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
       window.removeEventListener('game:event_triggered' as any, handleEventTriggered);
-      window.removeEventListener('game:add_residents' as any, handleAddResidents);
       window.removeEventListener('game:game_over' as any, handleGameOver);
       window.removeEventListener('game:warning_critical' as any, handleCriticalWarning);
       window.removeEventListener('game:warning_escalated' as any, handleWarningEscalated);
@@ -365,7 +367,7 @@ function App() {
     const interval = setInterval(() => {
       const es = eventSystemRef.current;
       const gsm = gameStateManagerRef.current;
-      if (es && gsm) {
+      if (es && gsm && !mainSceneRef.current?.getPauseManager().isPaused()) {
         es.update(gsm.getState());
       }
     }, 1000);
@@ -378,7 +380,7 @@ function App() {
     const interval = setInterval(() => {
       const gsm = gameStateManagerRef.current;
       const mutableState = gsm?.getMutableState();
-      if (mutableState) {
+      if (mutableState && !mainSceneRef.current?.getPauseManager().isPaused()) {
         warningSystem.updateWarnings(mutableState);
         gsm?.forceUpdate();
       }
@@ -386,13 +388,6 @@ function App() {
 
     return () => clearInterval(interval);
   }, [warningSystem]);
-  
-  // Update music based on day/night cycle
-  useEffect(() => {
-    if (gameState) {
-      audioSystem.updateMusicForPhase(gameState.currentPhase);
-    }
-  }, [gameState?.currentPhase]);
   
   const handlePlaceRoom = (roomType: RoomType, gridX: number, gridY: number) => {
     if (!gameStateManagerRef.current) return;
@@ -415,21 +410,22 @@ function App() {
       roomType,
       gridX,
       gridY,
-      state.currentPhase
+      state.currentPhase,
+      dormGenderRef.current
     );
     
     if (result.success && result.newMoney !== undefined) {
       state.money = result.newMoney;
       
       // Initialize food generation for cafeterias
-      if (roomType === 'cafeteria' && result.room) {
+      if (roomKind(roomType) === 'cafeteria' && result.room) {
         initializeCafeteriaGeneration(result.room.id);
         console.log(`🍽️ Initialized food generation for cafeteria ${result.room.id}`);
       }
       
       gameStateManagerRef.current.forceUpdate();
       playSFX('build');
-      addNotification(`Built ${roomType.replace('_', ' ')}!`, 'success');
+      addNotification(`Built ${roomType.replace(/_/g, ' ')}!`, 'success');
       
       // DEBUG: Log before clearing placement mode
       console.log('[App] Room placed successfully, clearing placement mode');
@@ -440,11 +436,13 @@ function App() {
     }
   };
   
-  const handleRoomSelected = (roomType: RoomType | null) => {
+  const handleRoomSelected = (roomType: RoomType | null, dormGender: Gender | 'any' = 'any') => {
     setSelectedRoomType(roomType);
+    dormGenderRef.current = dormGender;
     
     // Wait for MainScene to be ready before entering placement mode
     if (roomType) {
+      setShowBuildMenu(false); // get the menu out of the way while placing (ESC cancels)
       const tryEnterPlacementMode = () => {
         if (mainSceneRef.current) {
           mainSceneRef.current.enterPlacementMode(roomType);
@@ -485,15 +483,22 @@ function App() {
     };
     
     window.addEventListener('game:place_room' as any, handlePlaceRoomEvent);
+    const handleResidentSelected = (event: CustomEvent) => {
+      setSelectedResidentId(event.detail.id);
+      setSelectedRoomId(event.detail.roomId ?? null);
+    };
+    
     window.addEventListener('game:show_notification' as any, handleShowNotification);
+    window.addEventListener('game:resident_selected' as any, handleResidentSelected);
     
     return () => {
       window.removeEventListener('game:place_room' as any, handlePlaceRoomEvent);
       window.removeEventListener('game:show_notification' as any, handleShowNotification);
+      window.removeEventListener('game:resident_selected' as any, handleResidentSelected);
     };
   }, [handlePlaceRoom]);
   
-  const handleStartFundraiser = (stationId: string, residentIds: string[]) => {
+  const handleStartFundraiser = () => {
     if (!gameStateManagerRef.current) return;
     
     // Check if fundraisers are allowed (not during bankruptcy)
@@ -504,7 +509,7 @@ function App() {
     }
     
     const state = gameStateManagerRef.current.getMutableState();
-    const result = startFundraiser(state, stationId, residentIds);
+    const result = startRandomFundraiser(state);
     
     if (result.success) {
       gameStateManagerRef.current.forceUpdate();
@@ -514,6 +519,35 @@ function App() {
       playSFX('error');
       addNotification(result.error || 'Failed to start fundraiser', 'error');
     }
+  };
+  
+  const handleRemoveRoom = (roomId: string) => {
+    if (!gameStateManagerRef.current) return;
+    const state = gameStateManagerRef.current.getMutableState();
+    const room = state.rooms.find(r => r.id === roomId);
+    if (!room) return;
+    if (state.currentPhase === 'night') {
+      addNotification('Cannot remove buildings at night', 'error');
+      playSFX('error');
+      return;
+    }
+    if (state.activeFundraisers.some(f => f.stationId === roomId)) {
+      addNotification('Cannot remove a fundraiser station while a fundraiser is running', 'error');
+      playSFX('error');
+      return;
+    }
+    const result = demolishRoom(state.grid, state.rooms, roomId);
+    if (result.success) {
+      state.money += result.refund ?? 0;
+      if (roomKind(room.type) === 'cafeteria') removeCafeteriaGeneration(roomId);
+      gameStateManagerRef.current.forceUpdate();
+      playSFX('click');
+      addNotification(`Removed ${room.type.replace(/_/g, ' ')} (refund ${formatMoney(result.refund ?? 0)})`, 'info');
+    } else {
+      playSFX('error');
+      addNotification(result.error || 'Failed to remove room', 'error');
+    }
+    setSelectedRoomId(null);
   };
   
   const handleCancelFundraiser = (fundraiserId: string) => {
@@ -530,7 +564,7 @@ function App() {
     }
   };
   
-  const handleExpandGrid = (direction: 'north' | 'south' | 'east' | 'west') => {
+  const handleExpandGrid = (direction: 'north' | 'east' | 'west') => {
     if (!gameStateManagerRef.current) return;
     
     const state = gameStateManagerRef.current.getMutableState();
@@ -557,7 +591,6 @@ function App() {
     if (mainSceneRef.current) {
       const pauseManager = mainSceneRef.current.getPauseManager();
       pauseManager.toggle();
-      setIsPaused(pauseManager.isPaused());
       playSFX('click');
     }
   };
@@ -581,6 +614,9 @@ function App() {
       gameStateManagerRef.current.forceUpdate();
       setCurrentEvent(null);
       playSFX('click');
+    } else {
+      playSFX('error');
+      addNotification(result.error || 'Could not resolve event', 'error');
     }
   };
   
@@ -627,7 +663,7 @@ function App() {
     if (!eventSystemRef.current || !gameStateManagerRef.current) return;
     const state = gameStateManagerRef.current.getState();
     eventSystemRef.current.triggerEventByType(state, eventType);
-    addNotification(`Triggered ${eventType.replace('_', ' ')} event`, 'info');
+    addNotification(`Triggered ${eventType.replace(/_/g, ' ')} event`, 'info');
     playSFX('event');
   };
   
@@ -637,8 +673,8 @@ function App() {
     const resident = state.residents.find(r => r.id === residentId);
     
     if (resident) {
-      if (stat === 'happiness') {
-        resident.happiness = Math.max(0, Math.min(100, value));
+      if (stat === 'health') {
+        resident.health = Math.max(0, Math.min(100, value));
       } else if (stat === 'lifeMeter') {
         resident.lifeMeter = Math.max(0, Math.min(100, value));
       }
@@ -653,7 +689,7 @@ function App() {
     const state = gameStateManagerRef.current.getMutableState();
     state.money += amount;
     gameStateManagerRef.current.forceUpdate();
-    addNotification(`${amount > 0 ? 'Added' : 'Removed'} $${Math.abs(amount)}`, 'info');
+    addNotification(`${amount > 0 ? 'Added' : 'Removed'} ${formatMoney(Math.abs(amount))}`, 'info');
     playSFX('click');
   };
   
@@ -693,6 +729,7 @@ function App() {
     const state = gameStateManagerRef.current.getMutableState();
     const result = performUpgrade(state);
     if (result.success) {
+      mainSceneRef.current?.markGridDirty(); // new area + moved south gate
       gameStateManagerRef.current.forceUpdate();
       const newRoomsText = result.newRooms && result.newRooms.length > 0
         ? ` New rooms unlocked: ${result.newRooms.join(', ')}`
@@ -721,7 +758,7 @@ function App() {
         // Open finances tab in management panel
         setManagementPanelTab('finances');
         break;
-      case 'unhappy_resident':
+      case 'unhealthy_resident':
       case 'at_risk_resident':
       case 'stalled_progress':
       case 'life_meters_stalled':
@@ -759,10 +796,6 @@ function App() {
     playSFX('click');
   }, [warningSystem]);
   
-  const handleWarningClick = useCallback(() => {
-    // Warning button in HUD clicked - just let the panel handle expansion
-    // The WarningPanel has its own expand/collapse logic
-  }, []);
   
   if (!gameState) {
     return (
@@ -795,6 +828,7 @@ function App() {
       {currentEvent && (
         <EventModal
           event={currentEvent}
+          isPaused={isPaused}
           onResolve={handleResolveEvent}
           onClose={() => setCurrentEvent(null)}
         />
@@ -880,27 +914,59 @@ function App() {
         onPauseToggle={handlePauseToggle}
         isPaused={isPaused}
         onSettingsClick={() => setShowSettings(true)}
-        onWarningClick={handleWarningClick}
-        onStatisticsClick={() => setShowStatistics(true)}
+        onZoomIn={() => mainSceneRef.current?.zoomIn()}
+        onZoomOut={() => mainSceneRef.current?.zoomOut()}
       />
       
-      {/* Statistics Modal */}
-      {showStatistics && (
-        <StatisticsModal
-          isOpen={showStatistics}
-          onClose={() => setShowStatistics(false)}
+      {/* Clicked resident's stats */}
+      {(() => {
+        const resident = selectedResidentId ? gameState.residents.find(r => r.id === selectedResidentId) : null;
+        return resident ? (
+          <div className="resident-popup">
+            <button className="resident-popup-close" onClick={() => setSelectedResidentId(null)} title="Close">✕</button>
+            <ResidentCard resident={resident} gameState={gameState} />
+          </div>
+        ) : null;
+      })()}
+      
+      {/* Clicked room: remove option */}
+      {(() => {
+        const room = selectedRoomId ? gameState.rooms.find(r => r.id === selectedRoomId) : null;
+        return room ? (
+          <div className="resident-popup">
+            <button className="resident-popup-close" onClick={() => setSelectedRoomId(null)} title="Close">✕</button>
+            <div className="resident-detail-item">
+              <div className="resident-header"><span className="resident-name">{room.type.replace(/_/g, ' ')}</span></div>
+              <button className="cancel-button" disabled={gameState.currentPhase === 'night'} onClick={() => handleRemoveRoom(room.id)}>
+                {gameState.currentPhase === 'night' ? 'Cannot remove buildings at night' : `🗑️ Remove (refund ${formatMoney(Math.floor(room.buildCost * 0.2))})`}
+              </button>
+            </div>
+          </div>
+        ) : null;
+      })()}
+      
+      {/* Reports (alerts, stats, finances) */}
+      {showReports && (
+        <ReportsPanel
           gameState={gameState}
+          tab={reportsTab}
+          onTab={setReportsTab}
+          onClose={closeAllSideMenus}
           onChangeFoodSetting={handleChangeFoodSetting}
+          onWarningAction={handleWarningAction}
+          onWarningDismiss={handleWarningDismiss}
         />
       )}
       
-      {/* Warning Panel */}
-      <WarningPanel
-        gameState={gameState}
-        onAction={handleWarningAction}
-        onDismiss={handleWarningDismiss}
-        isExpanded={showWarningPanel}
-        onToggle={handleToggleWarningPanel}
+      {/* Bottom toolbar */}
+      <Toolbar
+        active={showBuildMenu ? 'build' : showManagementPanel ? 'management' : showReports ? 'reports' : null}
+        alertCount={warningSystem.getWarningCounts(gameState).total}
+        alertLevel={(() => {
+          const c = warningSystem.getWarningCounts(gameState);
+          return c.critical > 0 ? 'critical' : c.warning > 0 ? 'warning' : c.total > 0 ? 'info' : null;
+        })()}
+        onSelect={handleToolbarSelect}
       />
       
       {/* Game Canvas */}
@@ -926,6 +992,7 @@ function App() {
         onUpgradeTier={handleUpgradeTier}
         isOpen={showManagementPanel}
         onToggle={handleToggleManagementPanel}
+        isPaused={isPaused}
       />
       
       {/* Performance Monitor (F3 to toggle) */}

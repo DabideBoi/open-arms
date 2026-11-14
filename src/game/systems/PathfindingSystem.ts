@@ -1,5 +1,6 @@
 import { Grid, PathNode, Room, RoomType, DayPhase } from '../../types';
 import { isWalkable } from './GridSystem';
+import { roomKind } from '../../constants';
 import { isTileOccupiedByOther, isTileOccupiedByResident } from './CollisionDetectionSystem';
 
 /**
@@ -17,6 +18,7 @@ interface AStarNode {
   h: number;        // Heuristic to goal
   f: number;        // g + h
   parent: AStarNode | null;
+  dir: number;      // direction index we arrived by (-1 at start)
 }
 
 // ============================================================================
@@ -168,7 +170,9 @@ function reconstructPath(node: AStarNode): PathNode[] {
 }
 
 /**
- * Find path using A* algorithm
+ * Find path using A* (4-directional). Straight runs are preferred over staircases (small turn
+ * penalty). With residentId, tiles held by other residents cost extra so routes bend around
+ * crowds; hardBlock makes them impassable (used to re-route after getting stuck behind someone).
  */
 export function findPath(
   grid: Grid,
@@ -176,119 +180,64 @@ export function findPath(
   startY: number,
   goalX: number,
   goalY: number,
-  residentId?: string
+  residentId?: string,
+  hardBlock: boolean = false
 ): PathNode[] | null {
-  // Validate start and goal
-  const startWalkable = isWalkable(grid, startX, startY);
-  const goalWalkable = isWalkable(grid, goalX, goalY);
-  
-  if (!startWalkable) {
-    console.log(`[PathfindingDebug]     Start position (${startX}, ${startY}) is NOT walkable`);
-    return null;
-  }
-  if (!goalWalkable) {
-    console.log(`[PathfindingDebug]     Goal position (${goalX}, ${goalY}) is NOT walkable`);
-    return null;
-  }
-  
-  // If already at goal
-  if (startX === goalX && startY === goalY) {
-    return [{ x: startX, y: startY }];
-  }
-  
-  const openSet: AStarNode[] = [];
-  const closedSet = new Set<string>();
-  
-  // Initialize start node
-  const startNode: AStarNode = {
-    x: startX,
-    y: startY,
-    g: 0,
-    h: heuristic(startX, startY, goalX, goalY),
-    f: 0,
-    parent: null
-  };
-  startNode.f = startNode.g + startNode.h;
-  openSet.push(startNode);
-  
-  let iterations = 0;
-  const MAX_ITERATIONS = 1000; // Prevent infinite loops
-  
-  while (openSet.length > 0 && iterations < MAX_ITERATIONS) {
-    iterations++;
-    
-    // Get node with lowest f score
-    openSet.sort((a, b) => a.f - b.f);
-    const current = openSet.shift()!;
-    
-    // Check if goal reached
-    if (current.x === goalX && current.y === goalY) {
-      const path = reconstructPath(current);
-      console.log(`[PathfindingDebug]     Path found in ${iterations} iterations, length: ${path.length}`);
-      return path;
-    }
-    
-    closedSet.add(`${current.x},${current.y}`);
-    
-    // Check neighbors (4-directional movement)
-    const neighbors = [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 }
-    ];
-    
-    for (const neighborPos of neighbors) {
-      const key = `${neighborPos.x},${neighborPos.y}`;
-      
-      // Skip if already evaluated
-      if (closedSet.has(key)) continue;
-      
-      // Skip if not walkable
-      if (!isWalkable(grid, neighborPos.x, neighborPos.y)) continue;
-      
-      // Skip if occupied by another resident (unless it's the goal)
-      if (residentId &&
-          isTileOccupiedByOther(neighborPos.x, neighborPos.y, residentId) &&
-          (neighborPos.x !== goalX || neighborPos.y !== goalY)) {
-        continue;
+  if (!isWalkable(grid, startX, startY) || !isWalkable(grid, goalX, goalY)) return null;
+  if (startX === goalX && startY === goalY) return [{ x: startX, y: startY }];
+
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const startRoom = grid.tiles[startY][startX].occupiedBy;
+  const goalRoom = grid.tiles[goalY][goalX].occupiedBy;
+  const open: AStarNode[] = [{ x: startX, y: startY, g: 0, h: heuristic(startX, startY, goalX, goalY), f: 0, parent: null, dir: -1 }];
+  open[0].f = open[0].h;
+  const seen = new Map<number, AStarNode>(); // key -> best node so far
+  const closed = new Set<number>();
+  const keyOf = (x: number, y: number) => y * grid.width + x;
+  seen.set(keyOf(startX, startY), open[0]);
+
+  for (let iterations = 0; open.length > 0 && iterations < grid.width * grid.height * 2; iterations++) {
+    // Pop lowest f (linear scan: open set stays small on a 40x30 grid)
+    let best = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
+    const current = open[best];
+    open[best] = open[open.length - 1];
+    open.pop();
+
+    if (current.x === goalX && current.y === goalY) return reconstructPath(current);
+    closed.add(keyOf(current.x, current.y));
+
+    for (let d = 0; d < DIRS.length; d++) {
+      const nx = current.x + DIRS[d][0];
+      const ny = current.y + DIRS[d][1];
+      if (!isWalkable(grid, nx, ny) || closed.has(keyOf(nx, ny))) continue;
+
+      let step = 1 + (current.dir !== -1 && current.dir !== d ? 0.3 : 0);
+      const isGoal = nx === goalX && ny === goalY;
+      // Prefer open floor: tiles inside a room cost extra unless it's the start/goal room
+      const roomId = grid.tiles[ny][nx].occupiedBy;
+      if (roomId && roomId !== startRoom && roomId !== goalRoom) step += 2;
+      if (residentId && !isGoal && isTileOccupiedByOther(nx, ny, residentId)) {
+        if (hardBlock) continue;
+        step += 4;
       }
-      
-      const g = current.g + 1;
-      const h = heuristic(neighborPos.x, neighborPos.y, goalX, goalY);
-      
-      // Check if neighbor is in open set
-      const existingNode = openSet.find(
-        n => n.x === neighborPos.x && n.y === neighborPos.y
-      );
-      
-      if (existingNode) {
-        // Update if this path is better
-        if (g < existingNode.g) {
-          existingNode.g = g;
-          existingNode.f = g + existingNode.h;
-          existingNode.parent = current;
+
+      const g = current.g + step;
+      const existing = seen.get(keyOf(nx, ny));
+      if (existing) {
+        if (g < existing.g) {
+          existing.g = g;
+          existing.f = g + existing.h;
+          existing.parent = current;
+          existing.dir = d;
         }
       } else {
-        // Add new node
-        const neighbor: AStarNode = {
-          x: neighborPos.x,
-          y: neighborPos.y,
-          g,
-          h,
-          f: g + h,
-          parent: current
-        };
-        openSet.push(neighbor);
+        const h = heuristic(nx, ny, goalX, goalY);
+        const node: AStarNode = { x: nx, y: ny, g, h, f: g + h, parent: current, dir: d };
+        seen.set(keyOf(nx, ny), node);
+        open.push(node);
       }
     }
-  }
-  
-  // No path found
-  if (iterations >= MAX_ITERATIONS) {
-    console.log(`[PathfindingDebug]     Path search exceeded MAX_ITERATIONS (${MAX_ITERATIONS})`);
-  } else {
-    console.log(`[PathfindingDebug]     No path found after ${iterations} iterations (openSet exhausted)`);
   }
   return null;
 }
@@ -343,57 +292,6 @@ function isPathValid(grid: Grid, path: PathNode[]): boolean {
   // Sample middle points (every 5th node)
   for (let i = 5; i < path.length - 1; i += 5) {
     if (!isWalkable(grid, path[i].x, path[i].y)) {
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-/**
- * Smooth path by removing unnecessary waypoints
- */
-function smoothPath(grid: Grid, path: PathNode[]): PathNode[] {
-  if (path.length <= 2) return path;
-  
-  const smoothed: PathNode[] = [path[0]];
-  let current = 0;
-  
-  while (current < path.length - 1) {
-    let farthest = current + 1;
-    
-    // Find farthest visible point
-    for (let i = current + 2; i < path.length; i++) {
-      if (hasLineOfSight(grid, path[current], path[i])) {
-        farthest = i;
-      } else {
-        break;
-      }
-    }
-    
-    smoothed.push(path[farthest]);
-    current = farthest;
-  }
-  
-  return smoothed;
-}
-
-/**
- * Check line of sight between two points
- */
-function hasLineOfSight(grid: Grid, from: PathNode, to: PathNode): boolean {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const distance = Math.max(Math.abs(dx), Math.abs(dy));
-  
-  if (distance === 0) return true;
-  
-  for (let i = 1; i < distance; i++) {
-    const t = i / distance;
-    const x = Math.round(from.x + dx * t);
-    const y = Math.round(from.y + dy * t);
-    
-    if (!isWalkable(grid, x, y)) {
       return false;
     }
   }
@@ -461,12 +359,9 @@ export function findPathCached(
   
   // Cache miss - calculate new path
   pathCache.misses++;
-  let path = findPath(grid, startX, startY, goalX, goalY, residentId);
+  const path = findPath(grid, startX, startY, goalX, goalY, residentId);
   
   if (path) {
-    // Smooth path to reduce waypoints
-    path = smoothPath(grid, path);
-    
     // Add to cache
     addToCache(key, path);
   }
@@ -503,7 +398,7 @@ function getAvailableRooms(
   phase: DayPhase
 ): Room[] {
   return rooms.filter(room => {
-    if (room.type !== roomType) return false;
+    if (roomKind(room.type) !== roomType) return false;
     if (!room.isOpen) return false;
     
     // Check capacity (0 means unlimited)
@@ -542,7 +437,8 @@ function findRandomUnoccupiedTileInRoom(grid: Grid, room: Room): { x: number; y:
 }
 
 /**
- * Find nearest room of a specific type (optimized with spatial partitioning)
+ * Pick a room of the given type. Scored by path length plus how busy the room is plus a little
+ * jitter, so residents spread over all rooms instead of everyone piling into the closest one.
  */
 export function findNearestRoom(
   grid: Grid,
@@ -550,91 +446,24 @@ export function findNearestRoom(
   startX: number,
   startY: number,
   roomType: RoomType,
-  phase: DayPhase
+  phase: DayPhase,
+  residentId?: string
 ): { room: Room; path: PathNode[] } | null {
-  // Get available rooms of the specified type
-  const availableRooms = getAvailableRooms(rooms, roomType, phase);
-  
-  console.log(`[PathfindingDebug]   Available ${roomType} rooms: ${availableRooms.length}`);
-  
-  if (availableRooms.length === 0) {
-    console.log(`[PathfindingDebug]   No available rooms of type ${roomType}`);
-    return null;
+  let pick: { room: Room; path: PathNode[]; score: number } | null = null;
+
+  for (const room of getAvailableRooms(rooms, roomType, phase)) {
+    const tile = findRandomUnoccupiedTileInRoom(grid, room);
+    if (!tile) continue;
+    const path = findPath(grid, startX, startY, tile.x, tile.y, residentId);
+    if (!path) continue;
+    const score = path.length + room.currentOccupancy * 2 + Math.random() * 4;
+    if (!pick || score < pick.score) pick = { room, path, score };
   }
-  
-  // Log details about available rooms
-  availableRooms.forEach(room => {
-    console.log(`[PathfindingDebug]   - Room ${room.id.substring(0, 8)}... at (${room.gridX}, ${room.gridY}), size ${room.width}x${room.height}, isOpen: ${room.isOpen}, occupancy: ${room.currentOccupancy}`);
-  });
-  
-  // Use spatial partitioning to get nearby rooms first
-  const nearbyRooms = spatialGrid.getNearbyRooms(startX, startY, 3);
-  const nearbyAvailable = availableRooms.filter(room => nearbyRooms.includes(room));
-  
-  // Try nearby rooms first, then all rooms
-  const roomsToCheck = nearbyAvailable.length > 0 ? nearbyAvailable : availableRooms;
-  
-  console.log(`[PathfindingDebug]   Checking ${roomsToCheck.length} rooms (${nearbyAvailable.length} nearby, ${availableRooms.length} total)`);
-  
-  let nearestRoom: Room | null = null;
-  let shortestPath: PathNode[] | null = null;
-  let shortestDistance = Infinity;
-  
-  // Sort by Manhattan distance first for early exit
-  const sortedRooms = roomsToCheck.slice().sort((a, b) => {
-    const distA = Math.abs(a.gridX - startX) + Math.abs(a.gridY - startY);
-    const distB = Math.abs(b.gridX - startX) + Math.abs(b.gridY - startY);
-    return distA - distB;
-  });
-  
-  // Find nearest accessible room
-  for (const room of sortedRooms) {
-    // Early exit if Manhattan distance is already longer than shortest path
-    const manhattanDist = Math.abs(room.gridX - startX) + Math.abs(room.gridY - startY);
-    if (shortestPath && manhattanDist > shortestDistance) {
-      console.log(`[PathfindingDebug]   Early exit: remaining rooms too far (Manhattan: ${manhattanDist} > ${shortestDistance})`);
-      break; // No need to check further rooms
-    }
-    
-    // Find a random unoccupied tile in the room
-    const randomTile = findRandomUnoccupiedTileInRoom(grid, room);
-    if (!randomTile) {
-      console.log(`[PathfindingDebug]   Room ${room.id.substring(0, 8)}... has no available tiles`);
-      continue;
-    }
-    
-    const targetX = randomTile.x;
-    const targetY = randomTile.y;
-    
-    console.log(`[PathfindingDebug]   Attempting path to room ${room.id.substring(0, 8)}... from (${startX}, ${startY}) to random tile (${targetX}, ${targetY})`);
-    
-    // Note: We don't pass residentId here because we want to find the room even if temporarily blocked
-    // The movement system will handle waiting for occupied tiles
-    const path = findPathCached(grid, startX, startY, targetX, targetY);
-    
-    if (path && path.length < shortestDistance) {
-      console.log(`[PathfindingDebug]   ✓ Path found! Length: ${path.length}`);
-      shortestDistance = path.length;
-      shortestPath = path;
-      nearestRoom = room;
-    } else if (path) {
-      console.log(`[PathfindingDebug]   Path found but longer (${path.length} > ${shortestDistance})`);
-    } else {
-      console.log(`[PathfindingDebug]   ✗ No path found to this room`);
-    }
-  }
-  
-  if (nearestRoom && shortestPath) {
-    console.log(`[PathfindingDebug]   Final result: Room ${nearestRoom.id.substring(0, 8)}... with path length ${shortestPath.length}`);
-    return { room: nearestRoom, path: shortestPath };
-  }
-  
-  console.log(`[PathfindingDebug]   No accessible rooms found`);
-  return null;
+  return pick;
 }
 
 /**
- * Find nearest room for a specific need
+ * Find a room for a specific need
  */
 export function findNearestRoomForNeed(
   grid: Grid,
@@ -642,40 +471,21 @@ export function findNearestRoomForNeed(
   startX: number,
   startY: number,
   need: string,
-  phase: DayPhase
+  phase: DayPhase,
+  residentId?: string
 ): { room: Room; path: PathNode[] } | null {
-  // Map needs to room types
   const roomTypesForNeed: Record<string, RoomType[]> = {
     sleep: ["dormitory"],
-    learning: ["learning_center", "vocational_room"],
+    health: ["clinic"],
     social: ["common_room"],
     bathroom: ["bathroom"],
     food: ["cafeteria"]
   };
-  
-  const validRoomTypes = roomTypesForNeed[need];
-  
-  if (!validRoomTypes) {
-    console.log(`[PathfindingDebug] No room types mapped for need: ${need}`);
-    return null;
+
+  for (const roomType of roomTypesForNeed[need] ?? []) {
+    const result = findNearestRoom(grid, rooms, startX, startY, roomType, phase, residentId);
+    if (result) return result;
   }
-  
-  console.log(`[PathfindingDebug] Finding room for need '${need}' from (${startX}, ${startY})`);
-  console.log(`[PathfindingDebug] Valid room types: ${validRoomTypes.join(', ')}`);
-  
-  // Find nearest available room of any valid type
-  for (const roomType of validRoomTypes) {
-    console.log(`[PathfindingDebug] Attempting to find ${roomType}...`);
-    const result = findNearestRoom(grid, rooms, startX, startY, roomType, phase);
-    if (result) {
-      console.log(`[PathfindingDebug] ✓ Found ${roomType} (id: ${result.room.id.substring(0, 8)}...) with path length ${result.path.length}`);
-      return result;
-    } else {
-      console.log(`[PathfindingDebug] ✗ No accessible ${roomType} found`);
-    }
-  }
-  
-  console.log(`[PathfindingDebug] Failed to find any room for need '${need}'`);
   return null;
 }
 

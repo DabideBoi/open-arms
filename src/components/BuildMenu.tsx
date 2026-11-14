@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { RoomType, Room, ShelterTier, GameState } from '../types';
-import { ROOM_SPECS, ADJACENCY_BONUSES, getAdjacencyBonusKey, SHELTER_TIERS } from '../constants';
+import { RoomType, Room, ShelterTier, GameState, Gender, RoomEffect } from '../types';
+import { ROOM_SPECS, ADJACENCY_BONUSES, getAdjacencyBonusKey, SHELTER_TIERS, roomKind } from '../constants';
 import { isRoomAvailable, getLockedRooms } from '../game/systems/TierSystem';
 import './BuildMenu.css';
+import { formatMoney } from '../utils/helpers';
 
 interface BuildMenuProps {
   onPlaceRoom: (roomType: RoomType, gridX: number, gridY: number) => void;
-  onRoomSelected: (roomType: RoomType | null) => void;
+  onRoomSelected: (roomType: RoomType | null, dormGender?: Gender | 'any') => void;
   currentMoney: number;
   gameState: GameState;
   placementPreview?: {
@@ -24,32 +25,39 @@ interface BuildMenuProps {
 /**
  * Get adjacency synergies for a room type
  */
-function getRoomSynergies(roomType: RoomType): { positive: string[]; negative: string[] } {
+const effectText = (e: RoomEffect) =>
+  [e.health ? `${e.health > 0 ? '+' : ''}${e.health} health` : '',
+   e.lifeFillModifier ? `+${Math.round(e.lifeFillModifier * 100)}% LIFE` : ''].filter(Boolean).join(', ');
+
+function getRoomSynergies(roomType: RoomType): { positive: string[]; negative: string[]; notes: string[] } {
   const positive: string[] = [];
   const negative: string[] = [];
+  const notes: string[] = [];
+  const spec = ROOM_SPECS[roomType];
+  if (spec.baseType) notes.push(`Works as a ${spec.baseType.replace(/_/g, ' ')}`);
+  if (spec.bonus) notes.push(`Residents here: ${effectText(spec.bonus)}`);
+  if (spec.aura) notes.push(`Rooms touching it: ${effectText(spec.aura)}`);
   
-  const allRoomTypes: RoomType[] = [
-    'dormitory', 'cafeteria', 'learning_center', 'vocational_room',
-    'bathroom', 'common_room', 'admin_office', 'fundraiser_station'
-  ];
+  // Pairings are defined between base room kinds only
+  const baseTypes = [...new Set((Object.keys(ROOM_SPECS) as RoomType[]).map(roomKind))];
   
-  for (const otherType of allRoomTypes) {
-    if (otherType === roomType) continue;
+  for (const otherType of baseTypes) {
+    if (otherType === roomKind(roomType)) continue;
     
-    const key = getAdjacencyBonusKey(roomType, otherType);
+    const key = getAdjacencyBonusKey(roomKind(roomType), otherType);
     const bonus = ADJACENCY_BONUSES[key];
     
     if (bonus) {
       const roomName = otherType.replace(/_/g, ' ');
-      if (bonus.happiness > 0 || bonus.lifeFillModifier > 0 || bonus.maintenanceReduction > 0) {
+      if (bonus.health > 0 || bonus.lifeFillModifier > 0 || bonus.maintenanceReduction > 0) {
         positive.push(roomName);
-      } else if (bonus.happiness < 0 || bonus.lifeFillModifier < 0 || bonus.maintenanceReduction < 0) {
+      } else if (bonus.health < 0 || bonus.lifeFillModifier < 0 || bonus.maintenanceReduction < 0) {
         negative.push(roomName);
       }
     }
   }
   
-  return { positive, negative };
+  return { positive, negative, notes };
 }
 
 /**
@@ -71,7 +79,7 @@ function getRoomUnlockTier(roomType: RoomType): ShelterTier {
 interface TooltipProps {
   buttonRef: HTMLButtonElement | null;
   panelRef: HTMLDivElement | null;
-  synergies: { positive: string[]; negative: string[] };
+  synergies: { positive: string[]; negative: string[]; notes: string[] };
 }
 
 const SynergyTooltip: React.FC<TooltipProps> = ({ buttonRef, panelRef, synergies }) => {
@@ -117,6 +125,12 @@ const SynergyTooltip: React.FC<TooltipProps> = ({ buttonRef, panelRef, synergies
       }}
     >
       <h5>📐 Adjacency Synergies</h5>
+      {synergies.notes.map(n => (
+        <div key={n} className="synergy-positive">
+          <span className="synergy-label">✨</span>
+          <span className="synergy-list">{n}</span>
+        </div>
+      ))}
       {synergies.positive.length > 0 && (
         <div className="synergy-positive">
           <span className="synergy-label">✅ Good next to:</span>
@@ -158,6 +172,9 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
     }
   };
   const [selectedRoom, setSelectedRoom] = useState<RoomType | null>(null);
+  const [dormGender, setDormGender] = useState<Gender | 'any'>('any');
+  // Menu closes once a room is picked; drop the stale 'Placing' state with it
+  useEffect(() => { if (!isOpen) setSelectedRoom(null); }, [isOpen]);
   const [hoveredRoom, setHoveredRoom] = useState<RoomType | null>(null);
   const [hoveredButtonRef, setHoveredButtonRef] = useState<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -168,15 +185,17 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
   // Group rooms by category for better organization
   const roomCategories = {
     'Essential': ['dormitory', 'cafeteria', 'bathroom'] as RoomType[],
-    'Learning': ['learning_center', 'vocational_room'] as RoomType[],
-    'Social': ['common_room'] as RoomType[],
+    'Upgrades': ['large_dormitory', 'dining_hall', 'medical_center'] as RoomType[],
+    'Health': ['clinic'] as RoomType[],
+    'Social': ['common_room', 'library', 'garden'] as RoomType[],
+    'Decor': ['potted_plant', 'fountain'] as RoomType[],
     'Management': ['admin_office', 'fundraiser_station'] as RoomType[]
   };
   
   const handleRoomSelect = (roomType: RoomType) => {
     setSelectedRoom(roomType);
     // Enter placement mode - notify parent component
-    onRoomSelected(roomType);
+    onRoomSelected(roomType, roomKind(roomType) === 'dormitory' ? dormGender : undefined);
   };
   
   const handleCancelPlacement = () => {
@@ -189,13 +208,6 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
   
   return (
     <div className="build-menu">
-      <button
-        className="build-menu-toggle"
-        onClick={handleToggle}
-      >
-        🏗️ Build Menu
-      </button>
-      
       {isOpen && (
         <div className="build-menu-panel" ref={panelRef}>
           <h3>Build Rooms</h3>
@@ -282,16 +294,30 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
                             <div className="room-info">
                               <span>Size: {spec.width}×{spec.height}</span>
                               <span className={canAfford ? 'cost-affordable' : 'cost-expensive'}>
-                                💰 ${spec.buildCost}
+                                💰 {formatMoney(spec.buildCost)}
                               </span>
                             </div>
                             <div className="room-details">
                               Capacity: {spec.capacity > 0 ? spec.capacity : 'Unlimited'} |
-                              Maintenance: ${spec.maintenanceCost}/cycle
+                              Maintenance: {formatMoney(spec.maintenanceCost)}/cycle
                             </div>
                           </>
                         )}
                       </button>
+                      {roomKind(roomType) === 'dormitory' && (
+                        <div className="dorm-gender-picker">
+                          {(['any', 'male', 'female'] as const).map(g => (
+                            <button
+                              key={g}
+                              type="button"
+                              className={`dorm-gender-option ${dormGender === g ? 'active' : ''}`}
+                              onClick={() => setDormGender(g)}
+                            >
+                              {g === 'any' ? 'Any' : g === 'male' ? '♂ Male' : '♀ Female'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -302,7 +328,7 @@ export const BuildMenu: React.FC<BuildMenuProps> = ({
       )}
       
       {/* Portal-based tooltip that renders outside the menu panel */}
-      {hoveredRoom && hoveredButtonRef && synergies && (synergies.positive.length > 0 || synergies.negative.length > 0) && (
+      {hoveredRoom && hoveredButtonRef && synergies && (synergies.positive.length > 0 || synergies.negative.length > 0 || synergies.notes.length > 0) && (
         <SynergyTooltip buttonRef={hoveredButtonRef} panelRef={panelRef.current} synergies={synergies} />
       )}
     </div>

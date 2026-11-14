@@ -1,7 +1,7 @@
-import { Resident, ResidentProfile, Grid } from '../../types/index.ts';
+import { Resident, ResidentProfile, Grid, Gender } from '../../types/index.ts';
 import {
   LIFE_METER_CONFIG,
-  HAPPINESS_CONFIG,
+  HEALTH_CONFIG,
   PROFILE_SPECS,
   NAME_LISTS,
   ARRIVAL_REASONS
@@ -13,13 +13,21 @@ import { isWalkable } from './GridSystem';
 /**
  * Create a new resident with random attributes
  */
+/** Random gender plus a first+last name that matches it */
+export function randomGenderedName(forceGender?: Gender): { gender: Gender; name: string } {
+  const gender: Gender = forceGender ?? (Math.random() < 0.5 ? 'male' : 'female');
+  const firsts = gender === 'male' ? NAME_LISTS.MALE_FIRST_NAMES : NAME_LISTS.FEMALE_FIRST_NAMES;
+  return { gender, name: generateRandomName(firsts, NAME_LISTS.LAST_NAMES) };
+}
+
 export function createResident(
   profile: ResidentProfile,
   currentDay: number,
   spawnX: number,
-  spawnY: number
+  spawnY: number,
+  forceGender?: Gender
 ): Resident {
-  const name = generateRandomName(NAME_LISTS.FIRST_NAMES, NAME_LISTS.LAST_NAMES);
+  const { gender, name } = randomGenderedName(forceGender);
   const arrivalReason = getRandomItem(ARRIVAL_REASONS);
   const startingLife = randomInt(LIFE_METER_CONFIG.STARTING_MIN, LIFE_METER_CONFIG.STARTING_MAX);
   
@@ -30,8 +38,9 @@ export function createResident(
   const resident: Resident = {
     id: generateUUID(),
     name,
+    gender,
     profile,
-    happiness: HAPPINESS_CONFIG.STARTING,
+    health: HEALTH_CONFIG.STARTING,
     lifeMeter: startingLife,
     currentState: "idle",
     currentNeed: null,
@@ -50,12 +59,12 @@ export function createResident(
     arrivalDay: currentDay,
     arrivalReason,
     daysInShelter: 0,
-    lastHappinessUpdate: now - randomOffset,
+    lastHealthUpdate: now - randomOffset,
     lastNeedCheck: now - randomOffset,
     lastLifeUpdate: now - randomOffset,
     lastMealTime: now - randomOffset,
     // Departure tracking
-    unhappyDuration: 0,
+    unhealthyDuration: 0,
     isAtRisk: false,
     departureReason: undefined,
     // Fundraiser fatigue tracking (NEW)
@@ -123,7 +132,7 @@ export function createTestResidents(
   grid?: Grid
 ): Resident[] {
   const residents: Resident[] = [];
-  const profiles: ResidentProfile[] = ["young_adult", "veteran", "elderly"];
+  const profiles: ResidentProfile[] = ["young_adult", "adult", "elderly"];
   
   for (let i = 0; i < count; i++) {
     const profile = profiles[i % profiles.length];

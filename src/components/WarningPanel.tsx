@@ -10,6 +10,8 @@ interface WarningPanelProps {
   // Controlled mode props for single-menu-at-a-time behavior
   isExpanded?: boolean;
   onToggle?: () => void;
+  // Render the list inline (no floating toggle); used inside the Reports panel
+  embedded?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ const getWarningIcon = (type: string): string => {
     maintenance_due: '🔧',
     operating_costs_due: '📋',
     // Resident
-    unhappy_resident: '😢',
+    unhealthy_resident: '🤒',
     at_risk_resident: '🚪',
     overcrowded: '👥',
     hungry_residents: '🍽️',
@@ -67,7 +69,7 @@ const getDefaultActionLabel = (type: string): string => {
     near_bankruptcy: 'View Finances',
     maintenance_due: 'View Rooms',
     operating_costs_due: 'View Finances',
-    unhappy_resident: 'View Residents',
+    unhealthy_resident: 'View Residents',
     at_risk_resident: 'View Residents',
     overcrowded: 'Upgrade Tier',
     hungry_residents: 'Build Cafeteria',
@@ -158,7 +160,8 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
   onAction,
   onDismiss,
   isExpanded: controlledIsExpanded,
-  onToggle
+  onToggle,
+  embedded = false
 }) => {
   const [internalIsExpanded, setInternalIsExpanded] = useState(false);
   const [hasNewCritical, setHasNewCritical] = useState(false);
@@ -238,11 +241,11 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
   
   // Don't render if no warnings
   if (counts.total === 0) {
-    return null;
+    return embedded ? <p className="reports-empty">All clear. Nothing needs attention.</p> : null;
   }
   
   return (
-    <div className={`warning-panel ${isExpanded ? 'expanded' : 'collapsed'} ${hasNewCritical ? 'pulse-critical' : ''}`}>
+    <div className={`warning-panel ${embedded ? 'embedded' : ''} ${isExpanded ? 'expanded' : 'collapsed'} ${hasNewCritical ? 'pulse-critical' : ''}`}>
       {/* Collapsed State - Icon with Badge */}
       <div
         className="warning-panel-toggle"
@@ -264,7 +267,7 @@ export const WarningPanel: React.FC<WarningPanelProps> = ({
       </div>
       
       {/* Expanded State - Warning List */}
-      {isExpanded && (
+      {(isExpanded || embedded) && (
         <div className="warning-panel-content">
           <div className="warning-panel-header">
             <h3>Active Warnings</h3>

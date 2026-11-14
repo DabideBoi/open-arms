@@ -1,6 +1,6 @@
 import { Grid, Tile, Room, RoomType, PlacementResult, ShelterTier } from '../../types';
-import { GRID_CONFIG, ROOM_SPECS, EXPANSION_CONFIG, SHELTER_TIERS } from '../../constants';
-import { generateUUID } from '../../utils/helpers';
+import { GRID_CONFIG, ROOM_SPECS, EXPANSION_CONFIG, SHELTER_TIERS, roomKind } from '../../constants';
+import { generateUUID, formatMoney } from '../../utils/helpers';
 import { createDefaultAdjacencyBonuses, recalculateAllAdjacencies } from './AdjacencySystem';
 
 /**
@@ -39,12 +39,7 @@ export function initializeGrid(tier: ShelterTier = 1): Grid {
     }
   }
   
-  // Set entrance tile (bottom center of starter area)
-  const entranceX = startX + Math.floor(tierGridSize / 2);
-  const entranceY = startY + tierGridSize - 1;
-  tiles[entranceY][entranceX].type = "entrance";
-  
-  return {
+  const grid: Grid = {
     width: GRID_CONFIG.TOTAL_WIDTH,
     height: GRID_CONFIG.TOTAL_HEIGHT,
     tiles,
@@ -55,6 +50,27 @@ export function initializeGrid(tier: ShelterTier = 1): Grid {
       maxY: startY + tierGridSize
     }
   };
+  placeSouthGate(grid);
+  return grid;
+}
+
+/**
+ * Put the entrance (the south gate) at the bottom edge of the unlocked area.
+ * Clears any previous entrance tile first, so it can be re-called after the
+ * area grows (tier upgrade) or when migrating old saves.
+ */
+export function placeSouthGate(grid: Grid): void {
+  const { minX, maxX, maxY } = grid.unlockedArea;
+  const gate = grid.tiles[maxY - 1][Math.floor((minX + maxX) / 2)];
+  // A room on that tile would block arrivals: keep the old entrance rather than end up with none
+  if (gate.type !== "empty" && gate.type !== "hallway" && gate.type !== "entrance") return;
+  for (const row of grid.tiles) {
+    for (const tile of row) {
+      if (tile.type === "entrance") tile.type = "empty";
+    }
+  }
+  gate.type = "entrance";
+  gate.walkable = true;
 }
 
 /**
@@ -108,7 +124,8 @@ export function placeRoom(
   roomType: RoomType,
   gridX: number,
   gridY: number,
-  currentPhase: "day" | "night"
+  currentPhase: "day" | "night",
+  dormGender: Room["gender"] = "any"
 ): { success: boolean; error?: string; room?: Room; newMoney?: number } {
   const roomSpec = ROOM_SPECS[roomType];
   
@@ -136,7 +153,7 @@ export function placeRoom(
     maintenanceCost: roomSpec.maintenanceCost,
     lastMaintenancePaid: Date.now(),
     adjacencyBonuses: createDefaultAdjacencyBonuses(),
-    image: roomSpec.image  // Copy image property from spec
+    ...(roomKind(roomType) === "dormitory" ? { gender: dormGender } : {})
   };
   
   // Update grid tiles
@@ -216,7 +233,7 @@ export function calculateExpansionCost(grid: Grid): number {
 export function expandGrid(
   grid: Grid,
   money: number,
-  direction: "north" | "south" | "east" | "west"
+  direction: "north" | "east" | "west"
 ): { success: boolean; error?: string; newMoney?: number; cost?: number } {
   
   const expansionSize = EXPANSION_CONFIG.EXPANSION_SIZE;
@@ -233,11 +250,6 @@ export function expandGrid(
   switch (direction) {
     case "north":
       if (unlockedArea.minY - expansionSize < 0) {
-        return { success: false, error: "Cannot expand beyond grid boundary" };
-      }
-      break;
-    case "south":
-      if (unlockedArea.maxY + expansionSize > grid.height) {
         return { success: false, error: "Cannot expand beyond grid boundary" };
       }
       break;
@@ -258,9 +270,6 @@ export function expandGrid(
     case "north":
       unlockedArea.minY -= expansionSize;
       break;
-    case "south":
-      unlockedArea.maxY += expansionSize;
-      break;
     case "east":
       unlockedArea.maxX += expansionSize;
       break;
@@ -280,7 +289,7 @@ export function expandGrid(
     }
   }
   
-  console.log(`Grid expanded ${direction} for $${cost}`);
+  console.log(`Grid expanded ${direction} for ${formatMoney(cost)}`);
   
   return {
     success: true,
@@ -294,7 +303,7 @@ export function expandGrid(
  */
 export function canExpandInDirection(
   grid: Grid,
-  direction: "north" | "south" | "east" | "west"
+  direction: "north" | "east" | "west"
 ): boolean {
   const expansionSize = EXPANSION_CONFIG.EXPANSION_SIZE;
   const { unlockedArea } = grid;
@@ -302,8 +311,6 @@ export function canExpandInDirection(
   switch (direction) {
     case "north":
       return unlockedArea.minY - expansionSize >= 0;
-    case "south":
-      return unlockedArea.maxY + expansionSize <= grid.height;
     case "east":
       return unlockedArea.maxX + expansionSize <= grid.width;
     case "west":
@@ -314,8 +321,8 @@ export function canExpandInDirection(
 /**
  * Get all possible expansion directions
  */
-export function getAvailableExpansions(grid: Grid): Array<"north" | "south" | "east" | "west"> {
-  const directions: Array<"north" | "south" | "east" | "west"> = ["north", "south", "east", "west"];
+export function getAvailableExpansions(grid: Grid): Array<"north" | "east" | "west"> {
+  const directions: Array<"north" | "east" | "west"> = ["north", "east", "west"];
   return directions.filter(dir => canExpandInDirection(grid, dir));
 }
 
@@ -335,8 +342,8 @@ export function demolishRoom(
   
   const room = rooms[roomIndex];
   
-  // Calculate refund (50% of build cost)
-  const refund = Math.floor(room.buildCost * 0.5);
+  // Calculate refund (20% of build cost)
+  const refund = Math.floor(room.buildCost * 0.2);
   
   // Clear grid tiles
   for (let y = room.gridY; y < room.gridY + room.height; y++) {
@@ -353,7 +360,7 @@ export function demolishRoom(
   // Recalculate adjacency bonuses for remaining rooms
   recalculateAllAdjacencies(rooms);
   
-  console.log(`🏚️ Demolished ${room.type} at (${room.gridX}, ${room.gridY}), refund: $${refund}`);
+  console.log(`🏚️ Demolished ${room.type} at (${room.gridX}, ${room.gridY}), refund: ${formatMoney(refund)}`);
   
   return {
     success: true,

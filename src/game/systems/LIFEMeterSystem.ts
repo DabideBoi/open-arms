@@ -1,13 +1,13 @@
 import { GameState, Resident, ResidentState, Need, RoomType } from '../../types';
-import { LIFE_METER_CONFIG, PROFILE_SPECS, LIFE_ACTIVITY_RATES } from '../../constants';
+import { LIFE_METER_CONFIG, PROFILE_SPECS, LIFE_ACTIVITY_RATES, roomKind } from '../../constants';
+import { getEffectiveLifeFillModifier } from './AdjacencySystem';
 import { getReputationMultiplier, handleGraduationReputation, recordGraduation } from './ReputationSystem';
 import { getLifeFillModifier } from './FoodSystem';
-import { getEffectiveLifeFillModifier } from './AdjacencySystem';
 
 /**
  * LIFEMeterSystem - Manages resident progression toward graduation
- * LIFE meter fills at different rates depending on resident activity:
- * - Learning (learning_center/vocational_room): 100% rate (primary growth activity)
+ * The main LIFE source is taking part in fundraisers (see FundraiserSystem).
+ * This system adds only a slow passive fill, scaled by the resident's activity:
  * - Eating (cafeteria): 50% rate
  * - Sleeping (dormitory): 25% rate
  * - Social (common_room): 15% rate
@@ -16,8 +16,7 @@ import { getEffectiveLifeFillModifier } from './AdjacencySystem';
  *
  * Additional modifiers:
  * - Food quality affects LIFE fill rate via lifeFillModifier (0.3x to 1.5x)
- * - Room adjacency bonuses can increase/decrease fill rate
- * - Reputation and happiness also affect fill rate
+ * - Reputation and health also affect fill rate
  */
 
 // ============================================================================
@@ -45,15 +44,15 @@ export function getActivityRateMultiplier(
   if (resident.currentState === 'in_use' && resident.targetRoomId) {
     const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
     if (room) {
-      return getActivityRateForRoomType(room.type);
+      // Room/adjacency LIFE bonuses (library, decorations, ...) scale the activity rate
+      const { rate, activity } = getActivityRateForRoomType(roomKind(room.type));
+      return { rate: rate * getEffectiveLifeFillModifier(room), activity };
     }
   }
   
   // Check current need for other activities
   if (resident.currentNeed) {
     switch (resident.currentNeed) {
-      case 'learning':
-        return { rate: LIFE_ACTIVITY_RATES.LEARNING, activity: 'learning' };
       case 'food':
         return { rate: LIFE_ACTIVITY_RATES.EATING, activity: 'eating' };
       case 'sleep':
@@ -74,9 +73,6 @@ export function getActivityRateMultiplier(
  */
 function getActivityRateForRoomType(roomType: RoomType): { rate: number; activity: string } {
   switch (roomType) {
-    case 'learning_center':
-    case 'vocational_room':
-      return { rate: LIFE_ACTIVITY_RATES.LEARNING, activity: 'learning' };
     case 'cafeteria':
       return { rate: LIFE_ACTIVITY_RATES.EATING, activity: 'eating' };
     case 'dormitory':
@@ -87,6 +83,7 @@ function getActivityRateForRoomType(roomType: RoomType): { rate: number; activit
       return { rate: LIFE_ACTIVITY_RATES.BATHROOM, activity: 'bathroom' };
     case 'admin_office':
     case 'fundraiser_station':
+    case 'clinic':
     default:
       return { rate: LIFE_ACTIVITY_RATES.IDLE, activity: 'idle' };
   }
@@ -99,7 +96,6 @@ function getActivityRateForRoomType(roomType: RoomType): { rate: number; activit
 /**
  * Update LIFE meter for a resident based on their current activity
  * Different activities provide different growth rates:
- * - Learning: 100% (primary growth activity)
  * - Eating: 50%
  * - Sleeping: 25%
  * - Social: 15%
@@ -120,23 +116,14 @@ export function updateResidentLife(
   // Calculate base fill rate from profile
   const baseFillRate = PROFILE_SPECS[resident.profile].lifeFillRate;
   const reputationMultiplier = getReputationMultiplier(gameState.reputation);
-  const happinessMultiplier = resident.happiness / 100;
+  const healthMultiplier = resident.health / 100;
   
   // Get food quality modifier (0.3 to 1.5 based on food portion setting)
   const foodModifier = getLifeFillModifier(gameState);
   
-  // Get room adjacency modifier (only applies when in learning rooms)
-  let adjacencyModifier = 1.0;
-  if (resident.targetRoomId && (activity === 'learning')) {
-    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
-    if (room) {
-      adjacencyModifier = getEffectiveLifeFillModifier(room);
-    }
-  }
-  
-  // Combined multiplier (reputation, happiness, food quality, adjacency, and activity rate)
-  const baseMultiplier = (reputationMultiplier + happinessMultiplier) / 2;
-  const effectiveMultiplier = baseMultiplier * foodModifier * adjacencyModifier * activityRate;
+  // Combined multiplier (reputation, health, food quality, and activity rate)
+  const baseMultiplier = (reputationMultiplier + healthMultiplier) / 2;
+  const effectiveMultiplier = baseMultiplier * foodModifier * activityRate;
   
   // Calculate increase per second
   const fillPerSecond = baseFillRate * effectiveMultiplier;
@@ -148,10 +135,8 @@ export function updateResidentLife(
   
   // Log significant progress (every 10%)
   if (Math.floor(oldLife / 10) < Math.floor(resident.lifeMeter / 10)) {
-    const adjacencyBonus = Math.round((adjacencyModifier - 1) * 100);
-    const adjacencyStr = adjacencyBonus !== 0 ? `, adjacency: ${adjacencyBonus > 0 ? '+' : ''}${adjacencyBonus}%` : '';
     const activityRateStr = activityRate !== 1.0 ? `, activity: ${activity} (${Math.round(activityRate * 100)}%)` : '';
-    console.log(`${resident.name} LIFE: ${oldLife.toFixed(1)}% → ${resident.lifeMeter.toFixed(1)}% (food: ${foodModifier.toFixed(2)}x${adjacencyStr}${activityRateStr})`);
+    console.log(`${resident.name} LIFE: ${oldLife.toFixed(1)}% → ${resident.lifeMeter.toFixed(1)}% (food: ${foodModifier.toFixed(2)}x${activityRateStr})`);
   }
   
   // Check for graduation
@@ -228,36 +213,27 @@ function removeResident(gameState: GameState, residentId: string): void {
 
 /**
  * Calculate effective fill rate for a resident
- * Includes activity rate, food quality modifier, and adjacency bonuses
+ * Includes activity rate, food quality modifier
  */
 export function calculateFillRate(
   resident: Resident,
   gameState: GameState
 ): number {
   // Get activity-based rate multiplier
-  const { rate: activityRate, activity } = getActivityRateMultiplier(resident, gameState);
+  const { rate: activityRate } = getActivityRateMultiplier(resident, gameState);
   
   // If activity provides no LIFE growth, return 0
   if (activityRate <= 0) return 0;
   
   const baseFillRate = PROFILE_SPECS[resident.profile].lifeFillRate;
   const reputationMultiplier = getReputationMultiplier(gameState.reputation);
-  const happinessMultiplier = resident.happiness / 100;
+  const healthMultiplier = resident.health / 100;
   
   // Get food quality modifier
   const foodModifier = getLifeFillModifier(gameState);
   
-  // Get room adjacency modifier (only applies when learning)
-  let adjacencyModifier = 1.0;
-  if (resident.targetRoomId && activity === 'learning') {
-    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
-    if (room) {
-      adjacencyModifier = getEffectiveLifeFillModifier(room);
-    }
-  }
-  
-  const baseMultiplier = (reputationMultiplier + happinessMultiplier) / 2;
-  const effectiveMultiplier = baseMultiplier * foodModifier * adjacencyModifier * activityRate;
+  const baseMultiplier = (reputationMultiplier + healthMultiplier) / 2;
+  const effectiveMultiplier = baseMultiplier * foodModifier * activityRate;
   
   return baseFillRate * effectiveMultiplier;
 }
@@ -286,26 +262,17 @@ export function isLifeMeterStalled(
   gameState: GameState
 ): boolean {
   // Get activity-based rate multiplier
-  const { rate: activityRate, activity } = getActivityRateMultiplier(resident, gameState);
+  const { rate: activityRate } = getActivityRateMultiplier(resident, gameState);
   
   // If activity provides no LIFE growth, it's technically stalled
   if (activityRate <= 0) return true;
   
   const reputationMultiplier = getReputationMultiplier(gameState.reputation);
-  const happinessMultiplier = resident.happiness / 100;
+  const healthMultiplier = resident.health / 100;
   const foodModifier = getLifeFillModifier(gameState);
   
-  // Get room adjacency modifier if learning
-  let adjacencyModifier = 1.0;
-  if (resident.targetRoomId && activity === 'learning') {
-    const room = gameState.rooms.find(r => r.id === resident.targetRoomId);
-    if (room) {
-      adjacencyModifier = getEffectiveLifeFillModifier(room);
-    }
-  }
-  
-  const baseMultiplier = (reputationMultiplier + happinessMultiplier) / 2;
-  const effectiveMultiplier = baseMultiplier * foodModifier * adjacencyModifier * activityRate;
+  const baseMultiplier = (reputationMultiplier + healthMultiplier) / 2;
+  const effectiveMultiplier = baseMultiplier * foodModifier * activityRate;
   
   const STALL_THRESHOLD = 0.2; // 20%
   
@@ -386,7 +353,7 @@ export function getProfileInfo(profile: string): {
   
   const descriptions = {
     young_adult: 'Eager to learn and adapt quickly',
-    veteran: 'Resilient but requires patience',
+    adult: 'Steady and dependable, working to get back on their feet',
     elderly: 'Needs comfort and dignity'
   };
   

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Changed
+- **Currency is now the Philippine peso (₱).** Every price, income and threshold is ×50 (start with ₱250,000). Old saves are converted on load.
+- **Residents only arrive through events.** Nobody moves in on a timer any more; accept an arrival event to take someone in. The "accept new residents" choice in Community Support now actually adds them.
+- **Veteran is now Adult.** Same stats, 2-minute fundraiser fatigue, no extra graduation reputation. Old saves are converted.
+- **Pause now freezes everything:** day/night, event and fundraiser countdowns, donations, maintenance and warnings. Switching tabs no longer un-pauses a game you paused yourself.
+- Maintenance follows the dev-mode timers like the other cycles.
+- Resident popup: close button no longer covers the header; the status line wraps instead of overflowing.
+- **Learning Center and Vocational Room removed.** Existing saves lose them automatically (no refund) and the tiles are freed.
+- **Fundraisers no longer need you to pick residents.** "Start Fundraiser" sends a random group of rested residents.
+- **LIFE now comes from fundraisers:** +15 per participant on success, +5 on failure. The constant LIFE fill is a quarter of what it was.
+- **Happiness is now Health** (code and UI). Fundraisers still cost Health; food deliveries and rooms still affect it. Old saves are migrated.
+- **Food "portions" are now "deliveries".** Bigger deliveries make cafeterias produce food faster (Minimal 0.6x to Premium 1.5x).
+
+### Added
+- **Config files** in `public/config/` (`economy.json`, `randomization.json`, `timings.json`) to tune the game without rebuilding. Bad values are ignored with a console warning.
+- **Arrival events:** Elderly Home Transfer, Job Center Referral, Knock at the Door, Family Reunification. Accept is disabled when there's no free bed.
+- **New rooms:** Large Dormitory, Medical Center, Dining Hall (upgrades), Library and Garden (social), Potted Plant and Fountain (decorations that boost the rooms they touch).
+- Room and adjacency LIFE bonuses now actually speed up LIFE fill.
+- Resident sprite next to each name in the residents list and the click popup.
+- **Clinic** room (Tier 1, $400). Residents below 35% Health go there on their own to recover.
+- **Earthquake** disaster. Earthquakes and winter storms damage 1-4 buildings and charge $150 per damaged building immediately.
+
 ## [0.9.0] - 2026-05-07
 
 ### 🎉 Production Release Candidate

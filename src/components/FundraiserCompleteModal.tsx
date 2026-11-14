@@ -1,6 +1,8 @@
 import React from 'react';
 import { FundraiserCompletionData } from '../game/systems/FundraiserSystem';
+import { FUNDRAISER_CONFIG } from '../constants';
 import './FundraiserCompleteModal.css';
+import { formatMoney } from '../utils/helpers';
 
 interface FundraiserCompleteModalProps {
   data: FundraiserCompletionData | null;
@@ -60,17 +62,17 @@ export function FundraiserCompleteModal({ data, onClose }: FundraiserCompleteMod
               {data.success ? 'Money Raised' : 'Money Earned'}
             </div>
             <div className="money-amount">
-              ${data.payout.toLocaleString()}
+              {formatMoney(data.payout)}
             </div>
             {data.success && data.payout !== data.expectedPayout && (
               <div className="money-comparison">
                 {data.payout > data.expectedPayout ? (
                   <span className="above-expected">
-                    +${(data.payout - data.expectedPayout).toLocaleString()} above expected!
+                    +{formatMoney((data.payout - data.expectedPayout))} above expected!
                   </span>
                 ) : (
                   <span className="below-expected">
-                    (Expected: ${data.expectedPayout.toLocaleString()})
+                    (Expected: {formatMoney(data.expectedPayout)})
                   </span>
                 )}
               </div>
@@ -87,6 +89,9 @@ export function FundraiserCompleteModal({ data, onClose }: FundraiserCompleteMod
               </div>
               <div className="detail-value participant-count">
                 {data.participantCount} resident{data.participantCount !== 1 ? 's' : ''}
+              </div>
+              <div className="detail-subtext">
+                📈 +{data.success ? FUNDRAISER_CONFIG.LIFE_BOOST : FUNDRAISER_CONFIG.LIFE_BOOST_FAILURE} LIFE each
               </div>
               <div className="participant-names">
                 {data.participantNames.map((name, index) => (
@@ -154,7 +159,7 @@ export function FundraiserCompleteModal({ data, onClose }: FundraiserCompleteMod
               <p>
                 💔 Unfortunately, the fundraiser didn't go as planned. 
                 Don't worry - the residents tried their best. 
-                Focus on improving their happiness for better results next time!
+                Focus on improving their health for better results next time!
               </p>
             )}
           </div>

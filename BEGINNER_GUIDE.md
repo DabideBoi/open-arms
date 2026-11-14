@@ -108,7 +108,7 @@ money = "text"; // ✅ No error, but breaks calculations
 **Why:** Optimized for 60 FPS performance
 
 **Renders:**
-- Grid tiles (10×10 to 25×25)
+- Grid tiles (12×12 to 26×26)
 - Room sprites (dormitories, cafeterias)
 - Residents walking around
 - Status bars, effects, lighting
@@ -344,7 +344,7 @@ FUNCTION transitionToNight():
 Donation = BaseAmount × Reputation × Random × Graduates
 
 Where:
-- BaseAmount = ResidentCount × $25
+- BaseAmount = ResidentCount × ₱1,250
 - Reputation = 0.5 to 1.5 (based on reputation %)
 - Random = 0.8 to 1.2 (adds variety)
 - Graduates = 1 + (GraduatedCount × 0.1)
@@ -359,10 +359,10 @@ FUNCTION checkDonation(gameState):
         IF random() < chance:
             amount = calculateDonation(gameState)
             money += amount
-            showNotification("Donation: $" + amount)
+            showNotification("Donation: ₱" + amount)
 
 FUNCTION calculateDonation(gameState):
-    base = residentCount × 25
+    base = residentCount × 1250
     repMod = 0.5 + (reputation / 100)
     randomMod = 0.8 + (random() × 0.4)
     gradMod = 1 + (graduatedCount × 0.1)
@@ -373,12 +373,12 @@ FUNCTION calculateDonation(gameState):
 **Example:**
 ```
 15 residents, 75% reputation, 10 graduates
-base = 15 × 25 = 375
+base = 15 × 1,250 = 18,750
 repMod = 0.5 + 0.75 = 1.25
 randomMod = 1.0 (average)
 gradMod = 1 + (10 × 0.1) = 2.0
 
-Result = 375 × 1.25 × 1.0 × 2.0 = $937
+Result = 18,750 × 1.25 × 1.0 × 2.0 = ₱46,875
 ```
 
 ---
@@ -392,8 +392,8 @@ FillRate = BaseRate × Multipliers
 
 Multipliers:
 - Reputation (0-100%)
-- Happiness (0-100%)
-- Activity (Learning=100%, Eating=50%, Idle=10%)
+- Health (0-100%)
+- Activity (Eating=50%, Sleeping=25%, Idle=10%); fundraisers add +15 / +5 LIFE directly
 - Food Quality (0.5x to 1.5x)
 - Room Adjacency (0.9x to 1.15x)
 ```
@@ -404,12 +404,12 @@ FUNCTION updateLIFE(resident, deltaTime):
     baseRate = getProfileRate(resident)  // e.g., 60%/hour
     
     repMult = reputation / 100
-    happyMult = happiness / 100
+    healthMult = health / 100
     activityMult = getActivityRate(resident)  // What they're doing
     foodMult = getFoodQuality()
     adjacencyMult = getRoomBonus(resident)
     
-    totalMult = (repMult + happyMult) / 2
+    totalMult = (repMult + healthMult) / 2
     totalMult × activityMult × foodMult × adjacencyMult
     
     increase = baseRate × totalMult × deltaTime
@@ -442,7 +442,7 @@ FUNCTION gameLoop():
             updateLIFEMeter(resident, deltaTime)
         
         // 3. Update systems
-        updateHappinessDecay(deltaTime)
+        updateHealthDecay(deltaTime)
         checkWarnings()
         
         // 4. Render
@@ -461,7 +461,7 @@ FUNCTION gameLoop():
 | Rendering | 60 FPS | Smooth visuals |
 | Movement | 60 FPS | Smooth walking |
 | AI State | 1 FPS | Decisions don't need 60 FPS |
-| LIFE/Happiness | 0.1 FPS (every 10s) | Gradual changes |
+| LIFE/Health | 0.1 FPS (every 10s) | Gradual changes |
 | Donations | Every 90 seconds | Timer-based |
 | Day/Night | Every 4/2 minutes | Timer-based |
 
@@ -474,21 +474,21 @@ FUNCTION gameLoop():
 ```
 INCOME:
 ├─ Donations (every 90 sec)
-│  Amount = residents × $25 × reputation × graduates
+│  Amount = residents × ₱1,250 × reputation × graduates
 ├─ Fundraisers (manual)
-│  Amount = $150-350 (if successful)
+│  Amount = ₱7,500-17,500 (if successful)
 └─ Graduation bonuses
-   Amount = $500 + reputation boost
+   Amount = ₱25,000 + reputation boost
 
 EXPENSES:
 ├─ Daily operating costs
-│  $100 + $5/resident + $10/room
+│  ₱5,000 + ₱250/resident + ₱500/room
 ├─ Food costs
-│  $5-50 per resident (based on portion)
+│  ₱250-2,500 per resident (based on delivery level)
 ├─ Maintenance (every 5 min)
 │  Sum of all room maintenance costs
 └─ Random events (15% chance)
-   $50-200 emergencies
+   ₱2,500-10,000 emergencies
 ```
 
 ### Reputation System
@@ -498,7 +498,7 @@ REPUTATION CHANGES:
 +5  Resident graduates
 +2  Fundraiser succeeds
 +1  Premium food (daily)
--3  Resident leaves unhappy
+-3  Resident leaves unhealthy
 -5  Disaster rejected
 -2  Maintenance missed (per room)
 -1  Overcrowding (daily)
@@ -506,7 +506,7 @@ REPUTATION CHANGES:
 Reputation affects:
 - Donation chance (0-100%)
 - Donation amount (0.5x to 1.5x)
-- Resident spawn rate
+- Media coverage and inspection outcomes
 - LIFE meter fill rate
 ```
 

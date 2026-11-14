@@ -1,6 +1,9 @@
-import { GameState, Resident, DisasterEventType, ActiveDisasterEvent, DisasterEventConfig } from '../../types';
-import { REPUTATION_CHANGES, DISASTER_EVENTS, DISASTER_CONFIG } from '../../constants';
+import { GameState, Resident, ResidentProfile, DisasterEventType, ActiveDisasterEvent, DisasterEventConfig } from '../../types';
+import { REPUTATION_CHANGES, DISASTER_EVENTS, DISASTER_CONFIG, EVENT_CONFIG, EVENT_WEIGHTS, EVENT_ECONOMY, PROFILE_SPECS } from '../../constants';
+import { formatMoney } from '../../utils/helpers';
+import { spawnNewResident, getFreeResidentSlots } from './ResidentSpawningSystem';
 import { getResidentCap } from './TierSystem';
+import { recordExpense } from './DonationSystem';
 
 // ============================================================================
 // Event Types & Interfaces
@@ -13,17 +16,26 @@ export type EventType =
   | "volunteer_day"
   | "inspection"
   | "community_support"
+  | "elder_transfer"
+  | "job_referral"
+  | "knock_at_door"
+  | "family_reunification"
+  | "street_outreach"
+  | "hospital_referral"
+  | "pipe_burst"
   | "disaster";
 
 export interface EventEffect {
-  type: "money" | "reputation" | "add_residents" | "happiness_modifier" | "maintenance_discount";
+  type: "money" | "reputation" | "add_residents" | "health_modifier" | "maintenance_discount";
   value: number;
   duration?: number; // For temporary effects (in minutes)
+  profile?: ResidentProfile; // add_residents: who arrives (random by weight if omitted)
 }
 
 export interface EventOption {
   label: string;
   effects: EventEffect[];
+  disabled?: boolean; // e.g. accepting residents with no free bed
 }
 
 export interface GameEvent {
@@ -52,18 +64,6 @@ export interface EventTemplate {
 }
 
 // ============================================================================
-// Event Configuration - FASTER PACED
-// ============================================================================
-
-export const EVENT_CONFIG = {
-  MIN_INTERVAL: 60 * 1000,           // 1 minute minimum between events (down from 30)
-  MAX_INTERVAL: 3 * 60 * 1000,       // 3 minutes maximum between events (down from 60)
-  MAX_ACTIVE_EVENTS: 3,              // Maximum simultaneous events
-  EVENT_EXPIRY_TIME: 5 * 60 * 1000,  // 5 minutes to respond (down from 10)
-  BASE_CHANCE: 0.4                   // 40% chance per check when interval reached
-};
-
-// ============================================================================
 // Event Templates
 // ============================================================================
 
@@ -77,11 +77,11 @@ const DONATION_DRIVE_EVENT: EventTemplate = {
   ],
   
   generateOptions: (gameState: GameState) => {
-    const bonusAmount = Math.floor(gameState.residents.length * 100 + 300);
+    const bonusAmount = Math.floor(gameState.residents.length * EVENT_ECONOMY.DONATION_DRIVE_PER_RESIDENT + EVENT_ECONOMY.DONATION_DRIVE_BASE);
     
     return [
       {
-        label: `Participate in drive (+$${bonusAmount}, +2 reputation)`,
+        label: `Participate in drive (${formatMoney(bonusAmount, true)}, +2 reputation)`,
         effects: [
           { type: "money", value: bonusAmount },
           { type: "reputation", value: 2 }
@@ -105,27 +105,27 @@ const HEALTH_OUTBREAK_EVENT: EventTemplate = {
   ],
   
   generateOptions: (gameState: GameState) => {
-    const treatmentCost = Math.max(100, gameState.residents.length * 20);
+    const treatmentCost = Math.max(EVENT_ECONOMY.OUTBREAK_TREATMENT_MIN, gameState.residents.length * EVENT_ECONOMY.OUTBREAK_TREATMENT_PER_RESIDENT);
     
     return [
       {
-        label: `Provide treatment (-$${treatmentCost}, +2 reputation)`,
+        label: `Provide treatment (${formatMoney(-treatmentCost)}, +2 reputation)`,
         effects: [
           { type: "money", value: -treatmentCost },
           { type: "reputation", value: 2 }
         ]
       },
       {
-        label: "Quarantine only (-10 happiness for 30 min)",
+        label: "Quarantine only (-10 health for 30 min)",
         effects: [
-          { type: "happiness_modifier", value: -10, duration: 30 }
+          { type: "health_modifier", value: -10, duration: 30 }
         ]
       },
       {
-        label: "Ignore (-3 reputation, -15 happiness for 60 min)",
+        label: "Ignore (-3 reputation, -15 health for 60 min)",
         effects: [
           { type: "reputation", value: -3 },
-          { type: "happiness_modifier", value: -15, duration: 60 }
+          { type: "health_modifier", value: -15, duration: 60 }
         ]
       }
     ];
@@ -147,11 +147,11 @@ const MEDIA_COVERAGE_EVENT: EventTemplate = {
     return [
       {
         label: isPositive 
-          ? "Allow coverage (+10 reputation, +$500)" 
+          ? `Allow coverage (+10 reputation, ${formatMoney(EVENT_ECONOMY.MEDIA_GRANT, true)})` 
           : "Allow coverage (-8 reputation)",
         effects: isPositive ? [
           { type: "reputation", value: 10 },
-          { type: "money", value: 500 }
+          { type: "money", value: EVENT_ECONOMY.MEDIA_GRANT }
         ] : [
           { type: "reputation", value: -8 }
         ]
@@ -206,15 +206,19 @@ const INSPECTION_EVENT: EventTemplate = {
     
     return [
       {
-        label: passed 
-          ? "Undergo inspection (+$1000 grant, +5 reputation)" 
-          : "Undergo inspection (-5 reputation, -$500 fine)",
-        effects: passed ? [
-          { type: "money", value: 1000 },
-          { type: "reputation", value: 5 }
-        ] : [
-          { type: "reputation", value: -5 },
-          { type: "money", value: -500 }
+        label: `Prepare & undergo inspection (${formatMoney(-EVENT_ECONOMY.INSPECTION_PREP_COST)} upkeep, ` + (passed
+          ? `then ${formatMoney(EVENT_ECONOMY.INSPECTION_GRANT, true)} grant, +5 reputation)`
+          : `then -5 reputation, ${formatMoney(-EVENT_ECONOMY.INSPECTION_FINE)} fine)`),
+        // Upkeep is paid up front either way; the result depends on current reputation
+        effects: [
+          { type: "money", value: -EVENT_ECONOMY.INSPECTION_PREP_COST },
+          ...(passed ? [
+            { type: "money" as const, value: EVENT_ECONOMY.INSPECTION_GRANT },
+            { type: "reputation" as const, value: 5 }
+          ] : [
+            { type: "reputation" as const, value: -5 },
+            { type: "money" as const, value: -EVENT_ECONOMY.INSPECTION_FINE }
+          ])
         ]
       }
     ];
@@ -232,18 +236,23 @@ const COMMUNITY_SUPPORT_EVENT: EventTemplate = {
   
   generateOptions: (gameState: GameState) => {
     const residentCount = Math.floor(Math.random() * 3) + 2; // 2-4 residents
-    const moneyAmount = Math.floor(Math.random() * 500) + 300; // $300-800
+    const { COMMUNITY_DONATION_MIN: lo, COMMUNITY_DONATION_MAX: hi } = EVENT_ECONOMY;
+    const moneyAmount = Math.floor(Math.random() * (hi - lo)) + lo;
+    const free = getFreeResidentSlots(gameState);
     
     return [
       {
-        label: `Accept ${residentCount} new residents (+${residentCount} residents, +3 reputation)`,
+        label: free >= residentCount
+          ? `Accept ${residentCount} new residents (+3 reputation)`
+          : `Accept ${residentCount} new residents (only ${free} free bed${free === 1 ? '' : 's'})`,
         effects: [
           { type: "add_residents", value: residentCount },
           { type: "reputation", value: 3 }
-        ]
+        ],
+        disabled: free < residentCount
       },
       {
-        label: `Accept monetary donation (+$${moneyAmount}, +2 reputation)`,
+        label: `Accept monetary donation (${formatMoney(moneyAmount, true)}, +2 reputation)`,
         effects: [
           { type: "money", value: moneyAmount },
           { type: "reputation", value: 2 }
@@ -257,6 +266,134 @@ const COMMUNITY_SUPPORT_EVENT: EventTemplate = {
   }
 };
 
+/** A single-resident arrival: accept (if there's a free bed) or decline. */
+function arrivalEvent(
+  type: EventType,
+  title: string,
+  profile: ResidentProfile | null,
+  descriptions: string[],
+  extraAccept: EventEffect[] = [],
+  acceptNote = ""
+): EventTemplate {
+  return {
+    type,
+    title,
+    descriptions,
+    generateOptions: (gameState: GameState) => {
+      const free = getFreeResidentSlots(gameState) > 0;
+      const who = profile ? PROFILE_SPECS[profile].displayName.toLowerCase() : "new";
+      return [
+        {
+          label: free ? `Welcome them in (+1 ${who} resident${acceptNote})` : "Welcome them in (no free beds)",
+          effects: [{ type: "add_residents", value: 1, ...(profile ? { profile } : {}) }, ...extraAccept],
+          disabled: !free
+        },
+        { label: "Refer to a Different Institution", effects: [] }
+      ];
+    }
+  };
+}
+
+const ELDER_TRANSFER_EVENT = arrivalEvent(
+  "elder_transfer",
+  "Elderly Home Transfer",
+  "elderly",
+  [
+    "A nearby home for the aged is over capacity and asks if you can take custody of one of their residents.",
+    "An elderly care facility is closing a wing and is looking for a safe place for one of their lolos.",
+    "A social worker from an elderly home asks you to take in a resident who has nowhere else to go."
+  ],
+  [{ type: "money", value: EVENT_ECONOMY.ELDER_TRANSFER_STIPEND }, { type: "reputation", value: 3 }],
+  `, ${formatMoney(EVENT_ECONOMY.ELDER_TRANSFER_STIPEND, true)} stipend, +3 reputation`
+);
+
+const JOB_REFERRAL_EVENT = arrivalEvent(
+  "job_referral",
+  "Job Center Referral",
+  "adult",
+  [
+    "The local job center refers an adult who lost their job and their home in the same month.",
+    "A caseworker asks you to house an adult while they look for work.",
+    "An adult recently evicted after a layoff has been referred to your shelter."
+  ],
+  [{ type: "reputation", value: 1 }],
+  ", +1 reputation"
+);
+
+const KNOCK_AT_DOOR_EVENT = arrivalEvent(
+  "knock_at_door",
+  "Knock at the Door",
+  "young_adult",
+  [
+    "A young adult knocks at the door late in the day, asking for a place to stay.",
+    "A young person who aged out of foster care arrives with a single backpack.",
+    "A young adult was told by a friend that your shelter might have a bed."
+  ]
+);
+
+const FAMILY_REUNIFICATION_EVENT: EventTemplate = {
+  type: "family_reunification",
+  title: "Family Reunification",
+  descriptions: [""],
+  generateOptions: (gameState: GameState) => {
+    const free = getFreeResidentSlots(gameState) > 0;
+    return [
+      {
+        label: free ? "Bring them in (+1 resident, +2 reputation)" : "Bring them in (no free beds)",
+        effects: [{ type: "add_residents", value: 1 }, { type: "reputation", value: 2 }],
+        disabled: !free
+      },
+      { label: "Decline (-1 reputation)", effects: [{ type: "reputation", value: -1 }] }
+    ];
+  }
+};
+
+const STREET_OUTREACH_EVENT = arrivalEvent(
+  "street_outreach",
+  "Street Outreach",
+  null,
+  [
+    "A volunteer outreach team found someone sleeping rough and asks if you can offer them a bed.",
+    "Someone from a street outreach program brings a person in from the cold.",
+    "A church group asks whether you can shelter a person they met downtown tonight."
+  ],
+  [{ type: "reputation", value: 2 }],
+  ", +2 reputation"
+);
+
+const HOSPITAL_REFERRAL_EVENT = arrivalEvent(
+  "hospital_referral",
+  "Hospital Referral",
+  "adult",
+  [
+    "A hospital social worker needs a place for a recovered patient who has no home to go back to.",
+    "A clinic asks you to take an adult being discharged with nowhere to stay.",
+    "A nurse calls ahead: a patient is ready to leave but has no safe place to go."
+  ],
+  [{ type: "money", value: EVENT_ECONOMY.HOSPITAL_STIPEND }],
+  `, ${formatMoney(EVENT_ECONOMY.HOSPITAL_STIPEND, true)} stipend`
+);
+
+const PIPE_BURST_EVENT: EventTemplate = {
+  type: "pipe_burst",
+  title: "Burst Pipe",
+  descriptions: [
+    "A pipe burst in the kitchen wall and water is spreading across the floor.",
+    "Residents report a leak under the dormitory sink that is getting worse.",
+    "The plumbing gave out overnight. Someone needs to deal with it."
+  ],
+  generateOptions: () => [
+    {
+      label: `Call a plumber (${formatMoney(-EVENT_ECONOMY.PIPE_REPAIR_COST)})`,
+      effects: [{ type: "money", value: -EVENT_ECONOMY.PIPE_REPAIR_COST }]
+    },
+    {
+      label: "Patch it yourselves (-3 reputation)",
+      effects: [{ type: "reputation", value: -3 }]
+    }
+  ]
+};
+
 // ============================================================================
 // Event Templates Array
 // ============================================================================
@@ -267,8 +404,17 @@ const EVENT_TEMPLATES: EventTemplate[] = [
   MEDIA_COVERAGE_EVENT,
   VOLUNTEER_DAY_EVENT,
   INSPECTION_EVENT,
-  COMMUNITY_SUPPORT_EVENT
+  COMMUNITY_SUPPORT_EVENT,
+  ELDER_TRANSFER_EVENT,
+  JOB_REFERRAL_EVENT,
+  KNOCK_AT_DOOR_EVENT,
+  FAMILY_REUNIFICATION_EVENT,
+  STREET_OUTREACH_EVENT,
+  HOSPITAL_REFERRAL_EVENT,
+  PIPE_BURST_EVENT
 ];
+
+const ARRIVAL_EVENTS: EventType[] = ["community_support", "elder_transfer", "job_referral", "knock_at_door", "family_reunification", "street_outreach", "hospital_referral"];
 
 // ============================================================================
 // Event System Class
@@ -347,34 +493,28 @@ export class EventSystem {
    * Select event based on weighted probabilities
    */
   private selectWeightedEvent(gameState: GameState): EventTemplate {
-    // Use a partial record since disaster events are handled separately
-    const weights: Partial<Record<EventType, number>> = {
-      donation_drive: 0.25,
-      health_outbreak: 0.15,
-      media_coverage: 0.20,
-      volunteer_day: 0.15,
-      inspection: 0.10,
-      community_support: 0.15
-    };
+    const weights: Partial<Record<EventType, number>> = {};
+    for (const t of EVENT_TEMPLATES) weights[t.type] = (EVENT_WEIGHTS as Record<string, number>)[t.type] ?? 0;
     
     // Adjust weights based on game state
-    if (gameState.money < 500) {
-      weights.donation_drive = 0.35;
-      weights.community_support = 0.20;
+    if (gameState.money < EVENT_ECONOMY.LOW_MONEY_THRESHOLD) {
+      weights.donation_drive = EVENT_WEIGHTS.LOW_MONEY_DONATION_DRIVE;
     }
-    
     if (gameState.reputation > 70) {
-      weights.inspection = 0.15;
-      weights.media_coverage = 0.25;
+      weights.inspection = (weights.inspection ?? 0) * 1.5;
+      weights.media_coverage = (weights.media_coverage ?? 0) * 1.25;
     }
-    
     if (gameState.reputation < 40) {
-      weights.health_outbreak = 0.20;
-      weights.volunteer_day = 0.20;
+      weights.health_outbreak = (weights.health_outbreak ?? 0) * 1.33;
+      weights.volunteer_day = (weights.volunteer_day ?? 0) * 1.33;
+    }
+    if (getFreeResidentSlots(gameState) === 0) {
+      for (const t of ARRIVAL_EVENTS) weights[t] = (weights[t] ?? 0) * EVENT_WEIGHTS.NO_ROOM_ARRIVAL_MULTIPLIER;
     }
     
-    // Select based on weights
-    const roll = Math.random();
+    // Weighted pick (weights needn't sum to 1)
+    const total = EVENT_TEMPLATES.reduce((sum, t) => sum + (weights[t.type] || 0), 0);
+    const roll = Math.random() * total;
     let cumulative = 0;
     
     for (const template of EVENT_TEMPLATES) {
@@ -391,9 +531,15 @@ export class EventSystem {
    * Generate an event from a template
    */
   private generateEvent(template: EventTemplate, gameState: GameState): GameEvent {
-    const description = template.descriptions[
+    let description = template.descriptions[
       Math.floor(Math.random() * template.descriptions.length)
     ];
+    if (template.type === "family_reunification") {
+      const r = gameState.residents[Math.floor(Math.random() * gameState.residents.length)];
+      description = r
+        ? `A relative of ${r.name} has tracked them down and is asking to stay at the shelter too.`
+        : "Someone separated from their family asks to stay while they reconnect.";
+    }
     
     const options = template.generateOptions(gameState);
     
@@ -434,6 +580,12 @@ export class EventSystem {
       return { success: false, error: "Invalid option" };
     }
     
+    // Beds may have filled up since the event appeared
+    const arriving = option.effects.filter(e => e.type === "add_residents").reduce((n, e) => n + e.value, 0);
+    if (arriving > getFreeResidentSlots(gameState)) {
+      return { success: false, error: "Not enough free beds. Build a dormitory or upgrade your tier first." };
+    }
+    
     // Apply effects
     for (const effect of option.effects) {
       this.applyEventEffect(gameState, effect);
@@ -471,7 +623,7 @@ export class EventSystem {
       case "money":
         gameState.money += effect.value;
         this.showNotification(
-          `${effect.value > 0 ? '+' : ''}$${effect.value}`,
+          formatMoney(effect.value, true),
           effect.value > 0 ? "success" : "warning"
         );
         break;
@@ -485,10 +637,10 @@ export class EventSystem {
         break;
       
       case "add_residents":
-        this.addResidentsFromEvent(gameState, effect.value);
+        this.addResidentsFromEvent(gameState, effect.value, effect.profile);
         break;
       
-      case "happiness_modifier":
+      case "health_modifier":
         if (effect.duration) {
           this.applyTemporaryEffect(effect);
         }
@@ -505,16 +657,14 @@ export class EventSystem {
   /**
    * Add residents from an event
    */
-  private addResidentsFromEvent(gameState: GameState, count: number): void {
-    // This will be handled by the UI/main game loop
-    // Just emit an event for now
-    this.showNotification(
-      `${count} new residents arrived`,
-      "info"
-    );
-    
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('game:add_residents', { detail: { count } }));
+  private addResidentsFromEvent(gameState: GameState, count: number, profile?: ResidentProfile): void {
+    const names: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const r = spawnNewResident(gameState, profile);
+      if (r) names.push(r.name);
+    }
+    if (names.length) {
+      this.showNotification(`🚪 ${names.join(', ')} moved in`, "success");
     }
   }
   
@@ -592,12 +742,12 @@ export class EventSystem {
   }
   
   /**
-   * Get happiness modifier from temporary effects
+   * Get health modifier from temporary effects
    */
-  getHappinessModifier(): number {
+  getHealthModifier(): number {
     let modifier = 0;
     for (const { effect } of this.temporaryEffects.values()) {
-      if (effect.type === "happiness_modifier") {
+      if (effect.type === "health_modifier") {
         modifier += effect.value;
       }
     }
@@ -634,6 +784,16 @@ export class EventSystem {
   /**
    * Get time until next event
    */
+  /** Push event deadlines forward after a pause (see PauseManager). */
+  shiftTimers(ms: number): void {
+    this.nextEventTime += ms;
+    for (const e of this.activeEvents) {
+      e.triggeredAt += ms;
+      if (e.expiresAt !== null) e.expiresAt += ms;
+    }
+    this.temporaryEffects.forEach(t => { t.expiresAt += ms; });
+  }
+
   getTimeUntilNextEvent(): number {
     return Math.max(0, this.nextEventTime - Date.now());
   }
@@ -730,17 +890,49 @@ export class EventSystem {
   }
   
   /**
+   * Natural disasters damage a random number of buildings and charge the repair
+   * bill immediately. They don't create an accept/decline event, so nothing
+   * is left pending to expire.
+   */
+  private applyNaturalDisaster(gameState: GameState, config: DisasterEventConfig): void {
+    if (gameState.rooms.length === 0) return; // nothing to damage yet
+
+    const maxDamaged = Math.min(DISASTER_CONFIG.MAX_DAMAGED_BUILDINGS, gameState.rooms.length);
+    const damaged = 1 + Math.floor(Math.random() * maxDamaged);
+    const cost = damaged * DISASTER_CONFIG.REPAIR_COST_PER_BUILDING;
+    const buildings = `${damaged} building${damaged === 1 ? '' : 's'}`;
+
+    gameState.money -= cost;
+    gameState.lastDisasterTime = Date.now();
+    recordExpense(gameState, cost, 'random', `${config.title}: ${buildings} damaged`);
+
+    console.log(`🌪️ ${config.title}: ${buildings} damaged, repairs -${formatMoney(cost)}`);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('game:money_change', {
+        detail: { amount: -cost, source: `Disaster: ${config.title}`, icon: '🆘', type: 'expense' }
+      }));
+    }
+    this.showNotification(`🌪️ ${config.title}! ${buildings} damaged. Repairs cost ${formatMoney(cost)}.`, 'error');
+  }
+
+  /**
    * Trigger a random disaster event
    */
   private triggerDisasterEvent(gameState: GameState): void {
     // Select a random disaster type
     const disasterTypes: DisasterEventType[] = [
-      'house_fire', 'winter_storm', 'factory_closure',
+      'house_fire', 'winter_storm', 'earthquake', 'factory_closure',
       'domestic_violence', 'hospital_discharge', 'eviction_wave'
     ];
-    
+
     const selectedType = disasterTypes[Math.floor(Math.random() * disasterTypes.length)];
     const config = DISASTER_EVENTS[selectedType];
+
+    if (config.naturalDisaster) {
+      this.applyNaturalDisaster(gameState, config);
+      return;
+    }
     
     // Calculate expiry based on urgency
     const expiryTime = DISASTER_CONFIG.URGENCY_TIMERS[config.urgency];
@@ -796,20 +988,20 @@ export class EventSystem {
         reputationChange = config.reputationGainAccept;
         moneyChange = config.donationBonus;
         
-        // Apply happiness impact to existing residents
-        this.applyHappinessImpactToAll(gameState, config.happinessImpact);
+        // Apply health impact to existing residents
+        this.applyHealthImpactToAll(gameState, config.healthImpact);
         
         // Handle special costs
         if (config.securityRequired) {
           const securityCost = residentsToAdd * DISASTER_CONFIG.SECURITY_COST_PER_RESIDENT;
           moneyChange -= securityCost;
-          this.showNotification(`Security costs: -$${securityCost}`, "warning");
+          this.showNotification(`Security costs: -${formatMoney(securityCost)}`, "warning");
         }
         
         if (config.medicalCosts) {
           const medicalCost = residentsToAdd * config.medicalCosts;
           moneyChange -= medicalCost;
-          this.showNotification(`Medical costs: -$${medicalCost}`, "warning");
+          this.showNotification(`Medical costs: -${formatMoney(medicalCost)}`, "warning");
         }
         
         this.showNotification(
@@ -829,9 +1021,9 @@ export class EventSystem {
         reputationChange = Math.floor(config.reputationGainAccept * proportion);
         moneyChange = Math.floor(config.donationBonus * proportion);
         
-        // Reduced happiness impact for partial accept
-        const partialHappinessImpact = Math.floor(config.happinessImpact * proportion);
-        this.applyHappinessImpactToAll(gameState, partialHappinessImpact);
+        // Reduced health impact for partial accept
+        const partialHealthImpact = Math.floor(config.healthImpact * proportion);
+        this.applyHealthImpactToAll(gameState, partialHealthImpact);
         
         // Handle special costs proportionally
         if (config.securityRequired) {
@@ -956,18 +1148,18 @@ export class EventSystem {
   }
   
   /**
-   * Apply happiness impact to all existing residents
+   * Apply health impact to all existing residents
    */
-  private applyHappinessImpactToAll(gameState: GameState, impact: number): void {
+  private applyHealthImpactToAll(gameState: GameState, impact: number): void {
     if (impact === 0) return;
     
     for (const resident of gameState.residents) {
-      resident.happiness = Math.max(0, Math.min(100, resident.happiness + impact));
+      resident.health = Math.max(0, Math.min(100, resident.health + impact));
     }
     
     if (impact < 0) {
       this.showNotification(
-        `Existing residents stressed (${impact} happiness)`,
+        `Existing residents stressed (${impact} health)`,
         "warning"
       );
     }
@@ -990,20 +1182,25 @@ export class EventSystem {
   }
   
   /**
-   * Get the overcrowding happiness penalty
+   * Get the overcrowding health penalty
    */
   getOvercrowdingPenalty(gameState: GameState): number {
     if (!this.isOvercrowded(gameState)) return 0;
     
     const tierCap = getResidentCap(gameState);
     const overCount = gameState.residents.length - tierCap;
-    return overCount * DISASTER_CONFIG.OVERCROWDING_HAPPINESS_PENALTY;
+    return overCount * DISASTER_CONFIG.OVERCROWDING_HEALTH_PENALTY;
   }
   
   /**
    * Manually trigger a specific disaster type (for dev mode)
    */
   triggerDisasterByType(gameState: GameState, disasterType: DisasterEventType): void {
+    if (DISASTER_EVENTS[disasterType].naturalDisaster) {
+      this.applyNaturalDisaster(gameState, DISASTER_EVENTS[disasterType]);
+      return;
+    }
+
     if (gameState.activeDisasterEvent) {
       console.warn('Cannot trigger disaster: one already active');
       return;

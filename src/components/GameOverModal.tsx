@@ -1,6 +1,7 @@
 import React from 'react';
 import { GameOverReason } from '../types';
 import './GameOverModal.css';
+import { formatMoney } from '../utils/helpers';
 
 interface GameStats {
   daysSurvived: number;
@@ -59,7 +60,7 @@ function getGameOverTitle(reason: GameOverReason): string {
 function getGameOverMessage(reason: GameOverReason, stats: GameStats): string {
   switch (reason) {
     case 'bankruptcy':
-      return `Your shelter went bankrupt with a final balance of $${stats.finalMoney.toLocaleString()}. Despite your best efforts, the financial burden was too much to bear. But remember, you still helped ${stats.residentsHelped} residents during your time!`;
+      return `Your shelter went bankrupt with a final balance of ${formatMoney(stats.finalMoney)}. Despite your best efforts, the financial burden was too much to bear. But remember, you still helped ${stats.residentsHelped} residents during your time!`;
     case 'reputation':
       return `Your shelter's reputation dropped to 0%. The community lost faith in your ability to run the shelter effectively. Despite this, you managed to help ${stats.residentsHelped} residents over ${stats.daysSurvived} days.`;
     case 'exodus':
@@ -150,7 +151,7 @@ export function GameOverModal({
               <div className="stat-content">
                 <span className="stat-label">Final Reputation</span>
                 <span className="stat-value" style={{ color: stats.finalReputation <= 20 ? '#ff4444' : undefined }}>
-                  {stats.finalReputation}%
+                  {Math.floor(stats.finalReputation)}%
                 </span>
               </div>
             </div>
@@ -171,7 +172,7 @@ export function GameOverModal({
           <div className="victory-message">
             <p>
               🌟 Congratulations! You've successfully helped {stats.graduatedCount} residents 
-              rebuild their lives and achieved {stats.finalReputation}% reputation!
+              rebuild their lives and achieved {Math.floor(stats.finalReputation)}% reputation!
             </p>
           </div>
         )}

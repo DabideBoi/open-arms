@@ -20,28 +20,28 @@ A challenging shelter management tycoon game where you build and manage a homele
 ### 🎯 Key Features
 
 #### Core Systems
-- 🏗️ **Grid-Based Building** - Design your shelter with 8 room types across a 10×10 to 25×25 expandable grid
-- 👥 **Dynamic Residents** - Three profiles (Young Adult, Veteran, Elderly) with unique needs and progression rates
+- 🏗️ **Grid-Based Building** - Design your shelter with 8 room types across an expandable grid
+- 👥 **Dynamic Residents** - Three profiles (Young Adult, Adult, Elderly) with unique needs and progression rates
 - 📈 **LIFE Meter Progression** - Guide residents through 4 stages: Survival → Stability → Growth → Independence
 - 🎓 **Graduation System** - Help residents achieve independence for reputation and financial rewards
 
 #### Economic Systems
 - 💰 **Multi-Source Income** - Donations, fundraisers, graduation bonuses
-- 🍽️ **5-Tier Food Portions** - Balance cost vs. happiness vs. LIFE progression
+- 🍽️ **5-Level Food Deliveries** - Balance cost vs. health vs. food production
 - 🔧 **Maintenance Cycles** - Keep facilities running or face reputation penalties
 - 📊 **Economic Dashboard** - Real-time financial projections and alerts
-- ⚠️ **Bankruptcy Mechanics** - Fall below -$500 and face game over countdown
+- ⚠️ **Bankruptcy Mechanics** - Fall below -₱25,000 and face game over countdown
 
 #### Strategic Depth
 - 📐 **13 Adjacency Rules** - Room placement bonuses and penalties
 - 🏛️ **4 Shelter Tiers** - Unlock new rooms, capacity, and donation multipliers
 - 🌊 **6 Disaster Events** - Accept emergency residents for rewards or decline to stay stable
-- 🎪 **Fundraiser Risk/Reward** - Success based on resident happiness
+- 🎪 **Fundraiser Risk/Reward** - A random rested group takes part; success based on resident health, and LIFE comes from taking part
 - 📉 **Reputation Decay** - Active management required to maintain standing
 
 #### Visual & UI
 - 🌅 **Day/Night Cycle** - Dynamic lighting and activity changes
-- 📊 **Resident Status Bars** - Real-time LIFE and happiness indicators
+- 📊 **Resident Status Bars** - Real-time LIFE and health indicators
 - 💵 **Money Animations** - Floating gains/losses for feedback
 - ⚠️ **16-Type Warning System** - Prioritized alerts for issues
 - 🎨 **Clean, Responsive UI** - Works on desktop and mobile
@@ -79,19 +79,19 @@ npm run preview  # Test production build locally
 ### Getting Started
 
 1. **Build Essential Facilities**
-   - Dormitory ($300) - Sleeping quarters
-   - Cafeteria ($500) - Food service
-   - Bathroom ($200) - Hygiene facilities
+   - Dormitory (₱15,000) - Sleeping quarters
+   - Cafeteria (₱25,000) - Food service
+   - Bathroom (₱10,000) - Hygiene facilities
    
 2. **Manage Your Economy**
-   - Starting budget: $2,000
+   - Starting budget: ₱100,000
    - Donations arrive every 90 seconds
    - Maintenance due every 5 minutes
    - Daily operating costs accumulate
 
 3. **Care for Residents**
    - Meet their needs (sleep, food, hygiene)
-   - Keep happiness above 20% to prevent departures
+   - Keep health above 20% to prevent departures
    - Help them progress through LIFE stages
 
 4. **Grow Your Shelter**
@@ -114,30 +114,29 @@ npm run preview  # Test production build locally
 
 | Room | Size | Cost | Unlocks At |
 |------|------|------|------------|
-| Dormitory | 3×3 | $300 | Tier 1 |
-| Cafeteria | 5×3 | $500 | Tier 1 |
-| Bathroom | 2×2 | $200 | Tier 1 |
-| Common Room | 3×3 | $350 | Tier 1 |
-| Fundraiser Station | 3×2 | $400 | Tier 1 |
-| Learning Center | 4×3 | $450 | Tier 2 |
-| Admin Office | 2×2 | $700 | Tier 2 |
-| Vocational Room | 4×3 | $550 | Tier 3 |
+| Dormitory | 3×3 | ₱15,000 | Tier 1 |
+| Cafeteria | 5×3 | ₱25,000 | Tier 1 |
+| Bathroom | 2×2 | ₱10,000 | Tier 1 |
+| Common Room | 3×3 | ₱17,500 | Tier 1 |
+| Fundraiser Station | 3×2 | ₱20,000 | Tier 1 |
+| Clinic | 3×3 | ₱20,000 | Tier 1 |
+| Admin Office | 2×2 | ₱35,000 | Tier 2 |
 
 ### Shelter Tiers
 
-| Tier | Name | Capacity | Grid | Donation Bonus |
-|------|------|----------|------|----------------|
-| 1 | Starter Shelter | 10 | 10×10 | 1.0x |
-| 2 | Community Hub | 25 | 15×15 | 1.2x |
-| 3 | Opportunity Center | 50 | 20×20 | 1.5x |
-| 4 | Campus | 100 | 25×25 | 2.0x |
+| Tier | Name | Capacity | Donation Bonus |
+|------|------|----------|----------------|
+| 1 | Starter Shelter | 10 | 1.0x |
+| 2 | Community Hub | 25 | 1.2x |
+| 3 | Opportunity Center | 50 | 1.5x |
+| 4 | Campus | 100 | 2.0x |
 
 ### Tips for Success
 
 - 🏗️ **Place rooms strategically** - Adjacency bonuses can boost LIFE progression by 15%!
-- 💰 **Maintain a buffer** - Keep $200+ to handle emergencies
+- 💰 **Maintain a buffer** - Keep ₱10,000+ to handle emergencies
 - 🍽️ **Balance food costs** - Standard is break-even; Generous accelerates progress
-- 🎪 **Time fundraisers** - Run them when happiness is high (80%+) for 95% success
+- 🎪 **Time fundraisers** - Run them when health is high (80%+) for 95% success
 - 📊 **Watch the dashboard** - It predicts bankruptcy days in advance
 - 🌊 **Consider disaster carefully** - High rewards but can overwhelm your capacity
 
@@ -179,7 +178,7 @@ open-arms/
 1. **Build facilities** to house and serve residents
 2. **Manage income** through donations and fundraisers
 3. **Pay expenses** (food, maintenance, operations)
-4. **Keep residents happy** to prevent departures
+4. **Keep residents healthy** to prevent departures
 5. **Graduate residents** for reputation and rewards
 6. **Upgrade tiers** to expand capacity and unlock rooms
 7. **Survive disasters** for bonus rewards
@@ -187,20 +186,20 @@ open-arms/
 ### Economic Flow
 ```
 Income Sources:
-  Donations (every 90s) → $25/resident × tier multiplier
-  Fundraisers (manual) → $150-350 (if successful)
-  Graduation bonuses → $500 + reputation
+  Donations (every 90s) → ₱1,250/resident × tier multiplier
+  Fundraisers (manual) → ₱7,500-17,500 (if successful)
+  Graduation bonuses → ₱25,000 + reputation
 
 Expenses:
-  Food → $5-50/resident (based on portion)
+  Food → ₱250-2,500/resident (based on delivery level)
   Maintenance → Sum of room costs (every 5 min)
-  Operations → $100 + $5/resident + $10/room (daily)
-  Random events → $50-200 (15% chance)
+  Operations → ₱5,000 + ₱250/resident + ₱500/room (daily)
+  Random events → ₱2,500-10,000 (15% chance)
 ```
 
 ### Progression Metrics
 - **LIFE Meter**: 0-100% (4 stages to graduation)
-- **Reputation**: 0-100% (affects donations, spawning)
+- **Reputation**: 0-100% (affects donations and event outcomes)
 - **Tier**: 1-4 (unlocks rooms, capacity, bonuses)
 - **Graduations**: Track your total impact
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './MoneyAnimations.css';
+import { formatMoney } from '../utils/helpers';
 
 // ============================================================================
 // Types
@@ -104,8 +105,8 @@ const MoneyChangeFloat: React.FC<MoneyChangeFloatProps> = ({ change, index, onCo
   
   const isIncome = change.type === 'income';
   const formattedAmount = isIncome 
-    ? `+$${Math.abs(change.amount).toLocaleString()}`
-    : `-$${Math.abs(change.amount).toLocaleString()}`;
+    ? `+${formatMoney(Math.abs(change.amount))}`
+    : `-${formatMoney(Math.abs(change.amount))}`;
   
   return (
     <div 
@@ -243,7 +244,7 @@ export const AnimatedMoneyDisplay: React.FC<AnimatedMoneyDisplayProps> = ({
     
     // Trigger pulse effect
     const isIncome = difference > 0;
-    const isLarge = Math.abs(difference) > 200;
+    const isLarge = Math.abs(difference) > 10000;
     const newPulseClass = isIncome 
       ? (isLarge ? 'pulse-income-large' : 'pulse-income')
       : (isLarge ? 'pulse-expense-large' : 'pulse-expense');
@@ -307,7 +308,7 @@ export const AnimatedMoneyDisplay: React.FC<AnimatedMoneyDisplayProps> = ({
       className={`animated-money-display ${className} ${pulseClass} ${warningClass}`}
       style={{ color: getColor() }}
     >
-      ${displayValue.toLocaleString()}
+      {formatMoney(displayValue)}
       {warningLevel === 'critical' && ' ⚠️'}
       {warningLevel === 'debt' && ' ⚡'}
     </span>

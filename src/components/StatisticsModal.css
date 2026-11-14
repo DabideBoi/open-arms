@@ -16,7 +16,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(20, 25, 35, 0.98);
-  border: 2px solid #4a9eff;
+  border: 2px solid #8cc152;
   border-radius: 12px;
   padding: 24px;
   min-width: 550px;
@@ -24,22 +24,22 @@
   max-height: 85vh;
   overflow-y: auto;
   z-index: 10000;
-  box-shadow: 0 8px 32px rgba(74, 158, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(140,193,82,0.3);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .statistics-modal h2 {
   margin: 0 0 20px 0;
-  color: #4a9eff;
+  color: #8cc152;
   font-size: 24px;
   text-align: center;
-  border-bottom: 2px solid rgba(74, 158, 255, 0.3);
+  border-bottom: 2px solid rgba(140,193,82,0.3);
   padding-bottom: 12px;
 }
 
 .statistics-modal h3 {
   margin: 0 0 12px 0;
-  color: #6eb8ff;
+  color: #a4d46b;
   font-size: 16px;
   display: flex;
   align-items: center;
@@ -82,9 +82,9 @@
 .statistics-section {
   margin-bottom: 20px;
   padding: 16px;
-  background: rgba(74, 158, 255, 0.05);
+  background: rgba(140,193,82,0.05);
   border-radius: 8px;
-  border: 1px solid rgba(74, 158, 255, 0.2);
+  border: 1px solid rgba(140,193,82,0.2);
 }
 
 .statistics-content {
@@ -194,7 +194,7 @@
 }
 
 .mitigation-label {
-  color: #6eb8ff;
+  color: #a4d46b;
   font-weight: 600;
   display: block;
   margin-bottom: 8px;
@@ -224,14 +224,14 @@
   padding: 16px;
   border-radius: 8px;
   text-align: center;
-  border: 1px solid rgba(74, 158, 255, 0.2);
+  border: 1px solid rgba(140,193,82,0.2);
 }
 
 .stat-card .stat-value {
   display: block;
   font-size: 28px;
   font-weight: bold;
-  color: #4a9eff;
+  color: #8cc152;
   margin-bottom: 4px;
 }
 
@@ -308,7 +308,7 @@
 }
 
 .progress-label {
-  color: #6eb8ff;
+  color: #a4d46b;
   font-weight: 600;
   display: block;
   margin-bottom: 10px;
@@ -324,9 +324,9 @@
   display: flex;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(147, 112, 219, 0.2);
+  background: rgba(140,193,82,0.2);
   border-radius: 6px;
-  border: 1px solid rgba(147, 112, 219, 0.3);
+  border: 1px solid rgba(140,193,82,0.3);
 }
 
 .resident-name {
@@ -388,11 +388,11 @@
 .food-settings {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(74, 158, 255, 0.2);
+  border-top: 1px solid rgba(140,193,82,0.2);
 }
 
 .settings-label {
-  color: #6eb8ff;
+  color: #a4d46b;
   font-weight: 600;
   display: block;
   margin-bottom: 12px;
@@ -406,8 +406,8 @@
 
 .food-option {
   padding: 8px 14px;
-  background: rgba(74, 158, 255, 0.15);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: rgba(140,193,82,0.15);
+  border: 1px solid rgba(140,193,82,0.3);
   border-radius: 6px;
   color: #ccc;
   cursor: pointer;
@@ -416,14 +416,14 @@
 }
 
 .food-option:hover {
-  background: rgba(74, 158, 255, 0.25);
-  border-color: rgba(74, 158, 255, 0.5);
+  background: rgba(140,193,82,0.25);
+  border-color: rgba(140,193,82,0.5);
   color: #fff;
 }
 
 .food-option.active {
-  background: rgba(74, 158, 255, 0.4);
-  border-color: #4a9eff;
+  background: rgba(140,193,82,0.4);
+  border-color: #8cc152;
   color: #fff;
   font-weight: 600;
 }
@@ -432,7 +432,7 @@
 .statistics-footer {
   margin-top: 20px;
   padding-top: 12px;
-  border-top: 1px solid rgba(74, 158, 255, 0.2);
+  border-top: 1px solid rgba(140,193,82,0.2);
   text-align: center;
 }
 
@@ -452,12 +452,12 @@
 }
 
 .statistics-modal::-webkit-scrollbar-thumb {
-  background: #4a9eff;
+  background: #8cc152;
   border-radius: 4px;
 }
 
 .statistics-modal::-webkit-scrollbar-thumb:hover {
-  background: #6eb8ff;
+  background: #a4d46b;
 }
 
 /* Responsive adjustments */

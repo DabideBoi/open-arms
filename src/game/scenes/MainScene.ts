@@ -1,48 +1,47 @@
 import Phaser from 'phaser';
 import { GameStateManager } from '../systems/GameStateManager';
 import { GameState, Room, Resident, RoomType, StatusBarVisibilityMode, ResidentState } from '../../types';
-import { GRID_CONFIG, COLORS, ROOM_SPECS, STATUS_BAR_CONFIG, STATUS_ICONS } from '../../constants';
-import { getInitials } from '../../utils/helpers';
-import { GameClock, ThrottledUpdater, PauseManager } from '../systems/TimerManager';
+import { GRID_CONFIG, COLORS, ROOM_SPECS, STATUS_BAR_CONFIG, STATUS_ICONS, roomKind } from '../../constants';
+import { ROOM_LOOKS, residentFrame } from '../../constants/roomLooks';
+import { GameClock, ThrottledUpdater, PauseManager, shiftGameStateTimestamps } from '../systems/TimerManager';
 import { checkDayNightTransition } from '../systems/DayNightSystem';
-import { updateAllResidents, updateResidentMovement, updateAllResidentHappiness } from '../systems/ResidentAISystem';
+import { updateAllResidents, updateResidentMovement, updateAllResidentHealth } from '../systems/ResidentAISystem';
 import { AutoSaveManager, loadGame, saveGame } from '../systems/SaveLoadSystem';
 import { checkDonation } from '../systems/DonationSystem';
 import { checkMaintenance } from '../systems/MaintenanceSystem';
 import { updateAllResidentsLife } from '../systems/LIFEMeterSystem';
 import { checkFundraiserCompletion } from '../systems/FundraiserSystem';
-import { checkResidentSpawning } from '../systems/ResidentSpawningSystem';
 import { updateSpatialGrid } from '../systems/PathfindingSystem';
 import { initializeCollisionDetection, rebuildOccupancyMap } from '../systems/CollisionDetectionSystem';
-import { updateFoodGeneration, initializeCafeteriaGeneration, removeCafeteriaGeneration } from '../systems/FoodSystem';
+import { updateFoodGeneration, initializeCafeteriaGeneration, removeCafeteriaGeneration, shiftCafeteriaTimers } from '../systems/FoodSystem';
 
 /**
  * Main game scene with optimized rendering (culling, object pooling, dirty flags)
  */
 /**
- * Resident Status UI - Manages LIFE and Happiness bars above residents
+ * Resident Status UI - Manages LIFE and Health bars above residents
  */
 class ResidentStatusUI {
   private lifeBar: Phaser.GameObjects.Graphics;
-  private happinessBar: Phaser.GameObjects.Graphics;
+  private healthBar: Phaser.GameObjects.Graphics;
   private statusIcon: Phaser.GameObjects.Text;
   private container: Phaser.GameObjects.Container;
   private lastLifeValue: number = -1;
-  private lastHappinessValue: number = -1;
+  private lastHealthValue: number = -1;
   private lastState: string = '';
   private pulseTime: number = 0;
   
   constructor(scene: Phaser.Scene) {
     this.container = scene.add.container(0, 0);
     this.lifeBar = scene.add.graphics();
-    this.happinessBar = scene.add.graphics();
+    this.healthBar = scene.add.graphics();
     this.statusIcon = scene.add.text(0, -18, '', {
       fontSize: '10px',
       resolution: 2
     });
     this.statusIcon.setOrigin(0.5, 0.5);
     
-    this.container.add([this.lifeBar, this.happinessBar, this.statusIcon]);
+    this.container.add([this.lifeBar, this.healthBar, this.statusIcon]);
     this.container.setDepth(15); // Above residents (10) but below placement preview (100)
   }
   
@@ -53,26 +52,26 @@ class ResidentStatusUI {
     // Only redraw if values changed
     const needsRedraw = forceRedraw ||
       this.lastLifeValue !== resident.lifeMeter ||
-      this.lastHappinessValue !== resident.happiness ||
+      this.lastHealthValue !== resident.health ||
       this.lastState !== resident.currentState;
     
     if (needsRedraw) {
       this.drawLifeBar(resident.lifeMeter);
-      this.drawHappinessBar(resident.happiness, resident.isAtRisk);
+      this.drawHealthBar(resident.health, resident.isAtRisk);
       this.updateStatusIcon(resident);
       
       this.lastLifeValue = resident.lifeMeter;
-      this.lastHappinessValue = resident.happiness;
+      this.lastHealthValue = resident.health;
       this.lastState = resident.currentState;
     }
     
-    // Update pulse animation for critical happiness
-    if (resident.happiness < STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD) {
+    // Update pulse animation for critical health
+    if (resident.health < STATUS_BAR_CONFIG.HEALTH_LOW_THRESHOLD) {
       this.pulseTime += 16; // Approximate frame time
       const pulseAlpha = 0.7 + Math.sin(this.pulseTime / STATUS_BAR_CONFIG.PULSE_SPEED * Math.PI * 2) * 0.3;
-      this.happinessBar.setAlpha(pulseAlpha);
+      this.healthBar.setAlpha(pulseAlpha);
     } else {
-      this.happinessBar.setAlpha(1);
+      this.healthBar.setAlpha(1);
     }
     
     // Glow effect for near-graduation residents
@@ -109,36 +108,36 @@ class ResidentStatusUI {
     this.lifeBar.strokeRect(-halfWidth, 0, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.BAR_HEIGHT);
   }
   
-  private drawHappinessBar(value: number, isAtRisk: boolean): void {
-    this.happinessBar.clear();
+  private drawHealthBar(value: number, isAtRisk: boolean): void {
+    this.healthBar.clear();
     
     const halfWidth = STATUS_BAR_CONFIG.BAR_WIDTH / 2;
     const yOffset = STATUS_BAR_CONFIG.BAR_HEIGHT + STATUS_BAR_CONFIG.GAP_BETWEEN_BARS;
     
     // Background
-    this.happinessBar.fillStyle(STATUS_BAR_CONFIG.BACKGROUND_COLOR, STATUS_BAR_CONFIG.BACKGROUND_ALPHA);
-    this.happinessBar.fillRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+    this.healthBar.fillStyle(STATUS_BAR_CONFIG.BACKGROUND_COLOR, STATUS_BAR_CONFIG.BACKGROUND_ALPHA);
+    this.healthBar.fillRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HEALTH_BAR_HEIGHT);
     
     // Determine color based on value
     let color: number;
-    if (value >= STATUS_BAR_CONFIG.HAPPINESS_HIGH_THRESHOLD) {
-      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_HIGH;
-    } else if (value >= STATUS_BAR_CONFIG.HAPPINESS_MEDIUM_THRESHOLD) {
-      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_MEDIUM;
-    } else if (value >= STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD) {
-      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_LOW;
+    if (value >= STATUS_BAR_CONFIG.HEALTH_HIGH_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HEALTH_COLOR_HIGH;
+    } else if (value >= STATUS_BAR_CONFIG.HEALTH_MEDIUM_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HEALTH_COLOR_MEDIUM;
+    } else if (value >= STATUS_BAR_CONFIG.HEALTH_LOW_THRESHOLD) {
+      color = STATUS_BAR_CONFIG.HEALTH_COLOR_LOW;
     } else {
-      color = STATUS_BAR_CONFIG.HAPPINESS_COLOR_CRITICAL;
+      color = STATUS_BAR_CONFIG.HEALTH_COLOR_CRITICAL;
     }
     
     // Fill bar
     const fillWidth = STATUS_BAR_CONFIG.BAR_WIDTH * (value / 100);
-    this.happinessBar.fillStyle(color, 1);
-    this.happinessBar.fillRect(-halfWidth, yOffset, fillWidth, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+    this.healthBar.fillStyle(color, 1);
+    this.healthBar.fillRect(-halfWidth, yOffset, fillWidth, STATUS_BAR_CONFIG.HEALTH_BAR_HEIGHT);
     
     // Border
-    this.happinessBar.lineStyle(1, 0x000000, 0.3);
-    this.happinessBar.strokeRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HAPPINESS_BAR_HEIGHT);
+    this.healthBar.lineStyle(1, 0x000000, 0.3);
+    this.healthBar.strokeRect(-halfWidth, yOffset, STATUS_BAR_CONFIG.BAR_WIDTH, STATUS_BAR_CONFIG.HEALTH_BAR_HEIGHT);
   }
   
   private updateStatusIcon(resident: Resident): void {
@@ -163,15 +162,15 @@ class ResidentStatusUI {
         }
         break;
       default:
-        // Fall back to happiness-based icons
+        // Fall back to health-based icons
         if (resident.isAtRisk) {
           icon = STATUS_ICONS.AT_RISK;
-        } else if (resident.happiness > 80) {
-          icon = STATUS_ICONS.HAPPY;
-        } else if (resident.happiness >= 40) {
+        } else if (resident.health > 80) {
+          icon = STATUS_ICONS.HEALTHY;
+        } else if (resident.health >= 40) {
           icon = STATUS_ICONS.NEUTRAL;
-        } else if (resident.happiness >= 20) {
-          icon = STATUS_ICONS.UNHAPPY;
+        } else if (resident.health >= 20) {
+          icon = STATUS_ICONS.UNHEALTHY;
         } else {
           icon = STATUS_ICONS.AT_RISK;
         }
@@ -191,7 +190,7 @@ class ResidentStatusUI {
 
   destroy(): void {
     this.lifeBar.destroy();
-    this.happinessBar.destroy();
+    this.healthBar.destroy();
     this.statusIcon.destroy();
     this.container.destroy();
   }
@@ -208,12 +207,15 @@ class ResidentStatusUI {
  * a directional lead, idle breathing, a sleep pose, and spawn / despawn
  * flourishes. This is what turns "dots on a grid" into "little people".
  */
+const RESIDENT_SCALE = GRID_CONFIG.TILE_SIZE / 16; // 16px art -> one game tile
+const BODY_Y = -2;                                  // lifts the sprite so its feet sit on the ring
+
+
 class ResidentSprite {
   readonly container: Phaser.GameObjects.Container;
   private shadow: Phaser.GameObjects.Ellipse;
-  private body: Phaser.GameObjects.Arc;
-  private highlight: Phaser.GameObjects.Arc;
-  private initials: Phaser.GameObjects.Text;
+  private body: Phaser.GameObjects.Image;
+  private ring: Phaser.GameObjects.Ellipse; // state-coloured ring under the feet
   private readonly radius: number;
 
   // Position (world pixels)
@@ -231,7 +233,8 @@ class ResidentSprite {
   private facing = 1;          // -1 left, +1 right
   private lead = 0;            // smoothed horizontal lean into travel
   private speed = 0;           // smoothed px/sec
-  private sleepBlend = 0;      // 0 = awake, 1 = curled up asleep
+  private sleepBlend = 0;      // 0 = awake, 1 = lying in bed
+  private lieDir = 1;         // +1 head to the right, -1 head to the left (toward the pillow)
 
   // Lifecycle
   private spawnT = 0;          // 0..1 pop-in
@@ -243,25 +246,17 @@ class ResidentSprite {
 
   private state: ResidentState = 'idle';
 
-  constructor(scene: Phaser.Scene, worldX: number, worldY: number, color: number, initials: string) {
+  constructor(scene: Phaser.Scene, worldX: number, worldY: number, color: number, frame: number) {
     this.radius = GRID_CONFIG.TILE_SIZE / 3;
     const r = this.radius;
 
-    this.shadow = scene.add.ellipse(0, r * 0.98, r * 2.25, r * 0.95, 0x05070b, 0.32);
-    this.body = scene.add.circle(0, 0, r, color);
-    this.body.setStrokeStyle(2, 0x0e1218, 0.9);
-    // Soft top-left rim light gives the token a rounded, lit-from-above feel
-    this.highlight = scene.add.circle(-r * 0.34, -r * 0.42, r * 0.44, 0xffffff, 0.30);
-    this.initials = scene.add.text(0, 0, initials, {
-      fontSize: '9px',
-      fontFamily: 'Inter, Arial, sans-serif',
-      fontStyle: 'bold',
-      color: '#ffffff',
-      resolution: 2,
-    });
-    this.initials.setOrigin(0.5, 0.5);
+    this.shadow = scene.add.ellipse(0, 12, 20, 8, 0x05070b, 0.32);
+    this.ring = scene.add.ellipse(0, 12, 26, 11);
+    this.ring.setStrokeStyle(2, color, 0.95);
+    this.body = scene.add.image(0, BODY_Y, 'chars', frame);
+    this.body.setScale(RESIDENT_SCALE);
 
-    this.container = scene.add.container(worldX, worldY, [this.shadow, this.body, this.highlight, this.initials]);
+    this.container = scene.add.container(worldX, worldY, [this.shadow, this.ring, this.body]);
     this.container.setDepth(10);
     this.container.setScale(0.001); // grows in via spawn pop
 
@@ -272,14 +267,15 @@ class ResidentSprite {
   }
 
   setColor(color: number): void {
-    this.body.setFillStyle(color);
+    this.ring.setStrokeStyle(2, color, 0.95);
   }
 
   /** Called from render each frame with the resident's authoritative position/state. */
-  setTarget(worldX: number, worldY: number, resident: Resident): void {
+  setTarget(worldX: number, worldY: number, resident: Resident, lieDir = 1): void {
     this.targetX = worldX;
     this.targetY = worldY;
     this.state = resident.currentState;
+    this.lieDir = lieDir;
   }
 
   setVisible(v: boolean): void {
@@ -358,28 +354,25 @@ class ResidentSprite {
     let sx = 1 - Math.sin(this.bobPhase * 2) * 0.06 * this.moveBlend + breathe;
     let sy = 1 + Math.sin(this.bobPhase * 2) * 0.06 * this.moveBlend - breathe;
 
-    // Sleep pose: settle down, flatten and slow-breathe
-    const sleepBob = this.sleepBlend * r * 0.28;
+    // Sleep pose: lie down (rotated toward the pillow) and slow-breathe
+    const sleepBob = this.sleepBlend * r * 0.4;
     const sleepBreath = Math.sin(this.breathePhase * 0.5) * 0.03 * this.sleepBlend;
-    sx = sx * (1 - this.sleepBlend) + (1.22 + sleepBreath) * this.sleepBlend;
-    sy = sy * (1 - this.sleepBlend) + (0.62 - sleepBreath) * this.sleepBlend;
+    sx = sx * (1 - this.sleepBlend) + (1 + sleepBreath) * this.sleepBlend;
+    sy = sy * (1 - this.sleepBlend) + (1 - sleepBreath) * this.sleepBlend;
 
     const bodyY = walkHop + sleepBob;
 
-    this.body.setScale(this.facing * sx, sy);
-    this.body.y = bodyY;
-    this.highlight.setScale(sx, sy);
-    this.highlight.y = bodyY;
-    this.highlight.x = -r * 0.34 + this.lead * 0.4;
-    this.initials.y = bodyY * 0.5; // initials ride a little, stay legible
+    this.body.setScale((this.sleepBlend > 0.5 ? 1 : this.facing) * sx * RESIDENT_SCALE, sy * RESIDENT_SCALE);
+    this.body.setRotation(this.lieDir * (Math.PI / 2) * this.sleepBlend);
+    this.body.y = bodyY + BODY_Y;
     this.body.x = this.lead;
-    this.initials.x = this.lead;
 
     // Shadow shrinks & fades as the body lifts off the ground
     const lift = -walkHop / 3.4; // 0..1
     const shadowScale = 1 - lift * 0.28 + this.sleepBlend * 0.15;
     this.shadow.setScale(shadowScale, shadowScale);
-    this.shadow.setAlpha(0.32 - lift * 0.12);
+    this.shadow.setAlpha((0.32 - lift * 0.12) * (1 - this.sleepBlend * 0.7));
+    this.ring.setAlpha(1 - this.sleepBlend * 0.65);
 
     // Lifecycle scale + alpha
     const spawnScale = ResidentSprite.backOut(this.spawnT);
@@ -387,7 +380,7 @@ class ResidentSprite {
     const dieLift = this.dying ? this.dieT * 26 : 0;
     this.container.setScale(spawnScale * dieScale);
     this.container.setPosition(this.renderX, this.renderY - dieLift);
-    this.container.setAlpha((this.dying ? 1 - this.dieT : 1) * (1 - this.sleepBlend * 0.35));
+    this.container.setAlpha((this.dying ? 1 - this.dieT : 1) * (1 - this.sleepBlend * 0.15));
 
     return true;
   }
@@ -407,10 +400,12 @@ class ResidentSprite {
 export class MainScene extends Phaser.Scene {
   private gameStateManager!: GameStateManager;
   private gridGraphics!: Phaser.GameObjects.Graphics;
-  private roomGraphics!: Phaser.GameObjects.Graphics;
+  private floorGraphics!: Phaser.GameObjects.Graphics;   // checker floors drawn in code
+  private wallGraphics!: Phaser.GameObjects.Graphics;
+  private roomGraphics!: Phaser.GameObjects.Graphics;     // closed-room dimming, outlines, occupancy bars
   private roomFxGraphics!: Phaser.GameObjects.Graphics;  // animated room effects (fundraiser glow, occupancy pulse)
   private residentViews: Map<string, ResidentSprite> = new Map();
-  private roomImages: Map<string, Phaser.GameObjects.Image> = new Map();
+  private roomObjects: Map<string, Phaser.GameObjects.Image[]> = new Map(); // floor + furniture sprites per room id
   private knownRoomIds: Set<string> = new Set();          // to detect freshly-placed rooms
   private roomsSeeded: boolean = false;                    // suppress placement FX on first render
 
@@ -420,6 +415,7 @@ export class MainScene extends Phaser.Scene {
 
   // Game systems
   private gameClock!: GameClock;
+  private lastFundraiserTick = 0; // wall-clock ms of the previous frame, for the night freeze
   private throttledUpdater!: ThrottledUpdater;
   private pauseManager!: PauseManager;
   private autoSaveManager!: AutoSaveManager;
@@ -470,11 +466,9 @@ export class MainScene extends Phaser.Scene {
    * Preload assets
    */
   preload() {
-    // Load room images
-    this.load.image('rooms/learning_center', 'assets/rooms/learning_center.png');
-    this.load.image('rooms/dormitory', 'assets/rooms/dormitory.png');
-    this.load.image('rooms/cafeteria', 'assets/rooms/cafeteria.png');
-    this.load.image('rooms/fundraser_station', 'assets/rooms/fundraser_station.png');
+    // Kenney CC0 sheets: 16px tiles with a 1px gap
+    this.load.spritesheet('indoor', 'assets/kenney/indoor.png', { frameWidth: 16, frameHeight: 16, spacing: 1 });
+    this.load.spritesheet('chars', 'assets/kenney/chars.png', { frameWidth: 16, frameHeight: 16, spacing: 1 });
   }
   
   /**
@@ -505,8 +499,15 @@ export class MainScene extends Phaser.Scene {
     // Create graphics objects
     this.gridGraphics = this.add.graphics();
     this.gridGraphics.setDepth(0);
+    // Layers: ground 0, floors 1, walls 2, furniture 3, room overlays 4, night wash 6, residents 10
+    this.textures.get('indoor').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get('chars').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.floorGraphics = this.add.graphics();
+    this.floorGraphics.setDepth(1);
+    this.wallGraphics = this.add.graphics();
+    this.wallGraphics.setDepth(2);
     this.roomGraphics = this.add.graphics();
-    this.roomGraphics.setDepth(1);
+    this.roomGraphics.setDepth(4);
     this.roomFxGraphics = this.add.graphics();
     this.roomFxGraphics.setDepth(9); // animated room glows, just under residents (10)
     this.placementPreview = this.add.graphics();
@@ -523,7 +524,7 @@ export class MainScene extends Phaser.Scene {
     initializeCollisionDetection(initialState.residents);
     
     // Initialize food generation for existing cafeterias
-    const cafeterias = initialState.rooms.filter(room => room.type === 'cafeteria');
+    const cafeterias = initialState.rooms.filter(room => roomKind(room.type) === 'cafeteria');
     cafeterias.forEach(cafeteria => {
       initializeCafeteriaGeneration(cafeteria.id);
       console.log(`🍽️ Initialized food generation for existing cafeteria ${cafeteria.id}`);
@@ -542,7 +543,9 @@ export class MainScene extends Phaser.Scene {
       console.log("Game paused");
     });
     
-    this.pauseManager.onResume(() => {
+    this.pauseManager.onResume((pausedMs) => {
+      shiftGameStateTimestamps(this.gameStateManager.getMutableState(), pausedMs);
+      shiftCafeteriaTimers(pausedMs);
       this.gameClock.resume();
       console.log("Game resumed");
     });
@@ -623,11 +626,11 @@ export class MainScene extends Phaser.Scene {
     this.sparkEmitter = this.add.particles(0, 0, 'soft-dot', {
       lifespan: 780,
       speed: { min: 40, max: 150 },
-      scale: { start: 0.42, end: 0 },
-      alpha: { start: 1, end: 0 },
+      scale: { start: 0.28, end: 0 },
+      alpha: { start: 0.9, end: 0 },
       rotate: { min: 0, max: 360 },
       gravityY: 60,
-      blendMode: 'ADD',
+      blendMode: 'NORMAL', // additive light blows out on the bright grass
       emitting: false,
     });
     this.sparkEmitter.setDepth(30);
@@ -722,6 +725,8 @@ export class MainScene extends Phaser.Scene {
 
   /** Create a gentle pulsing glow on the entrance tile. */
   private createEntranceGlow(grid: any): void {
+    this.entranceGlow?.destroy();
+    this.entranceGlow = null;
     let ex = -1;
     let ey = -1;
     for (let y = 0; y < grid.height && ex < 0; y++) {
@@ -737,7 +742,7 @@ export class MainScene extends Phaser.Scene {
     const t = GRID_CONFIG.TILE_SIZE;
     this.entranceGlow = this.add.image(ex * t + t / 2, ey * t + t / 2, 'soft-dot');
     this.entranceGlow.setBlendMode(Phaser.BlendModes.ADD);
-    this.entranceGlow.setTint(0x22d3ee);
+    this.entranceGlow.setTint(0xffe08a);
     this.entranceGlow.setDepth(2);
     this.entranceGlow.setScale(t / 22);
   }
@@ -769,6 +774,9 @@ export class MainScene extends Phaser.Scene {
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
+    let dragScrollX = 0;
+    let dragScrollY = 0;
+    let dragMoved = false;
     
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       // Check if in placement mode
@@ -778,8 +786,11 @@ export class MainScene extends Phaser.Scene {
       }
       
       isDragging = true;
-      dragStartX = pointer.x + camera.scrollX;
-      dragStartY = pointer.y + camera.scrollY;
+      dragMoved = false;
+      dragStartX = pointer.x;
+      dragStartY = pointer.y;
+      dragScrollX = camera.scrollX;
+      dragScrollY = camera.scrollY;
     });
     
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -787,13 +798,21 @@ export class MainScene extends Phaser.Scene {
       if (this.placementMode && this.selectedRoomType) {
         this.updatePlacementPreview(pointer);
       } else if (isDragging) {
-        camera.scrollX = dragStartX - pointer.x;
-        camera.scrollY = dragStartY - pointer.y;
+        if (Math.abs(pointer.x - dragStartX) + Math.abs(pointer.y - dragStartY) > 4) dragMoved = true;
+        camera.scrollX = dragScrollX - (pointer.x - dragStartX) / camera.zoom;
+        camera.scrollY = dragScrollY - (pointer.y - dragStartY) / camera.zoom;
       }
     });
     
-    this.input.on('pointerup', () => {
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      // A click without dragging selects the resident under the cursor (or clears)
+      if (isDragging && !dragMoved) this.selectResidentAt(pointer);
       isDragging = false;
+    });
+
+    // Mouse wheel zoom
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
+      this.zoomBy(dy > 0 ? 0.9 : 1.1);
     });
     
     // ESC key to cancel placement
@@ -851,9 +870,9 @@ export class MainScene extends Phaser.Scene {
       updateAllResidents(gameState, deltaTime);
     }
     
-    // Throttled: Happiness decay (every 10 seconds)
-    if (this.throttledUpdater.shouldUpdate("happiness_decay", 10)) {
-      updateAllResidentHappiness(gameState, 10);
+    // Throttled: Health decay (every 10 seconds)
+    if (this.throttledUpdater.shouldUpdate("health_decay", 10)) {
+      updateAllResidentHealth(gameState, 10);
     }
     
     // Throttled: LIFE meter updates (every 10 seconds)
@@ -873,11 +892,16 @@ export class MainScene extends Phaser.Scene {
     // Check maintenance timer
     checkMaintenance(gameState);
     
+    // Fundraisers don't progress at night: push deadlines forward by the real time elapsed
+    const nowMs = Date.now();
+    if (gameState.currentPhase === 'night' && this.lastFundraiserTick > 0) {
+      const ms = Math.min(nowMs - this.lastFundraiserTick, 1000);
+      for (const f of gameState.activeFundraisers) { f.startedAt += ms; f.completesAt += ms; }
+    }
+    this.lastFundraiserTick = nowMs;
+
     // Check fundraiser completion
     checkFundraiserCompletion(gameState);
-    
-    // Check resident spawning
-    checkResidentSpawning(gameState);
     
     // Update bankruptcy countdown (if active)
     if (gameState.isBankrupt) {
@@ -920,6 +944,7 @@ export class MainScene extends Phaser.Scene {
     // itself only needs redrawing when its structure actually changes.
     if (this.gridDirty) {
       this.renderGrid(state.grid);
+      this.createEntranceGlow(state.grid); // the gate moves when a tier upgrade grows the grid
       this.gridDirty = false;
     }
 
@@ -995,7 +1020,7 @@ export class MainScene extends Phaser.Scene {
 
           // Subtle checkerboard shading on buildable land for readable depth
           if (isUnlocked && tile.type === "empty" && (x + y) % 2 === 0) {
-            this.gridGraphics.fillStyle(0xffffff, 0.025);
+            this.gridGraphics.fillStyle(0xffffff, 0.05);
             this.gridGraphics.fillRect(pixelX, pixelY, tileSize, tileSize);
           }
         }
@@ -1012,9 +1037,9 @@ export class MainScene extends Phaser.Scene {
       const by = ua.minY * tileSize;
       const bw = (ua.maxX - ua.minX) * tileSize;
       const bh = (ua.maxY - ua.minY) * tileSize;
-      this.gridGraphics.lineStyle(3, 0x22d3ee, 0.35);
+      this.gridGraphics.lineStyle(3, 0xf2e6c4, 0.5);
       this.gridGraphics.strokeRect(bx - 1, by - 1, bw + 2, bh + 2);
-      this.gridGraphics.lineStyle(1, 0x22d3ee, 0.15);
+      this.gridGraphics.lineStyle(1, 0xf2e6c4, 0.2);
       this.gridGraphics.strokeRect(bx - 4, by - 4, bw + 8, bh + 8);
     }
   }
@@ -1024,124 +1049,77 @@ export class MainScene extends Phaser.Scene {
    */
   private renderRooms(rooms: Room[]) {
     this.roomGraphics.clear();
+    this.floorGraphics.clear();
+    this.wallGraphics.clear();
     
     const tileSize = GRID_CONFIG.TILE_SIZE;
     const gameState = this.gameStateManager.getState();
     
-    // Track which room images are still in use
+    // Drop sprites for rooms that no longer exist
     const activeRoomIds = new Set(rooms.map(r => r.id));
-    
-    // Remove images for rooms that no longer exist
-    for (const [roomId, image] of this.roomImages.entries()) {
+    for (const [roomId, objs] of this.roomObjects.entries()) {
       if (!activeRoomIds.has(roomId)) {
-        image.destroy();
-        this.roomImages.delete(roomId);
+        objs.forEach(o => o.destroy());
+        this.roomObjects.delete(roomId);
       }
     }
-    
+
     for (const room of rooms) {
       const pixelX = room.gridX * tileSize;
       const pixelY = room.gridY * tileSize;
       const pixelWidth = room.width * tileSize;
       const pixelHeight = room.height * tileSize;
-      
-      // Check if room has an image and if it's loaded
-      const hasImage = room.image && this.textures.exists(room.image);
-      
-      if (hasImage) {
-        // Render using image
-        let roomImage = this.roomImages.get(room.id);
-        
-        if (!roomImage) {
-          // Create new image
-          roomImage = this.add.image(pixelX, pixelY, room.image!);
-          roomImage.setOrigin(0, 0);
-          roomImage.setDepth(0); // Render below residents (residents are at depth 10)
-          this.roomImages.set(room.id, roomImage);
+      const look = ROOM_LOOKS[room.type];
+
+      // Sprite floors and furniture are built once per room; the rest is redrawn every time
+      if (!this.roomObjects.has(room.id)) {
+        this.roomObjects.set(room.id, this.buildRoomSprites(room));
+        this.applyRoomTint();
+      }
+
+      // Tile floor (the sheet has no tile frame, so draw checks in code)
+      if (look.checker) {
+        const half = tileSize / 2;
+        this.floorGraphics.fillStyle(this.applyAmbientLight(look.checker[0]), 1);
+        this.floorGraphics.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
+        this.floorGraphics.fillStyle(this.applyAmbientLight(look.checker[1]), 1);
+        for (let cy = 0; cy < room.height * 2; cy++) {
+          for (let cx = 0; cx < room.width * 2; cx++) {
+            if ((cx + cy) % 2 === 1) this.floorGraphics.fillRect(pixelX + cx * half, pixelY + cy * half, half, half);
+          }
         }
-        
-        // Update image properties
-        roomImage.setPosition(pixelX, pixelY);
-        roomImage.setDisplaySize(pixelWidth, pixelHeight);
-        
-        // Apply alpha based on room state - make images semi-transparent so NPCs are visible on top
-        const hasActiveFundraiser = gameState.activeFundraisers?.some(f => f.stationId === room.id);
-        let alpha = room.isOpen ? 0.6 : 0.4; // Semi-transparent (0.6 for open, 0.4 for closed)
-        if (hasActiveFundraiser) {
-          alpha = 0.7; // Slightly more visible for active fundraisers
-        }
-        roomImage.setAlpha(alpha);
-        
-        // Apply ambient light tint
-        const tintColor = this.colorTint;
-        roomImage.setTint(tintColor);
-        
-      } else {
-        // Fallback to color rendering
-        // Remove any existing image for this room
-        const existingImage = this.roomImages.get(room.id);
-        if (existingImage) {
-          existingImage.destroy();
-          this.roomImages.delete(room.id);
-        }
-        
-        // Choose color based on room type
-        let color = COLORS.ROOM_DORMITORY;
-        switch (room.type) {
-          case "dormitory":
-            color = COLORS.ROOM_DORMITORY;
-            break;
-          case "cafeteria":
-            color = COLORS.ROOM_CAFETERIA;
-            break;
-          case "learning_center":
-            color = COLORS.ROOM_LEARNING;
-            break;
-          case "vocational_room":
-            color = COLORS.ROOM_VOCATIONAL;
-            break;
-          case "bathroom":
-            color = COLORS.ROOM_BATHROOM;
-            break;
-          case "common_room":
-            color = COLORS.ROOM_COMMON;
-            break;
-          case "admin_office":
-            color = COLORS.ROOM_ADMIN;
-            break;
-          case "fundraiser_station":
-            color = COLORS.ROOM_FUNDRAISER;
-            break;
-        }
-        
-        // Apply ambient light
-        color = this.applyAmbientLight(color);
-        
-        // Check if this room has an active fundraiser
-        const hasActiveFundraiser = gameState.activeFundraisers?.some(f => f.stationId === room.id);
-        
-        // Dim closed rooms, brighten active fundraisers
-        let alpha = room.isOpen ? 0.8 : 0.4;
-        if (hasActiveFundraiser) {
-          alpha = 0.9;
-        }
-        
-        // Draw room
-        this.roomGraphics.fillStyle(color, alpha);
+      }
+
+      // Walls: a thick back wall along the top, thin trim on the other sides.
+      // Residents can cross any edge, so there are no doors to line up with.
+      const wallFace = this.applyAmbientLight(0xd9cdb0);
+      const wallLip = this.applyAmbientLight(0xb3a487);
+      const wallEdge = this.applyAmbientLight(0x3b2f24);
+      const top = 10;
+      const trim = 4;
+      this.wallGraphics.fillStyle(wallFace, 1);
+      this.wallGraphics.fillRect(pixelX, pixelY, pixelWidth, top);
+      this.wallGraphics.fillRect(pixelX, pixelY, trim, pixelHeight);
+      this.wallGraphics.fillRect(pixelX + pixelWidth - trim, pixelY, trim, pixelHeight);
+      this.wallGraphics.fillRect(pixelX, pixelY + pixelHeight - trim, pixelWidth, trim);
+      this.wallGraphics.fillStyle(wallLip, 1);
+      this.wallGraphics.fillRect(pixelX, pixelY + top - 3, pixelWidth, 3);
+      this.wallGraphics.fillStyle(0x000000, 0.16); // soft shadow the wall casts on the floor
+      this.wallGraphics.fillRect(pixelX + trim, pixelY + top, pixelWidth - trim * 2, 4);
+      this.wallGraphics.lineStyle(2, wallEdge, 1);
+      this.wallGraphics.strokeRect(pixelX, pixelY, pixelWidth, pixelHeight);
+
+      // Closed rooms are dimmed; active fundraisers get a steady gold outline
+      // (their animated glow comes from roomFxGraphics in update()).
+      if (!room.isOpen) {
+        this.roomGraphics.fillStyle(0x0a0f1a, 0.4);
         this.roomGraphics.fillRect(pixelX, pixelY, pixelWidth, pixelHeight);
       }
-      
-      // Draw room border (for both image and color modes). Active fundraisers
-      // get their animated glow from roomFxGraphics in update(); here we just
-      // draw a steady, slightly brighter gold outline.
-      const hasActiveFundraiser = gameState.activeFundraisers?.some(f => f.stationId === room.id);
-      if (hasActiveFundraiser) {
+      if (gameState.activeFundraisers?.some(f => f.stationId === room.id)) {
         this.roomGraphics.lineStyle(3, 0xffd700, 0.75);
-      } else {
-        this.roomGraphics.lineStyle(2, 0xffffff, room.isOpen ? 0.5 : 0.2);
+        this.roomGraphics.strokeRect(pixelX, pixelY, pixelWidth, pixelHeight);
       }
-      this.roomGraphics.strokeRect(pixelX, pixelY, pixelWidth, pixelHeight);
-      
+
       // Show capacity indicator for rooms with capacity limits
       const spec = ROOM_SPECS[room.type];
       if (spec.capacity > 0 && room.currentOccupancy > 0) {
@@ -1151,11 +1129,9 @@ export class MainScene extends Phaser.Scene {
         const barX = pixelX + (pixelWidth - barWidth) / 2;
         const barY = pixelY + pixelHeight - 8;
         
-        // Background
         this.roomGraphics.fillStyle(0x000000, 0.5);
         this.roomGraphics.fillRect(barX, barY, barWidth, barHeight);
         
-        // Fill
         const fillColor = occupancyPercent >= 1 ? 0xff0000 : 0x00ff00;
         this.roomGraphics.fillStyle(fillColor, 0.8);
         this.roomGraphics.fillRect(barX, barY, barWidth * Math.min(occupancyPercent, 1), barHeight);
@@ -1174,6 +1150,40 @@ export class MainScene extends Phaser.Scene {
     this.roomsSeeded = true;
   }
 
+  /** Create the sprite floor and furniture for one room (see ROOM_LOOKS). */
+  private buildRoomSprites(room: Room): Phaser.GameObjects.Image[] {
+    const t = GRID_CONFIG.TILE_SIZE;
+    const look = ROOM_LOOKS[room.type];
+    const objs: Phaser.GameObjects.Image[] = [];
+    const place = (frame: number, x: number, y: number, depth: number, base: number, flip = false) => {
+      const img = this.add.image((room.gridX + x) * t, (room.gridY + y) * t, 'indoor', frame);
+      img.setOrigin(0, 0).setScale(t / 16).setDepth(depth).setFlipX(flip).setData('base', base);
+      objs.push(img);
+    };
+    if (!look.checker) {
+      for (let y = 0; y < room.height; y++) {
+        for (let x = 0; x < room.width; x++) place(look.floor, x, y, 1, look.tint ?? 0xffffff);
+      }
+    }
+    for (const p of look.props) {
+      if (p.x < room.width && p.y < room.height) place(p.f, p.x, p.y, 3, 0xffffff, p.flip);
+    }
+    return objs;
+  }
+
+  /** Multiply each sprite's own base tint by the current day/night tint. */
+  private applyRoomTint(): void {
+    for (const objs of this.roomObjects.values()) {
+      for (const o of objs) o.setTint(MainScene.mulColor(o.getData('base') ?? 0xffffff, this.colorTint));
+    }
+  }
+
+  /** Multiply two 0xRRGGBB colours channel by channel. */
+  private static mulColor(a: number, b: number): number {
+    const ch = (shift: number) => ((((a >> shift) & 255) * ((b >> shift) & 255)) / 255) | 0;
+    return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+  }
+
   /** A satisfying sparkle + light flash when a room is placed. */
   private playRoomPlacement(room: Room): void {
     const t = GRID_CONFIG.TILE_SIZE;
@@ -1189,6 +1199,7 @@ export class MainScene extends Phaser.Scene {
     flash.setBlendMode(Phaser.BlendModes.ADD);
     flash.setTint(0xffe08a);
     flash.setDepth(8);
+    flash.setAlpha(0.45);
     flash.setScale((Math.max(room.width, room.height) * t) / 40);
     this.tweens.add({
       targets: flash,
@@ -1202,7 +1213,7 @@ export class MainScene extends Phaser.Scene {
 
   /** Resolve a resident's body colour from their profile. */
   private residentColor(resident: Resident): number {
-    if (resident.profile === 'veteran') return COLORS.RESIDENT_VETERAN;
+    if (resident.profile === 'adult') return COLORS.RESIDENT_ADULT;
     if (resident.profile === 'elderly') return COLORS.RESIDENT_ELDERLY;
     return COLORS.RESIDENT_YOUNG;
   }
@@ -1220,11 +1231,12 @@ export class MainScene extends Phaser.Scene {
     const statusBarSettings = gameState.statusBarSettings;
 
     const padding = tileSize * 3;
+    const wv = camera.worldView;
     const vb = {
-      left: camera.scrollX - padding,
-      right: camera.scrollX + camera.width + padding,
-      top: camera.scrollY - padding,
-      bottom: camera.scrollY + camera.height + padding,
+      left: wv.x - padding,
+      right: wv.right + padding,
+      top: wv.y - padding,
+      bottom: wv.bottom + padding,
     };
 
     const currentIds = new Set(residents.map(r => r.id));
@@ -1254,16 +1266,22 @@ export class MainScene extends Phaser.Scene {
 
       let view = this.residentViews.get(resident.id);
       if (!view) {
-        view = new ResidentSprite(this, pixelX, pixelY, this.residentColor(resident), getInitials(resident.name));
+        view = new ResidentSprite(this, pixelX, pixelY, this.residentColor(resident), residentFrame(resident.id, resident.gender));
         this.residentViews.set(resident.id, view);
         if (isVisible) {
           // Arrival flourish
-          this.sparkEmitter.setParticleTint(0x9fe8ff);
+          this.sparkEmitter.setParticleTint(0xfff1c2);
           this.sparkEmitter.emitParticleAt(pixelX, pixelY, 9);
         }
       }
 
-      view.setTarget(pixelX, pixelY, resident);
+      // Sleepers lie head-toward-pillow: the left bed tile of a pair has its pillow on the right, and vice versa.
+      let lieDir = 1;
+      if (resident.currentState === 'sleeping') {
+        const bedRoom = gameState.rooms.find(r => r.id === resident.targetRoomId);
+        if (bedRoom && Math.floor(resident.gridX) > bedRoom.gridX) lieDir = -1;
+      }
+      view.setTarget(pixelX, pixelY, resident, lieDir);
       view.setVisible(isVisible);
       if (isVisible) visibleCount++;
 
@@ -1295,41 +1313,50 @@ export class MainScene extends Phaser.Scene {
       case 'hover':
         return this.hoveredResidentId === resident.id;
       case 'at-risk':
-        return resident.isAtRisk || resident.happiness < STATUS_BAR_CONFIG.HAPPINESS_LOW_THRESHOLD;
+        return resident.isAtRisk || resident.health < STATUS_BAR_CONFIG.HEALTH_LOW_THRESHOLD;
       default:
         return true;
     }
   }
   
+  /** Multiply camera zoom, clamped to a sane range */
+  private zoomBy(factor: number): void {
+    const camera = this.cameras.main;
+    // Min 1: the world (1280x960) is bigger than the canvas, so below 1 it would show empty space
+    camera.setZoom(Phaser.Math.Clamp(camera.zoom * factor, 1, 2));
+    this.vignette?.setScale(1 / camera.zoom); // vignette is screen-fixed; undo camera zoom on it
+  }
+
+  public zoomIn(): void { this.zoomBy(1.2); }
+  public zoomOut(): void { this.zoomBy(1 / 1.2); }
+
+  /** Resident id under the pointer (world-space hit test), or null */
+  private residentIdAt(pointer: Phaser.Input.Pointer): string | null {
+    const tileSize = GRID_CONFIG.TILE_SIZE;
+    const { x, y } = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const hit = this.gameStateManager.getState().residents.find(r =>
+      Math.hypot(x - (r.gridX * tileSize + tileSize / 2), y - (r.gridY * tileSize + tileSize / 2)) <= tileSize / 2
+    );
+    return hit ? hit.id : null;
+  }
+
+  private selectResidentAt(pointer: Phaser.Input.Pointer): void {
+    const id = this.residentIdAt(pointer);
+    let roomId: string | null = null;
+    if (!id) { // no resident under the cursor: select the room on that tile, if any
+      const t = GRID_CONFIG.TILE_SIZE;
+      const { x, y } = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      roomId = this.gameStateManager.getState().grid.tiles[Math.floor(y / t)]?.[Math.floor(x / t)]?.occupiedBy ?? null;
+    }
+    window.dispatchEvent(new CustomEvent('game:resident_selected', { detail: { id, roomId } }));
+  }
+
   /**
    * Update hovered resident for hover visibility mode
    */
   private updateHoveredResident(pointer: Phaser.Input.Pointer): void {
-    const camera = this.cameras.main;
-    const worldX = pointer.x + camera.scrollX;
-    const worldY = pointer.y + camera.scrollY;
-    
-    const tileSize = GRID_CONFIG.TILE_SIZE;
     const gameState = this.gameStateManager.getState();
-    
-    // Check each resident to see if pointer is over them
-    let foundResident: string | null = null;
-    const hoverRadius = tileSize / 2; // Radius around resident center
-    
-    for (const resident of gameState.residents) {
-      const residentX = resident.gridX * tileSize + tileSize / 2;
-      const residentY = resident.gridY * tileSize + tileSize / 2;
-      
-      const distance = Math.sqrt(
-        Math.pow(worldX - residentX, 2) +
-        Math.pow(worldY - residentY, 2)
-      );
-      
-      if (distance <= hoverRadius) {
-        foundResident = resident.id;
-        break;
-      }
-    }
+    const foundResident = this.residentIdAt(pointer);
     
     // Only trigger update if hovered resident changed
     if (this.hoveredResidentId !== foundResident) {
@@ -1399,14 +1426,12 @@ export class MainScene extends Phaser.Scene {
 
     // Cool the room tint toward moonlight as night falls
     this.colorTint = MainScene.lerpColor(0xffffff, 0x8f9bd6, b);
-    for (const image of this.roomImages.values()) {
-      image.setTint(this.colorTint);
-    }
+    this.applyRoomTint();
 
     // Entrance beacon breathes; warmer/brighter at night
     if (this.entranceGlow) {
       const breath = Math.sin(this.animClock * 2.1);
-      this.entranceGlow.setAlpha(Phaser.Math.Clamp(0.38 + breath * 0.16 + b * 0.28, 0, 1));
+      this.entranceGlow.setAlpha(Phaser.Math.Clamp(0.14 + breath * 0.05 + b * 0.3, 0, 1));
       const base = GRID_CONFIG.TILE_SIZE / 22;
       this.entranceGlow.setScale(base * (1 + breath * 0.07 + b * 0.16));
     }
@@ -1511,11 +1536,9 @@ export class MainScene extends Phaser.Scene {
     }
     this.residentStatusUIs.clear();
 
-    // Clean up room images
-    for (const image of this.roomImages.values()) {
-      image.destroy();
-    }
-    this.roomImages.clear();
+    // Clean up room sprites
+    for (const objs of this.roomObjects.values()) objs.forEach(o => o.destroy());
+    this.roomObjects.clear();
 
     // Remove event listeners
     window.removeEventListener('blur', this.handleBlur);
@@ -1524,13 +1547,22 @@ export class MainScene extends Phaser.Scene {
     window.removeEventListener('resident_graduated', this.handleResidentGraduated as EventListener);
   }
   
+  // Only auto-resume on focus if blur did the pausing; a manual pause must stick.
+  private pausedByBlur = false;
+
   private handleBlur = () => {
-    this.pauseManager.pause();
+    if (!this.pauseManager.isPaused()) {
+      this.pausedByBlur = true;
+      this.pauseManager.pause();
+    }
     this.autoSaveManager.forceSave(this.gameStateManager.getMutableState());
   };
   
   private handleFocus = () => {
-    this.pauseManager.resume();
+    if (this.pausedByBlur) {
+      this.pausedByBlur = false;
+      this.pauseManager.resume();
+    }
   };
   
   private handleResidentAteFood = (event: CustomEvent) => {
@@ -1622,9 +1654,7 @@ export class MainScene extends Phaser.Scene {
   private updatePlacementPreview(pointer: Phaser.Input.Pointer): void {
     if (!this.selectedRoomType) return;
     
-    const camera = this.cameras.main;
-    const worldX = pointer.x + camera.scrollX;
-    const worldY = pointer.y + camera.scrollY;
+    const { x: worldX, y: worldY } = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     
     const gridX = Math.floor(worldX / GRID_CONFIG.TILE_SIZE);
     const gridY = Math.floor(worldY / GRID_CONFIG.TILE_SIZE);
@@ -1690,9 +1720,7 @@ export class MainScene extends Phaser.Scene {
   private handlePlacementClick(pointer: Phaser.Input.Pointer): void {
     if (!this.selectedRoomType) return;
     
-    const camera = this.cameras.main;
-    const worldX = pointer.x + camera.scrollX;
-    const worldY = pointer.y + camera.scrollY;
+    const { x: worldX, y: worldY } = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     
     const gridX = Math.floor(worldX / GRID_CONFIG.TILE_SIZE);
     const gridY = Math.floor(worldY / GRID_CONFIG.TILE_SIZE);

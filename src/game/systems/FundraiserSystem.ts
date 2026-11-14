@@ -1,8 +1,9 @@
 import { GameState, Fundraiser, Resident, ResidentProfile, Room } from '../../types';
-import { FUNDRAISER_CONFIG, PROFILE_SPECS, ROOM_SPECS } from '../../constants';
-import { generateUUID } from '../../utils/helpers';
+import { FUNDRAISER_CONFIG, LIFE_METER_CONFIG, PROFILE_SPECS, ROOM_SPECS } from '../../constants';
+import { generateUUID, formatMoney } from '../../utils/helpers';
 import { modifyReputation } from './ReputationSystem';
 import { consumeFood, hasFoodAvailable } from './FoodSystem';
+import { graduateResident } from './LIFEMeterSystem';
 import { findPath } from './PathfindingSystem';
 import { isWalkable } from './GridSystem';
 import { isTileOccupiedByResident } from './CollisionDetectionSystem';
@@ -14,21 +15,11 @@ import { isTileOccupiedByResident } from './CollisionDetectionSystem';
 /**
  * Get fatigue duration based on resident's age group (profile)
  * - Young Adults: 30 seconds (faster recovery)
- * - Adults: 2 minutes (moderate recovery) - Note: no "adult" profile exists, mapped to default
+ * - Adults: 2 minutes (moderate recovery)
  * - Elderly: 5 minutes (slower recovery)
- * - Veterans: 5 minutes (same as elderly)
  */
 export function getFatigueDurationForProfile(profile: ResidentProfile): number {
-  switch (profile) {
-    case 'young_adult':
-      return 30 * 1000; // 30 seconds
-    case 'veteran':
-      return 5 * 60 * 1000; // 5 minutes (300 seconds)
-    case 'elderly':
-      return 5 * 60 * 1000; // 5 minutes (300 seconds)
-    default:
-      return FUNDRAISER_CONFIG.FATIGUE_DURATION; // Default fallback
-  }
+  return FUNDRAISER_CONFIG.FATIGUE_BY_PROFILE[profile] ?? FUNDRAISER_CONFIG.FATIGUE_DURATION;
 }
 
 // ============================================================================
@@ -148,7 +139,7 @@ function findRandomUnoccupiedTileInRoom(
  * FundraiserSystem - Manages fundraiser events with rebalanced mechanics
  *
  * MECHANICS:
- * - Failure chance based on average resident happiness
+ * - Failure chance based on average resident health
  * - Food consumption (3 units per participating resident)
  * - Failed fundraisers have consequences
  * - Variable payout based on success roll
@@ -160,18 +151,18 @@ function findRandomUnoccupiedTileInRoom(
 // ============================================================================
 
 /**
- * Calculate fundraiser success chance based on average happiness of participating residents
+ * Calculate fundraiser success chance based on average health of participating residents
  */
 export function getFundraiserSuccessChance(residents: Resident[]): number {
   if (residents.length === 0) return 0;
   
-  const avgHappiness = residents.reduce((sum, r) => sum + r.happiness, 0) / residents.length;
+  const avgHealth = residents.reduce((sum, r) => sum + r.health, 0) / residents.length;
   
-  if (avgHappiness >= 80) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_80_PLUS;
-  if (avgHappiness >= 60) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_60_PLUS;
-  if (avgHappiness >= 40) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_40_PLUS;
-  if (avgHappiness >= 20) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_20_PLUS;
-  return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HAPPINESS_BELOW_20;
+  if (avgHealth >= 80) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HEALTH_80_PLUS;
+  if (avgHealth >= 60) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HEALTH_60_PLUS;
+  if (avgHealth >= 40) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HEALTH_40_PLUS;
+  if (avgHealth >= 20) return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HEALTH_20_PLUS;
+  return FUNDRAISER_CONFIG.SUCCESS_CHANCE.HEALTH_BELOW_20;
 }
 
 // ============================================================================
@@ -206,8 +197,8 @@ function applyFatigueToResidents(residents: Resident[]): void {
     const fatigueDuration = getFatigueDurationForProfile(resident.profile);
     resident.fundraiserFatigueUntil = now + fatigueDuration;
     
-    // Apply fatigue happiness penalty
-    resident.happiness = Math.max(0, resident.happiness + FUNDRAISER_CONFIG.FATIGUE_HAPPINESS_PENALTY);
+    // Apply fatigue health penalty
+    resident.health = Math.max(0, resident.health + FUNDRAISER_CONFIG.FATIGUE_HEALTH_PENALTY);
     
     console.log(`⏳ ${resident.name} (${resident.profile}) fatigued for ${fatigueDuration / 1000}s`);
   }
@@ -266,6 +257,11 @@ export function startFundraiser(
   
   if (!station.isOpen) {
     return { success: false, error: "Fundraiser station is closed" };
+  }
+  
+  // One group at a time per station
+  if (isStationBusy(gameState, stationId)) {
+    return { success: false, error: "Fundraiser station is busy with another group" };
   }
   
   // Check capacity
@@ -393,10 +389,10 @@ export function startFundraiser(
   let warning: string | undefined;
   if (successChance < 0.5) {
     const percentChance = Math.round(successChance * 100);
-    warning = `⚠️ Low success chance (${percentChance}%) due to low happiness!`;
+    warning = `⚠️ Low success chance (${percentChance}%) due to low health!`;
   }
   
-  console.log(`🎪 Fundraiser started! Success chance: ${Math.round(successChance * 100)}%, Expected: $${expectedPayout} in ${FUNDRAISER_CONFIG.DURATION_MINUTES} minutes`);
+  console.log(`🎪 Fundraiser started! Success chance: ${Math.round(successChance * 100)}%, Expected: ${formatMoney(expectedPayout)} in ${FUNDRAISER_CONFIG.DURATION_MINUTES} minutes`);
   console.log(`🍽️ Consumed ${foodCost} food for fundraiser`);
   
   return { success: true, fundraiser, warning };
@@ -404,7 +400,7 @@ export function startFundraiser(
 
 /**
  * Calculate fundraiser payout based on residents and reputation
- * Formula: BaseAmount × AssignedResidents × (Reputation/100) × AvgEfficiency
+ * Formula: BaseAmount × AssignedResidents × (0.25 + Reputation/200) × AvgEfficiency
  */
 export function calculateFundraiserPayout(
   residentCount: number,
@@ -417,8 +413,8 @@ export function calculateFundraiserPayout(
     FUNDRAISER_CONFIG.BASE_PAYOUT_MIN
   );
   
-  // Reputation modifier (0.5 to 1.5 based on 0-100 reputation)
-  const reputationModifier = FUNDRAISER_CONFIG.BASE_REPUTATION_MODIFIER + (reputation / 100);
+  // Reputation modifier (0.25 to 0.75 based on 0-100 reputation)
+  const reputationModifier = FUNDRAISER_CONFIG.BASE_REPUTATION_MODIFIER + (reputation / 200);
   
   // Profile efficiency (average of all residents)
   const profileEfficiencies = residents.map(r => 
@@ -451,8 +447,8 @@ export function calculateActualPayout(
   }
   
   // Scale payout by how well the roll exceeded threshold
-  // Better rolls = higher payout (up to 150% of expected)
-  const bonusMultiplier = 1 + ((successRoll - failureThreshold) / successChance) * 0.5;
+  // Better rolls = higher payout (up to 125% of expected)
+  const bonusMultiplier = 1 + ((successRoll - failureThreshold) / successChance) * 0.25;
   return Math.floor(expectedPayout * bonusMultiplier);
 }
 
@@ -480,6 +476,15 @@ export function checkFundraiserCompletion(gameState: GameState): void {
  * Complete a fundraiser and apply effects
  * Now includes success/failure determination
  */
+/** Fundraisers are the main LIFE source, so graduation is checked here too. */
+function graduateReadyParticipants(participants: Resident[], gameState: GameState): void {
+  for (const resident of participants) {
+    if (resident.lifeMeter >= LIFE_METER_CONFIG.GRADUATION_THRESHOLD) {
+      graduateResident(resident, gameState);
+    }
+  }
+}
+
 function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void {
   // Roll for success
   const successRoll = Math.random();
@@ -513,10 +518,10 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     // Apply positive effects to participants
     for (const resident of participants) {
       // LIFE meter boost
-      resident.lifeMeter = Math.min(100, resident.lifeMeter + FUNDRAISER_CONFIG.LIFE_BOOST);
+      resident.lifeMeter = Math.min(LIFE_METER_CONFIG.MAX, resident.lifeMeter + FUNDRAISER_CONFIG.LIFE_BOOST);
       
-      // Happiness cost (fatigue from work)
-      resident.happiness = Math.max(0, resident.happiness - FUNDRAISER_CONFIG.HAPPINESS_COST);
+      // Health cost (fatigue from work)
+      resident.health = Math.max(0, resident.health - FUNDRAISER_CONFIG.HEALTH_COST);
       
       // Reset state and clear fundraiser need
       resident.currentState = "satisfied";
@@ -529,10 +534,11 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     // Apply fatigue to all participants
     applyFatigueToResidents(participants);
     
-    console.log(`✅ Fundraiser SUCCEEDED! Earned $${actualPayout} (expected: $${fundraiser.expectedPayout})`);
+    console.log(`✅ Fundraiser SUCCEEDED! Earned ${formatMoney(actualPayout)} (expected: ${formatMoney(fundraiser.expectedPayout)})`);
     
     // Emit success event with full details
     emitFundraiserCompleted(fundraiser, true, actualPayout, participants);
+    graduateReadyParticipants(participants, gameState);
   } else {
     // FAILURE: Apply negative consequences
     
@@ -541,8 +547,11 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     
     // Apply negative effects to participants
     for (const resident of participants) {
-      // Happiness penalty (embarrassment)
-      resident.happiness = Math.max(0, resident.happiness + FUNDRAISER_CONFIG.FAILURE_HAPPINESS_PENALTY);
+      // Taking part still builds LIFE, just less than a success
+      resident.lifeMeter = Math.min(LIFE_METER_CONFIG.MAX, resident.lifeMeter + FUNDRAISER_CONFIG.LIFE_BOOST_FAILURE);
+      
+      // Health penalty (embarrassment)
+      resident.health = Math.max(0, resident.health + FUNDRAISER_CONFIG.FAILURE_HEALTH_PENALTY);
       
       // Reset state and clear fundraiser need
       resident.currentState = "satisfied";
@@ -559,6 +568,7 @@ function completeFundraiser(fundraiser: Fundraiser, gameState: GameState): void 
     
     // Emit failure event with full details
     emitFundraiserCompleted(fundraiser, false, 0, participants);
+    graduateReadyParticipants(participants, gameState);
   }
 }
 
@@ -648,10 +658,59 @@ export function getAvailableResidentsForFundraiser(gameState: GameState): Reside
     const fatigued = isResidentFatigued(r);
     
     // Not in critical state
-    const healthy = r.happiness > 20 && r.lifeMeter < 95;
+    const healthy = r.health > 20;
     
     return !inFundraiser && !fatigued && healthy;
   });
+}
+
+function isStationBusy(gameState: GameState, stationId: string): boolean {
+  return gameState.activeFundraisers.some(f => f.stationId === stationId);
+}
+
+/** Open fundraiser stations with no group currently using them */
+function getIdleStations(gameState: GameState): Room[] {
+  return gameState.rooms.filter(r => r.type === "fundraiser_station" && r.isOpen && !isStationBusy(gameState, r.id));
+}
+
+/**
+ * Start a fundraiser with a random group of residents who are eligible
+ * (not tired, not already fundraising). The player doesn't pick anyone.
+ */
+export function startRandomFundraiser(
+  gameState: GameState
+): ReturnType<typeof startFundraiser> {
+  if (!gameState.rooms.some(r => r.type === "fundraiser_station" && r.isOpen)) {
+    return { success: false, error: "No open fundraiser station" };
+  }
+  const stations = getIdleStations(gameState);
+  if (stations.length === 0) {
+    return { success: false, error: "Fundraiser station is busy with another group" };
+  }
+  
+  const pool = getAvailableResidentsForFundraiser(gameState);
+  if (pool.length === 0) {
+    return { success: false, error: "No rested residents available" };
+  }
+  
+  // Random group size, capped at how many rested residents there are
+  const { MIN_GROUP, MAX_GROUP } = FUNDRAISER_CONFIG;
+  const rolled = MIN_GROUP + Math.floor(Math.random() * (MAX_GROUP - MIN_GROUP + 1));
+  const need = Math.min(rolled, pool.length);
+  
+  if (gameState.food < calculateFundraiserFoodCost(need)) {
+    return { success: false, error: `Not enough food! This fundraiser needs ${calculateFundraiserFoodCost(need)} units for ${need} resident${need > 1 ? "s" : ""}, have ${gameState.food}` };
+  }
+  
+  // Fisher-Yates shuffle, then take the group
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const group = pool.slice(0, need);
+  
+  const station = findBestFundraiserStationForGroup(group, stations)!;
+  return startFundraiser(gameState, station.id, group.map(r => r.id));
 }
 
 /**
@@ -662,11 +721,14 @@ export function getFundraiserStatus(gameState: GameState): {
   availableResidents: number;
   minResidentsRequired: number;
   foodCostPerResident: number;
+  stationBusy: boolean; // every open station already has a group
 } {
   const availableResidents = getAvailableResidentsForFundraiser(gameState);
+  const stationBusy = getIdleStations(gameState).length === 0;
   
   return {
-    canStart: availableResidents.length >= FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
+    stationBusy,
+    canStart: !stationBusy && availableResidents.length >= FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
     availableResidents: availableResidents.length,
     minResidentsRequired: FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS,
     foodCostPerResident: FUNDRAISER_CONFIG.FOOD_COST_PER_RESIDENT

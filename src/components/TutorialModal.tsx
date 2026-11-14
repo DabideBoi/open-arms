@@ -18,15 +18,15 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     title: "Building Rooms 🏗️",
-    content: "Click the 'Build' button (or press B) to enter build mode. You'll need Dormitories for sleeping, Cafeterias for food, and Learning Centers to help residents graduate."
+    content: "Click the 'Build' button (or press B) to enter build mode. You'll need Dormitories for sleeping, Cafeterias for food, and a Clinic to keep residents healthy."
   },
   {
     title: "Managing Residents 👥",
-    content: "Residents have needs: sleep, food, bathroom, learning, and social. They'll automatically seek out rooms to satisfy these needs. Keep them happy!"
+    content: "Residents have needs: sleep, food, bathroom, social, and medical care when their Health runs low. They'll automatically seek out rooms to satisfy these needs. Keep them healthy!"
   },
   {
     title: "The LIFE Meter 📈",
-    content: "Each resident has a LIFE meter that fills as they use Learning Centers or Vocational Rooms. When it reaches 100%, they graduate and you earn reputation!"
+    content: "Each resident has a LIFE meter that fills as they take part in fundraisers. When it reaches 100%, they graduate and you earn reputation!"
   },
   {
     title: "Money & Donations 💰",
@@ -46,7 +46,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     title: "Ready to Begin! 🎮",
-    content: "Start by building a Dormitory, Cafeteria, and Bathroom. Then add a Learning Center to help residents progress. Good luck!"
+    content: "Start by building a Dormitory, Cafeteria, and Bathroom. Then add a Fundraiser Station and a Clinic. Good luck!"
   }
 ];
 

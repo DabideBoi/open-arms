@@ -7,9 +7,9 @@
 }
 
 .management-panel {
-  --mgmt: #8b7cf0;
-  --mgmt-strong: #7059e6;
-  --mgmt-glow: rgba(139, 124, 240, 0.35);
+  --mgmt: #8cc152;
+  --mgmt-strong: #6fa13a;
+  --mgmt-glow: rgba(140,193,82,0.35);
 }
 
 .management-panel-toggle {
@@ -142,7 +142,7 @@
 }
 
 .fundraiser-info-box {
-  background: rgba(102, 126, 234, 0.2);
+  background: rgba(111,161,58,0.2);
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 15px;
@@ -180,8 +180,8 @@
 }
 
 .resident-select-item.selected {
-  background: rgba(102, 126, 234, 0.3);
-  border-color: #667eea;
+  background: rgba(111,161,58,0.3);
+  border-color: #6fa13a;
 }
 
 .start-fundraiser-button {
@@ -258,8 +258,30 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
   font-weight: bold;
+  font-size: 14px;
+}
+
+.resident-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.resident-sprite {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+/* leave room for the popup's close button */
+.resident-popup .resident-header {
+  padding-right: 22px;
 }
 
 .resident-profile {
@@ -283,7 +305,12 @@
 }
 
 .stat > span:first-child {
-  min-width: 90px;
+  min-width: 64px;
+}
+
+.stat > span:last-child {
+  min-width: 34px;
+  text-align: right;
 }
 
 .stat-bar {
@@ -299,7 +326,7 @@
   transition: width 0.3s ease;
 }
 
-.stat-bar-fill.happiness {
+.stat-bar-fill.health {
   background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
 }
 
@@ -307,16 +334,22 @@
   background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
 }
 
+.stat-bar-fill.energy {
+  background: linear-gradient(90deg, #f1c40f 0%, #6fa13a 100%);
+}
+
 .resident-status {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 4px 8px;
   font-size: 12px;
   color: #aaa;
 }
 
 .status-badge {
-  background: rgba(102, 126, 234, 0.3);
+  background: rgba(111,161,58,0.3);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
@@ -343,7 +376,7 @@
    ============================================================================ */
 
 .current-food-setting {
-  background: rgba(102, 126, 234, 0.2);
+  background: rgba(111,161,58,0.2);
   padding: 15px;
   border-radius: 10px;
   margin-bottom: 15px;
@@ -363,7 +396,7 @@
 .food-label {
   font-size: 18px;
   font-weight: bold;
-  color: #667eea;
+  color: #6fa13a;
 }
 
 .food-description {
@@ -431,8 +464,8 @@
 }
 
 .food-option.selected {
-  background: rgba(102, 126, 234, 0.3);
-  border-color: #667eea;
+  background: rgba(111,161,58,0.3);
+  border-color: #6fa13a;
 }
 
 .food-option.below-standard {
@@ -614,13 +647,13 @@
 
 .management-panel-content::-webkit-scrollbar-thumb,
 .resident-selection::-webkit-scrollbar-thumb {
-  background: #667eea;
+  background: #6fa13a;
   border-radius: 4px;
 }
 
 .management-panel-content::-webkit-scrollbar-thumb:hover,
 .resident-selection::-webkit-scrollbar-thumb:hover {
-  background: #764ba2;
+  background: #567f2c;
 }
 
 /* ============================================
@@ -645,8 +678,8 @@
 
 /* Current Tier Info */
 .current-tier-info {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-  border: 2px solid #667eea;
+  background: linear-gradient(135deg, rgba(111,161,58,0.2), rgba(86,127,44,0.2));
+  border: 2px solid #6fa13a;
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
@@ -660,7 +693,7 @@
 }
 
 .tier-badge-large {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #6fa13a, #567f2c);
   color: white;
   font-weight: bold;
   padding: 6px 14px;
@@ -709,7 +742,7 @@
 /* Next Tier Preview */
 .next-tier-preview {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed #667eea;
+  border: 1px dashed #6fa13a;
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 16px;

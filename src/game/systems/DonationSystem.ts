@@ -1,6 +1,7 @@
 import { GameState, DonationRecord, ExpenseRecord } from '../../types';
 import { DONATION_CONFIG, OPERATING_COSTS_CONFIG, EXPENSE_EVENTS_CONFIG, getActiveTimerConfig } from '../../constants';
 import { getDonationMultiplier } from './TierSystem';
+import { formatMoney } from '../../utils/helpers';
 
 // ============================================================================
 // Financial History Recording Helpers
@@ -93,7 +94,7 @@ export function checkDonation(gameState: GameState): void {
     // Record donation to financial history
     recordDonation(gameState, amount, 'passive');
     
-    console.log(`💰 Donation received: $${amount} (chance: ${(chance * 100).toFixed(1)}%)`);
+    console.log(`💰 Donation received: ${formatMoney(amount)} (chance: ${(chance * 100).toFixed(1)}%)`);
     
     // Emit event for UI notification
     emitDonationReceived(amount, gameState);
@@ -250,7 +251,7 @@ export function applyOfflineDonations(
     // Record offline donations to financial history
     recordDonation(gameState, offlineDonations, 'offline');
     
-    console.log(`💰 Offline donations: $${offlineDonations}`);
+    console.log(`💰 Offline donations: ${formatMoney(offlineDonations)}`);
     
     // Emit notification
     emitOfflineDonations(offlineDonations);
@@ -284,7 +285,7 @@ export function deductDailyOperatingCosts(gameState: GameState): void {
   // Record operating costs to financial history
   recordExpense(gameState, cost, 'operating', 'Daily operating costs');
   
-  console.log(`💸 Daily operating costs: -$${cost}`);
+  console.log(`💸 Daily operating costs: -${formatMoney(cost)}`);
   
   // Emit notification
   emitOperatingCosts(cost);
@@ -337,7 +338,7 @@ function checkRandomExpenseEvent(gameState: GameState): void {
     // Record random expense to financial history
     recordExpense(gameState, cost, 'random', eventType);
     
-    console.log(`⚠️ ${eventType}: -$${cost}`);
+    console.log(`⚠️ ${eventType}: -${formatMoney(cost)}`);
     
     // Emit expense event
     emitExpenseEvent(eventType, cost);

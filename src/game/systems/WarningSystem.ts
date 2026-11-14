@@ -6,43 +6,15 @@ import {
   WarningCooldown,
   Resident
 } from '../../types';
-import { BANKRUPTCY_CONFIG, REPUTATION_CONFIG, SHELTER_TIERS, getActiveTimerConfig } from '../../constants';
+import { BANKRUPTCY_CONFIG, REPUTATION_CONFIG, SHELTER_TIERS, getActiveTimerConfig, WARNING_CONFIG } from '../../constants';
 import { getResidentCap, isApproachingCapacity, isAtResidentCap } from './TierSystem';
+import { formatMoney } from '../../utils/helpers';
 
 // ============================================================================
 // Warning System Configuration
 // ============================================================================
 
-export const WARNING_CONFIG = {
-  // Check interval
-  CHECK_INTERVAL: 5000, // Check every 5 seconds
-  
-  // Cooldown durations (ms)
-  COOLDOWN_DEFAULT: 2 * 60 * 1000,      // 2 minutes - same warning can only appear once per 2 min
-  COOLDOWN_DISMISSED: 5 * 60 * 1000,    // 5 minutes - after dismissing, don't show for 5 min
-  COOLDOWN_CRITICAL: 30 * 1000,         // 30 seconds - critical warnings can reappear sooner
-  
-  // Escalation (ms)
-  ESCALATION_TIME: 3 * 60 * 1000,       // 3 minutes - escalate severity if ignored
-  
-  // Financial thresholds
-  LOW_FUNDS_THRESHOLD: 500,
-  IN_DEBT_THRESHOLD: 0,
-  NEAR_BANKRUPTCY_THRESHOLD: -300,
-  MAINTENANCE_WARNING_MINUTES: 2,       // Warn 2 minutes before maintenance
-  
-  // Resident thresholds
-  UNHAPPY_THRESHOLD: 30,
-  UNHAPPY_DURATION_WARNING: 60 * 1000,  // 1 minute below happiness threshold
-  LOW_FOOD_PER_RESIDENT: 2,             // Warn if food < residents * 2
-  
-  // Operational thresholds
-  LOW_REPUTATION_THRESHOLD: 40,
-  
-  // Progression thresholds
-  STALLED_PROGRESS_MINUTES: 5,          // 5 minutes with no graduations
-  LIFE_METER_STALLED_THRESHOLD: 5,      // If LIFE meter hasn't moved by 5 points in 2 min
-} as const;
+export { WARNING_CONFIG }; // lives in constants so config/*.json can override it
 
 // ============================================================================
 // Warning System Class
@@ -137,7 +109,7 @@ export class WarningSystem {
           'critical',
           'Near Bankruptcy!',
           {
-            detail: `Funds at $${money}. Bankruptcy imminent!`,
+            detail: `Funds at ${formatMoney(money)}. Bankruptcy imminent!`,
             actionLabel: 'View Finances',
             dismissable: false
           }
@@ -152,7 +124,7 @@ export class WarningSystem {
           'warning',
           'Shelter in Debt',
           {
-            detail: `Balance: $${money}. Income needed urgently!`,
+            detail: `Balance: ${formatMoney(money)}. Income needed urgently!`,
             actionLabel: 'View Finances'
           }
         ));
@@ -166,7 +138,7 @@ export class WarningSystem {
           'info',
           'Low Funds',
           {
-            detail: `Only $${money} remaining. Consider fundraising.`,
+            detail: `Only ${formatMoney(money)} remaining. Consider fundraising.`,
             actionLabel: 'View Finances'
           }
         ));
@@ -193,7 +165,7 @@ export class WarningSystem {
             money < totalMaintenanceCost / 2 ? 'critical' : 'warning',
             'Maintenance Due Soon',
             {
-              detail: `$${totalMaintenanceCost} due in ~${minutes} min. Current balance: $${money}`,
+              detail: `${formatMoney(totalMaintenanceCost)} due in ~${minutes} min. Current balance: ${formatMoney(money)}`,
               actionLabel: 'View Rooms'
             }
           ));
@@ -213,7 +185,7 @@ export class WarningSystem {
             'info',
             'Day Ending Soon',
             {
-              detail: `Estimated daily costs: $${dailyCost}. Current: $${money}`,
+              detail: `Estimated daily costs: ${formatMoney(dailyCost)}. Current: ${formatMoney(money)}`,
               actionLabel: 'View Finances'
             }
           ));
@@ -246,18 +218,18 @@ export class WarningSystem {
     const warnings: Warning[] = [];
     const now = Date.now();
     
-    // Check for unhappy residents
+    // Check for unhealthy residents
     state.residents.forEach(resident => {
-      // Unhappy Resident (happiness < 30 for > 1 minute)
-      if (resident.happiness < WARNING_CONFIG.UNHAPPY_THRESHOLD) {
-        if (resident.unhappyDuration > WARNING_CONFIG.UNHAPPY_DURATION_WARNING) {
-          if (!this.hasActiveWarning(state, 'unhappy_resident') && !this.isOnCooldown(state, 'unhappy_resident')) {
+      // Unhealthy Resident (health < 30 for > 1 minute)
+      if (resident.health < WARNING_CONFIG.UNHEALTHY_THRESHOLD) {
+        if (resident.unhealthyDuration > WARNING_CONFIG.UNHEALTHY_DURATION_WARNING) {
+          if (!this.hasActiveWarning(state, 'unhealthy_resident') && !this.isOnCooldown(state, 'unhealthy_resident')) {
             warnings.push(this.createWarning(
-              'unhappy_resident',
+              'unhealthy_resident',
               'warning',
-              `${resident.name} is Unhappy`,
+              `${resident.name} is Unhealthy`,
               {
-                detail: `Happiness at ${resident.happiness}%. Address their needs!`,
+                detail: `Health at ${resident.health}%. Address their needs!`,
                 actionLabel: 'View Residents',
                 suffix: resident.id
               }
@@ -274,7 +246,7 @@ export class WarningSystem {
             'critical',
             `${resident.name} May Leave!`,
             {
-              detail: `This resident is at risk of departing. Improve their happiness immediately!`,
+              detail: `This resident is at risk of departing. Improve their health immediately!`,
               actionLabel: 'View Residents',
               suffix: resident.id,
               dismissable: false
@@ -334,7 +306,7 @@ export class WarningSystem {
           state.reputation < 20 ? 'critical' : 'warning',
           'Low Reputation',
           {
-            detail: `Reputation at ${state.reputation}%. Focus on resident happiness and graduations.`,
+            detail: `Reputation at ${state.reputation}%. Focus on resident health and graduations.`,
             actionLabel: 'View Dashboard'
           }
         ));
@@ -356,7 +328,7 @@ export class WarningSystem {
           'warning',
           'Reputation Dropping',
           {
-            detail: `Reputation is declining rapidly! Check for unhappy residents.`,
+            detail: `Reputation is declining rapidly! Check for unhealthy residents.`,
             actionLabel: 'View Residents'
           }
         ));
@@ -588,14 +560,14 @@ export class WarningSystem {
         return state.nextMaintenanceCheck - Date.now() < WARNING_CONFIG.MAINTENANCE_WARNING_MINUTES * 60 * 1000;
       case 'operating_costs_due':
         return state.currentPhase === 'day' && state.nextDayNightTransition - Date.now() < 60000;
-      case 'unhappy_resident':
+      case 'unhealthy_resident':
       case 'at_risk_resident':
         // Check if the specific resident is still in this state
         const residentId = warning.id.split('_').slice(-2)[0];
         const resident = state.residents.find(r => warning.id.includes(r.id));
         if (!resident) return false;
-        if (warning.type === 'unhappy_resident') {
-          return resident.happiness < WARNING_CONFIG.UNHAPPY_THRESHOLD;
+        if (warning.type === 'unhealthy_resident') {
+          return resident.health < WARNING_CONFIG.UNHEALTHY_THRESHOLD;
         }
         return resident.isAtRisk;
       case 'overcrowded':

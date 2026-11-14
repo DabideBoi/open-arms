@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './NotificationToast.css';
 
 export type NotificationType = 'success' | 'warning' | 'info' | 'error';
@@ -75,16 +75,17 @@ export function NotificationContainer({ notifications, onDismiss }: Notification
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
-  const addNotification = (message: string, type: NotificationType = 'info', duration?: number) => {
+  // Stable identities: toast timers depend on onDismiss, so a new function each render restarts them forever
+  const addNotification = useCallback((message: string, type: NotificationType = 'info', duration?: number) => {
     const id = `notification-${Date.now()}-${Math.random()}`;
     const notification: Notification = { id, message, type, duration };
     
     setNotifications(prev => [...prev, notification]);
-  };
+  }, []);
   
-  const dismissNotification = (id: string) => {
+  const dismissNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
   
   useEffect(() => {
     const handleNotification = (event: CustomEvent) => {

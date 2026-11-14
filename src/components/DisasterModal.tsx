@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActiveDisasterEvent, DisasterEventConfig } from '../types';
 import { DISASTER_CONFIG } from '../constants';
 import './DisasterModal.css';
+import { formatMoney } from '../utils/helpers';
 
 interface DisasterModalProps {
   disaster: ActiveDisasterEvent | null;
@@ -153,27 +154,27 @@ export function DisasterModal({
           <div className="stat-item positive">
             <span className="stat-icon">💰</span>
             <span className="stat-label">Community Donation:</span>
-            <span className="stat-value">+${config.donationBonus}</span>
+            <span className="stat-value">+{formatMoney(config.donationBonus)}</span>
           </div>
-          {config.happinessImpact !== 0 && (
+          {config.healthImpact !== 0 && (
             <div className="stat-item warning">
-              <span className="stat-icon">😟</span>
-              <span className="stat-label">Happiness Impact:</span>
-              <span className="stat-value">{config.happinessImpact}</span>
+              <span className="stat-icon">🤒</span>
+              <span className="stat-label">Health Impact:</span>
+              <span className="stat-value">{config.healthImpact}</span>
             </div>
           )}
           {config.securityRequired && (
             <div className="stat-item warning">
               <span className="stat-icon">🔒</span>
               <span className="stat-label">Security Cost:</span>
-              <span className="stat-value">-${config.residentSurge * DISASTER_CONFIG.SECURITY_COST_PER_RESIDENT}</span>
+              <span className="stat-value">-{formatMoney(config.residentSurge * DISASTER_CONFIG.SECURITY_COST_PER_RESIDENT)}</span>
             </div>
           )}
           {config.medicalCosts && (
             <div className="stat-item warning">
               <span className="stat-icon">🏥</span>
               <span className="stat-label">Medical Costs:</span>
-              <span className="stat-value">-${config.residentSurge * config.medicalCosts}</span>
+              <span className="stat-value">-{formatMoney(config.residentSurge * config.medicalCosts)}</span>
             </div>
           )}
           {config.maintenanceSurge && (
@@ -217,7 +218,7 @@ export function DisasterModal({
             </div>
             <div className="partial-preview">
               <span>+{calculatePartialReputation(partialCount)} reputation</span>
-              <span>+${calculatePartialDonation(partialCount)} donation</span>
+              <span>+{formatMoney(calculatePartialDonation(partialCount))} donation</span>
             </div>
             <div className="partial-actions">
               <button className="btn-partial-confirm" onClick={handlePartialAccept}>
@@ -258,7 +259,7 @@ export function DisasterModal({
               className="btn-decline"
               onClick={onDecline}
             >
-              ❌ Decline (-{config.reputationLossDecline} reputation)
+              ❌ Refer to a Different Institution (-{config.reputationLossDecline} reputation)
             </button>
           </div>
         )}
@@ -266,7 +267,7 @@ export function DisasterModal({
         {/* Decline Consequence Preview */}
         <div className="disaster-consequence">
           <small>
-            If declined: {config.residentSurge} people will find help elsewhere, 
+            If referred elsewhere: {config.residentSurge} people will find help elsewhere, 
             but your reputation will suffer.
           </small>
         </div>

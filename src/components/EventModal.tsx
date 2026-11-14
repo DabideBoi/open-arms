@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameEvent, EventOption } from '../game/systems/EventSystem';
+import { formatMoney } from '../utils/helpers';
 import './EventModal.css';
 
 interface EventModalProps {
   event: GameEvent | null;
   onResolve: (optionIndex: number) => void;
   onClose?: () => void;
+  isPaused?: boolean;
 }
 
-export function EventModal({ event, onResolve, onClose }: EventModalProps) {
+export function EventModal({ event, onResolve, onClose, isPaused = false }: EventModalProps) {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const resolving = useRef(false); // blocks a double click from resolving twice
+  useEffect(() => { resolving.current = false; }, [event?.id]);
   
   useEffect(() => {
     if (!event || !event.expiresAt) return;
@@ -29,15 +33,17 @@ export function EventModal({ event, onResolve, onClose }: EventModalProps) {
     };
     
     updateTimer();
+    if (isPaused) return; // frozen until resume shifts expiresAt
     const interval = setInterval(updateTimer, 1000);
     
     return () => clearInterval(interval);
-  }, [event]);
+  }, [event, event?.expiresAt, isPaused]);
   
   if (!event) return null;
   
   const handleConfirm = () => {
-    if (selectedOption !== null) {
+    if (selectedOption !== null && !resolving.current) {
+      resolving.current = true;
       onResolve(selectedOption);
       setSelectedOption(null);
     }
@@ -48,7 +54,7 @@ export function EventModal({ event, onResolve, onClose }: EventModalProps) {
       case 'money': return '💰';
       case 'reputation': return '⭐';
       case 'add_residents': return '👥';
-      case 'happiness_modifier': return '😊';
+      case 'health_modifier': return '❤️';
       case 'maintenance_discount': return '🔧';
       default: return '📋';
     }
@@ -57,13 +63,13 @@ export function EventModal({ event, onResolve, onClose }: EventModalProps) {
   const getEffectText = (effect: any): string => {
     switch (effect.type) {
       case 'money':
-        return `${effect.value > 0 ? '+' : ''}$${effect.value}`;
+        return formatMoney(effect.value, true);
       case 'reputation':
         return `${effect.value > 0 ? '+' : ''}${effect.value} reputation`;
       case 'add_residents':
         return `+${effect.value} residents`;
-      case 'happiness_modifier':
-        return `${effect.value > 0 ? '+' : ''}${effect.value} happiness for ${effect.duration}min`;
+      case 'health_modifier':
+        return `${effect.value > 0 ? '+' : ''}${effect.value} health for ${effect.duration}min`;
       case 'maintenance_discount':
         return `${effect.value}% off maintenance for ${effect.duration}min`;
       default:
@@ -93,6 +99,7 @@ export function EventModal({ event, onResolve, onClose }: EventModalProps) {
               key={index}
               className={`event-option ${selectedOption === index ? 'selected' : ''}`}
               onClick={() => setSelectedOption(index)}
+              disabled={option.disabled}
             >
               <div className="option-label">{option.label}</div>
               {option.effects.length > 0 && (

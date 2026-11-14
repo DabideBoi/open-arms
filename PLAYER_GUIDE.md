@@ -10,7 +10,7 @@ Welcome to Open Arms! This comprehensive guide will help you master the art of s
 4. [Room Placement Strategy](#room-placement-strategy)
 5. [Resident System](#resident-system)
 6. [LIFE Meter Progression](#life-meter-progression)
-7. [Food System & Portions](#food-system--portions)
+7. [Food System & Deliveries](#food-system--deliveries)
 8. [Economic Management](#economic-management)
 9. [Fundraiser System](#fundraiser-system)
 10. [Tier Progression](#tier-progression)
@@ -29,23 +29,23 @@ Welcome to Open Arms! This comprehensive guide will help you master the art of s
 ### Your First Day
 
 When you start a new game, you'll have:
-- **$2,000** starting budget
+- **₱250,000** starting budget
 - **40% reputation**
 - **3 initial residents**
-- **10×10 tile grid** for building (Tier 1)
+- **12×12 tile grid** for building (Tier 1)
 - **Basic room access** (Dormitory, Cafeteria, Bathroom, Common Room)
 
 ### Initial Setup Strategy
 
 1. **Build Essential Facilities First**
-   - Place 1 Dormitory ($300) for sleeping
-   - Add 1 Cafeteria ($500) for meals
-   - Include 1 Bathroom ($200) for hygiene
+   - Place 1 Dormitory (₱15,000) for sleeping
+   - Add 1 Cafeteria (₱25,000) for meals
+   - Include 1 Bathroom (₱10,000) for hygiene
    - Place them adjacent for bonuses!
 
 2. **Monitor Your Resources**
    - Watch your money carefully (game is faster-paced now)
-   - Keep an eye on resident happiness
+   - Keep an eye on resident health
    - Check the warning panel for issues
 
 3. **Understand the Pace**
@@ -97,80 +97,101 @@ Located at the top of the screen:
 ## 🏗️ Room Types & Facilities
 
 ### Dormitory
-**Size**: 3×3 tiles | **Cost**: $300 | **Capacity**: 4 residents | **Maintenance**: $25/cycle
+**Size**: 3×3 tiles | **Cost**: ₱15,000 | **Capacity**: 4 residents | **Maintenance**: ₱1,250/cycle
 
 **Purpose**: Sleeping quarters where residents rest.
 
-**Good Adjacent To**: Bathroom (+5 happiness), Common Room (+3 happiness)  
-**Bad Adjacent To**: Cafeteria (-5 happiness), Fundraiser Station (-3 happiness)
+**Good Adjacent To**: Bathroom (+5 health), Common Room (+3 health)  
+**Bad Adjacent To**: Cafeteria (-5 health), Fundraiser Station (-3 health)
 
 ---
 
 ### Cafeteria
-**Size**: 5×3 tiles | **Cost**: $500 | **Capacity**: 10 residents | **Maintenance**: $50/cycle
+**Size**: 5×3 tiles | **Cost**: ₱25,000 | **Capacity**: 5 residents (one per chair) | **Maintenance**: ₱2,500/cycle
 
 **Purpose**: Dining area where residents eat meals. Also generates food over time.
 
-**Good Adjacent To**: Common Room (+5 happiness)  
-**Bad Adjacent To**: Dormitory (-5 happiness), Bathroom (-8 happiness)
+**Good Adjacent To**: Common Room (+5 health)  
+**Bad Adjacent To**: Dormitory (-5 health), Bathroom (-8 health)
 
 ---
 
 ### Bathroom
-**Size**: 2×2 tiles | **Cost**: $200 | **Capacity**: N/A | **Maintenance**: $20/cycle
+**Size**: 2×2 tiles | **Cost**: ₱10,000 | **Capacity**: N/A | **Maintenance**: ₱1,000/cycle
 
 **Purpose**: Hygiene facilities for residents.
 
-**Good Adjacent To**: Dormitory (+5 happiness, -10% maintenance)  
-**Bad Adjacent To**: Cafeteria (-8 happiness), Learning Center (-5% LIFE fill)
+**Good Adjacent To**: Dormitory (+5 health, -10% maintenance)  
+**Bad Adjacent To**: Cafeteria (-8 health)
 
 ---
 
 ### Common Room
-**Size**: 3×3 tiles | **Cost**: $350 | **Capacity**: N/A | **Maintenance**: $30/cycle
+**Size**: 3×3 tiles | **Cost**: ₱17,500 | **Capacity**: N/A | **Maintenance**: ₱1,500/cycle
 
 **Purpose**: Social and recreational space for relaxation.
 
-**Good Adjacent To**: Dormitory (+3 happiness, +5% LIFE), Cafeteria (+5 happiness), Fundraiser Station (+2 happiness)
+**Good Adjacent To**: Dormitory (+3 health, +5% LIFE), Cafeteria (+5 health), Fundraiser Station (+2 health)
 
 ---
 
-### Learning Center (Unlocks at Tier 2)
-**Size**: 4×3 tiles | **Cost**: $450 | **Capacity**: 6 residents | **Maintenance**: $40/cycle
+### Clinic (Unlocks at Tier 1)
+**Size**: 3×3 tiles | **Cost**: ₱20,000 | **Capacity**: 4 residents | **Maintenance**: ₱1,750/cycle
 
-**Purpose**: Education and skill development facility. Accelerates LIFE meter!
+**Purpose**: Residents whose Health drops below 35% go to the Clinic on their own and recover there (about +2 Health per second while inside).
 
-**Good Adjacent To**: Admin Office (+10% LIFE fill), Vocational Room (+15% LIFE fill)  
-**Bad Adjacent To**: Bathroom (-2 happiness, -5% LIFE fill)
-
----
-
-### Vocational Room (Unlocks at Tier 3)
-**Size**: 4×3 tiles | **Cost**: $550 | **Capacity**: 6 residents | **Maintenance**: $45/cycle
-
-**Purpose**: Job training and career preparation.
-
-**Good Adjacent To**: Learning Center (+15% LIFE fill), Admin Office (+8% LIFE fill)  
-**Bad Adjacent To**: Bathroom (-2 happiness, -5% LIFE fill)
+**Good Adjacent To**: Bathroom (+3 health)
+**Bad Adjacent To**: Cafeteria (-3 health)
 
 ---
 
 ### Admin Office (Unlocks at Tier 2)
-**Size**: 2×2 tiles | **Cost**: $700 | **Capacity**: N/A | **Maintenance**: $60/cycle
+**Size**: 2×2 tiles | **Cost**: ₱35,000 | **Capacity**: N/A | **Maintenance**: ₱3,000/cycle
 
 **Purpose**: Management and coordination. Boosts efficiency of adjacent rooms.
 
-**Good Adjacent To**: Learning Center (+10% LIFE), Vocational Room (+8% LIFE), Fundraiser Station (-10% maintenance)
+**Good Adjacent To**: Fundraiser Station (-10% maintenance)
 
 ---
 
 ### Fundraiser Station (Unlocks at Tier 1)
-**Size**: 3×2 tiles | **Cost**: $400 | **Capacity**: 4 residents | **Maintenance**: $35/cycle
+**Size**: 3×2 tiles | **Cost**: ₱20,000 | **Capacity**: 4 residents | **Maintenance**: ₱1,750/cycle
 
 **Purpose**: Location for running fundraiser events.
 
-**Good Adjacent To**: Common Room (+2 happiness), Admin Office (-10% maintenance)  
-**Bad Adjacent To**: Dormitory (-3 happiness)
+**Good Adjacent To**: Common Room (+2 health), Admin Office (-10% maintenance)  
+**Bad Adjacent To**: Dormitory (-3 health)
+
+---
+
+### Upgraded Rooms
+Bigger versions of the basics. Each one works exactly like its base room (same needs and adjacency pairings).
+
+| Room | Works as | Unlocks | Size | Cost | Maintenance | Extra |
+|------|----------|---------|------|------|-------------|-------|
+| Large Dormitory | Dormitory | Tier 2 | 4×3 | ₱27,500 | ₱2,000/cycle | 6 beds |
+| Medical Center | Clinic | Tier 3 | 4×3 | ₱40,000 | ₱3,000/cycle | 6 patients, +5 health while inside |
+| Dining Hall | Cafeteria | Tier 3 | 6×3 | ₱45,000 | ₱3,750/cycle | 8 seats |
+
+---
+
+### Service Rooms
+Social rooms that work like a Common Room, with a bonus for anyone using them.
+
+| Room | Unlocks | Size | Cost | Maintenance | Bonus |
+|------|---------|------|------|-------------|-------|
+| Library | Tier 2 | 3×3 | ₱25,000 | ₱1,750/cycle | +15% LIFE |
+| Garden | Tier 3 | 3×3 | ₱30,000 | ₱1,500/cycle | +3 health, +5% LIFE |
+
+---
+
+### Decorations
+1×1 pieces with no use of their own. They boost residents **using any room they touch** (shared edge, not diagonal). Decorations don't boost each other.
+
+| Decoration | Unlocks | Cost | Maintenance | Boost to touching rooms |
+|------------|---------|------|-------------|-------------------------|
+| Potted Plant | Tier 1 | ₱3,000 | ₱150/cycle | +2 health |
+| Fountain | Tier 3 | ₱12,500 | ₱500/cycle | +3 health, +5% LIFE |
 
 ---
 
@@ -187,13 +208,12 @@ Rooms that share an edge (not diagonal) can give each other bonuses or penalties
    - Place Bathrooms adjacent to Dormitories
    - Keep Cafeteria and Fundraiser Station away
 
-2. **Create an "Education Zone"**
-   - Place Learning Center next to Vocational Room (+15% LIFE!)
-   - Add Admin Office for extra efficiency
-   - Keep Bathrooms far away
+2. **Create a "Health Zone"**
+   - Place the Clinic next to a Bathroom (+3 health)
+   - Keep the Clinic away from the Cafeteria (-3 health)
 
 3. **Create a "Social Zone"**
-   - Common Room adjacent to Cafeteria (+5 happiness)
+   - Common Room adjacent to Cafeteria (+5 health)
    - Fundraiser Station nearby for events
    - This keeps activity noise away from sleeping areas
 
@@ -216,19 +236,21 @@ Rooms that share an edge (not diagonal) can give each other bonuses or penalties
 
 Each resident has one of three profiles:
 
-#### 🧑 Young Adult (40% spawn rate)
+New residents only arrive when you accept them in a random event (see [Arrival Events](#-arrival-events)). The percentages below are used when an event doesn't say who is coming.
+
+#### 🧑 Young Adult (40%)
 - **LIFE Fill**: 20 points/hour (fastest)
 - **Need Decay**: 12 points/day (moderate)
 - **Fundraiser Efficiency**: 1.2x
 - **Best For**: Quick graduations
 
-#### 🎖️ Veteran (40% spawn rate)
+#### 🧔 Adult (40%)
 - **LIFE Fill**: 12 points/hour (moderate)
 - **Need Decay**: 7 points/day (slowest)
-- **Graduation Bonus**: +2 reputation
-- **Best For**: Steady progression, reputation building
+- **Fundraiser Fatigue**: 2 minutes
+- **Best For**: Steady progression
 
-#### 👴 Elderly (20% spawn rate)
+#### 👴 Elderly (20%)
 - **LIFE Fill**: 8 points/hour (slowest)
 - **Need Decay**: 20 points/day (fastest)
 - **Special**: Requires more care
@@ -241,8 +263,8 @@ Residents have 5 core needs (0-100 scale):
 1. **🛏️ Sleep** - Restored in Dormitories at night
 2. **🍽️ Hunger** - Satisfied in Cafeteria
 3. **🚿 Hygiene** - Improved in Bathrooms
-4. **😊 Happiness** - Affected by all factors
-5. **🏥 Health** - Deteriorates if needs unmet
+4. **💬 Social** - Improved in Common Rooms
+5. **❤️ Health** - Affected by all factors; below 35% residents head to the Clinic
 
 ### Resident Status Bars
 
@@ -251,15 +273,15 @@ Press **B** to toggle status bars above residents:
 - **Blue Bar**: LIFE meter progress
   - Turns gold when near graduation (90%+)
   - Turns grey if stalled
-- **Color Bar**: Happiness level
-  - 🟢 Green (70-100%) - Happy
+- **Color Bar**: Health level
+  - 🟢 Green (70-100%) - Healthy
   - 🟡 Yellow (40-69%) - Neutral
-  - 🟠 Orange (20-39%) - Unhappy
+  - 🟠 Orange (20-39%) - Unhealthy
   - 🔴 Red (0-19%) - At risk (pulses!)
 
 ### Departure Warning
 
-If happiness stays below 20% for too long:
+If health stays below 20% for too long:
 1. **Warning Phase** (12 minutes): Resident becomes "at-risk"
 2. **Departure Phase** (24 minutes): Resident leaves
 3. **Reputation Loss**: -3 to -5 depending on severity
@@ -285,70 +307,76 @@ The **LIFE (Living Independently For Empowerment)** meter tracks each resident's
 - Priority: Build trust, provide social opportunities
 
 #### 3. 🟢 Growth (50-75%)
-- Focus: Skill development
+- Focus: Earning through fundraisers
 - Duration: ~20-40 game days
-- Priority: Learning Centers, Vocational Rooms
+- Priority: Keep fundraisers running
 
 #### 4. 🔵 Independence (75-100%)
 - Focus: Preparing to graduate
 - Duration: ~10-20 game days
-- Priority: Final support, job preparation
+- Priority: Final fundraisers
 
 ### Boosting LIFE Progression
 
-| Factor | Effect |
+LIFE now comes mostly from **fundraisers**. Everyone who takes part gains LIFE:
+
+| Source | Effect |
 |--------|--------|
-| Learning Center | +0.5% per visit |
-| Vocational Room | +0.5% per visit |
-| Food: Premium | +50% fill rate |
-| Food: Generous | +20% fill rate |
-| Adjacent bonuses | Up to +15% fill rate |
-| High happiness | Faster progression |
+| Successful fundraiser | +15 LIFE per participant |
+| Failed fundraiser | +5 LIFE per participant |
+| Passive fill | Slow trickle for every resident |
+| Food: Premium | +50% passive fill rate |
+| Food: Generous | +20% passive fill rate |
+| High health | Faster passive fill |
 
 ### Graduation
 
 When LIFE reaches 100%:
 - Resident "graduates" and leaves
-- You receive +5 reputation (+7 for Veterans)
-- Potential $500 bonus donation
+- You receive +5 reputation
+- Potential ₱25,000 bonus donation
 - Progress toward next tier unlock
 
 ---
 
-## 🍽️ Food System & Portions
+## 🍽️ Food System & Deliveries
 
-### Five Food Tiers
+Your food **delivery level** sets the supplies that arrive each day. Bigger deliveries cost more, keep residents healthier, and make cafeterias produce food faster.
 
-| Tier | Cost/Resident | Happiness | Reputation | LIFE Fill |
-|------|---------------|-----------|------------|-----------|
-| **Minimal** | $5 | -10 | -3 | 0.5x |
-| **Small** | $10 | -5 | -1 | 0.8x |
-| **Standard** | $18 | 0 | 0 | 1.0x |
-| **Generous** | $30 | +10 | +2 | 1.2x |
-| **Premium** | $50 | +20 | +5 | 1.5x |
+### Five Delivery Levels
 
-### Food Strategy
+| Level | Cost/Resident | Health | Reputation | LIFE Fill | Food Production |
+|-------|---------------|--------|------------|-----------|-----------------|
+| **Minimal** | ₱250 | -10 | -3 | 0.5x | 0.6x |
+| **Small** | ₱500 | -5 | -1 | 0.8x | 0.8x |
+| **Standard** | ₱900 | 0 | 0 | 1.0x | 1.0x |
+| **Generous** | ₱1,500 | +10 | +2 | 1.2x | 1.2x |
+| **Premium** | ₱2,500 | +20 | +5 | 1.5x | 1.5x |
+
+"No Deliveries" is also available as a last resort: it costs nothing, hurts Health and reputation, and cafeterias only produce 0.3x food.
+
+### Delivery Strategy
 
 **Early Game (Tight Budget)**
-- Use **Small** portions to save money
-- Accept the happiness penalty temporarily
+- Use **Small** deliveries to save money
+- Accept the health penalty temporarily
 - Switch to Standard when stable
 
 **Mid Game (Stable)**
 - Use **Standard** as baseline
-- Switch to **Generous** before fundraisers (boosts happiness)
+- Switch to **Generous** before fundraisers (boosts health)
 - Use **Minimal** only in emergencies
 
 **Late Game (Prosperous)**
-- **Generous** or **Premium** accelerates graduations
+- **Generous** or **Premium** accelerates graduations and food production
 - Higher reputation = better donations
-- ROI is positive at higher tiers
 
-### Food Generation
+### Food Generation and Use
 
-- Cafeterias generate 1 food every 15 seconds
-- More cafeterias = more passive food income
-- Food is consumed daily based on portion setting
+- Each cafeteria produces 1 food every 15 seconds at Standard; the delivery level speeds this up or slows it down
+- Every time a resident finishes a meal at a cafeteria, 1 food is used up
+- Fundraisers also use food (3 per participant)
+- If food runs out, residents leave the cafeteria hungry
 
 ---
 
@@ -358,7 +386,7 @@ When LIFE reaches 100%:
 
 #### 1. Automatic Donations
 - **Frequency**: Every 90 seconds
-- **Base Amount**: $25 per resident
+- **Base Amount**: ₱1,250 per resident
 - **Reputation Multiplier**: Affects donation chance
 - **Tier Multiplier**: 1.0x → 2.0x based on tier
 
@@ -367,14 +395,13 @@ When LIFE reaches 100%:
 - See [Fundraiser System](#fundraiser-system)
 
 #### 3. Graduation Bonuses
-- $500 potential bonus per graduation
-- Veterans provide +$200 extra
+- ₱25,000 potential bonus per graduation
 
 ### Expenses
 
 #### 1. Food Costs
-- Daily cost = Residents × Portion Cost
-- Example: 10 residents × $18 (Standard) = $180/day
+- Daily cost = Residents × Delivery Cost
+- Example: 10 residents × ₱900 (Standard) = ₱9,000/day
 
 #### 2. Maintenance
 - Due every 5 minutes
@@ -382,14 +409,14 @@ When LIFE reaches 100%:
 - **Failure = -2 reputation per room!**
 
 #### 3. Operating Costs (Daily)
-- Base: $100/day
-- Per resident: $5/day each
-- Per room: $10/day each
-- Example: $100 + (10 × $5) + (5 × $10) = $200/day
+- Base: ₱5,000/day
+- Per resident: ₱250/day each
+- Per room: ₱500/day each
+- Example: ₱5,000 + (10 × ₱250) + (5 × ₱500) = ₱10,000/day
 
 #### 4. Random Expenses
 - 15% chance each donation cycle
-- Range: $50-$200
+- Range: ₱2,500-₱10,000
 - Types: Plumbing, electrical, inspections, etc.
 
 ### Economic Dashboard
@@ -405,12 +432,12 @@ Click 📊 in the HUD to see:
 
 | Money Level | Status |
 |-------------|--------|
-| Below $200 | Low funds warning |
-| Below $0 | In debt warning |
-| Below -$300 | Near bankruptcy |
-| Below -$500 | **Bankruptcy countdown starts** |
+| Below ₱10,000 | Low funds warning |
+| Below ₱0 | In debt warning |
+| Below -₱15,000 | Near bankruptcy |
+| Below -₱25,000 | **Bankruptcy countdown starts** |
 
-**Bankruptcy Countdown**: 18 minutes to recover above $0 or game over!
+**Bankruptcy Countdown**: 18 minutes to recover above ₱0 or game over!
 
 ---
 
@@ -418,14 +445,14 @@ Click 📊 in the HUD to see:
 
 ### How Fundraisers Work
 
-1. Click "Start Fundraiser" in management panel
-2. Non-fatigued residents participate
-3. Duration: 15 minutes
-4. Outcome based on average happiness
+1. Click "Start Fundraiser" in the management panel (you don't pick anyone)
+2. A random group of rested (non-fatigued) residents takes part
+3. Duration: 2.5 minutes
+4. Outcome based on average health of the group
 
 ### Success Chance
 
-| Avg. Happiness | Success Rate |
+| Avg. Health | Success Rate |
 |----------------|--------------|
 | 80%+ | 95% |
 | 60-79% | 80% |
@@ -436,12 +463,13 @@ Click 📊 in the HUD to see:
 ### Outcomes
 
 **On Success:**
-- Payout: $150-$350
-- +5 LIFE meter for participants
+- Payout: ₱7,500-₱17,500
+- +15 LIFE for each participant
 - +2 reputation
 
 **On Failure:**
-- -5 happiness for participants
+- +5 LIFE for each participant (taking part is what counts)
+- -5 health for participants
 - -2 reputation
 - No money earned
 
@@ -450,12 +478,12 @@ Click 📊 in the HUD to see:
 - **Fundraiser Cooldown**: 10 minutes between events
 - **Resident Fatigue**: 5 minutes after participating
   - Fatigued residents can't participate
-  - -5 happiness during fatigue
-- **Minimum Requirement**: 3 non-fatigued residents to start
+  - -5 health during fatigue
+- **Minimum Requirement**: at least 1 rested resident, enough food (3 per participant) and an open Fundraiser Station
 
 ### Fundraiser Tips
 
-1. **Boost happiness first** - Use generous food before starting
+1. **Boost health first** - Use generous food before starting
 2. **Wait for cooldown** - Don't rush between fundraisers
 3. **Watch fatigue** - Rotate which residents participate
 4. **Timing matters** - Run when reputation is high for bonus
@@ -467,46 +495,63 @@ Click 📊 in the HUD to see:
 
 ### Four Shelter Tiers
 
-| Tier | Name | Residents | Grid | Donation Bonus |
-|------|------|-----------|------|----------------|
-| 1 | Starter Shelter | 10 | 10×10 | 1.0x |
-| 2 | Community Hub | 25 | 15×15 | 1.2x |
-| 3 | Opportunity Center | 50 | 20×20 | 1.5x |
-| 4 | Campus | 100 | 25×25 | 2.0x |
+| Tier | Name | Residents | Donation Bonus |
+|------|------|-----------|----------------|
+| 1 | Starter Shelter | 10 | 1.0x |
+| 2 | Community Hub | 25 | 1.2x |
+| 3 | Opportunity Center | 50 | 1.5x |
+| 4 | Campus | 100 | 2.0x |
+
+Tier upgrades don't enlarge your build area; use the Expansion tab for that.
 
 ### Upgrade Requirements
 
 **To Tier 2 (Community Hub):**
-- $3,000 cash
+- ₱150,000 cash
 - 60% reputation
 - 5 graduations
-- 70% grid utilization
+- 40% grid utilization
 
 **To Tier 3 (Opportunity Center):**
-- $8,000 cash
+- ₱400,000 cash
 - 60% reputation
 - 15 graduations
-- 70% grid utilization
+- 40% grid utilization
 
 **To Tier 4 (Campus):**
-- $20,000 cash
+- ₱1,000,000 cash
 - 60% reputation
 - 40 graduations
-- 70% grid utilization
+- 40% grid utilization
 
 ### Room Unlocks by Tier
 
-- **Tier 1**: Dormitory, Cafeteria, Bathroom, Common Room, Fundraiser Station
-- **Tier 2**: + Learning Center, Admin Office
-- **Tier 3**: + Vocational Room
+- **Tier 1**: Dormitory, Cafeteria, Bathroom, Common Room, Clinic, Fundraiser Station
+- **Tier 2**: + Admin Office
 - **Tier 4**: All rooms
 
 ### Tier Strategy
 
-1. **Fill your grid** to 70% before upgrading
+1. **Fill your grid** to 40% before upgrading
 2. **Graduate steadily** - don't rush capacity
 3. **Save money** for upgrade + post-upgrade building
 4. **Maintain reputation** at 60%+ for qualification
+
+---
+
+## 🚪 Arrival Events
+
+Residents never walk in on their own. They arrive through random events you can accept or decline:
+
+| Event | Who arrives | If you accept |
+|-------|-------------|---------------|
+| Elderly Home Transfer | 1 elderly | +₱12,500 stipend, +3 reputation |
+| Job Center Referral | 1 adult | +1 reputation |
+| Knock at the Door | 1 young adult | — |
+| Family Reunification | 1 relative of a current resident | +2 reputation (declining costs 1) |
+| Community Support | 2-4 residents | +3 reputation (or take a cash donation instead) |
+
+You need a free bed (and room under your tier's resident cap) to accept. Without one, the accept option is greyed out, and arrival events show up less often.
 
 ---
 
@@ -518,31 +563,35 @@ Random emergencies that bring new residents seeking shelter.
 
 | Disaster | Residents | Urgency | Rep Gain | Donation |
 |----------|-----------|---------|----------|----------|
-| House Fire | 3 | 1 min | +8 | $200 |
-| Winter Storm | 5 | 3 min | +10 | $350 |
-| Factory Closure | 4 | 5 min | +5 | $100 |
-| Domestic Violence | 2 | 1 min | +12 | $150 |
-| Hospital Discharge | 2 | 3 min | +6 | $100 |
-| Mass Eviction | 8 | 1 min | +15 | $500 |
+| House Fire | 3 | 1 min | +8 | ₱10,000 |
+| Winter Storm | 5 | 3 min | +10 | ₱17,500 |
+| Factory Closure | 4 | 5 min | +5 | ₱5,000 |
+| Domestic Violence | 2 | 1 min | +12 | ₱7,500 |
+| Hospital Discharge | 2 | 3 min | +6 | ₱5,000 |
+| Mass Eviction | 8 | 1 min | +15 | ₱25,000 |
 
 ### Response Options
 
 - **Accept All**: Take all residents, full rewards
 - **Accept Partial** (if 4+ residents): Take half, half rewards
-- **Decline**: Reputation penalty (varies by disaster)
+- **Refer to a Different Institution**: Reputation penalty (varies by disaster)
 
 ### Special Considerations
 
 - **Winter Storm**: +50% maintenance costs temporarily
 - **Factory Closure**: Residents get +25% LIFE fill boost
-- **Domestic Violence**: Extra $30/resident security cost
-- **Hospital Discharge**: $50 medical costs
+- **Domestic Violence**: Extra ₱1,500/resident security cost
+- **Hospital Discharge**: ₱2,500 medical costs
 
 ### Capacity Overflow
 
 - Disasters can push you 50% over tier capacity
-- Overcrowded residents suffer -2 happiness penalty
+- Overcrowded residents suffer -2 health penalty
 - Consider declining if already near capacity
+
+### Natural Disasters
+
+Earthquakes and winter storms damage a random number of your buildings (1-4, never more than you have). You pay for repairs right away: **₱7,500 per damaged building**. There is no choice to make; keep a cash buffer.
 
 ### Disaster Strategy
 
@@ -570,7 +619,7 @@ Random emergencies that bring new residents seeking shelter.
 
 ### Night Phase Activities
 
-- Some rooms close (Learning Center, Vocational Room)
+- Some rooms close (Cafeteria, Fundraiser Station, Admin Office)
 - Residents sleep in Dormitories
 - Energy restores
 - Fewer random events
@@ -599,14 +648,14 @@ Shows current issues requiring attention. Three severity levels:
 ### Warning Types (16 Total)
 
 **Financial Warnings:**
-- Low funds (below $500)
-- In debt (below $0)
-- Near bankruptcy (below -$300)
+- Low funds (below ₱25,000)
+- In debt (below ₱0)
+- Near bankruptcy (below -₱15,000)
 - Maintenance due soon
 - Operating costs due
 
 **Resident Warnings:**
-- Unhappy resident (prolonged low happiness)
+- Unhealthy resident (prolonged low health)
 - At-risk resident (about to leave)
 - Overcrowded
 - Hungry residents (low food)
@@ -647,7 +696,6 @@ Shows current issues requiring attention. Three severity levels:
 | Action | Change |
 |--------|--------|
 | Resident graduated | +5 |
-| Veteran graduated | +7 |
 | Fundraiser success | +2 |
 | Generous food | +1 |
 | Premium food | +2 |
@@ -657,9 +705,9 @@ Shows current issues requiring attention. Three severity levels:
 
 | Action | Change |
 |--------|--------|
-| Resident left unhappy | -3 |
+| Resident left unhealthy | -3 |
 | Resident left hopeless | -5 |
-| Small food portion | -1 |
+| Small food delivery | -1 |
 | No food | -5 |
 | Maintenance missed | -2 |
 | Overcrowding | -1 |
@@ -680,7 +728,7 @@ Your reputation naturally decays over time:
 **Decay Mitigation:**
 - Each active resident: -10% decay
 - Recent graduation (7 days): -20% decay
-- High happiness (>70% avg): -30% decay
+- High health (>70% avg): -30% decay
 - At tier capacity: -20% decay
 
 ---
@@ -693,16 +741,16 @@ Your reputation naturally decays over time:
 
 ✅ **Do:**
 - Build essentials: Dormitory, Cafeteria, Bathroom
-- Use Small or Standard food portions
+- Use Small or Standard food deliveries
 - Accept most disasters (need the residents!)
 - Place rooms with adjacency bonuses
-- Maintain 40%+ reputation for spawns
+- Accept arrival events when you have free beds
 
 ❌ **Don't:**
 - Build luxury rooms yet
 - Use Premium food (too expensive)
-- Let money drop below $200
-- Ignore happiness warnings
+- Let money drop below ₱10,000
+- Ignore health warnings
 - Expand too fast
 
 ---
@@ -713,16 +761,16 @@ Your reputation naturally decays over time:
 
 ✅ **Do:**
 - Graduate residents steadily
-- Run fundraisers when happiness is high
-- Build to 70% grid utilization
-- Save for Tier 2 upgrade ($3,000)
-- Unlock Learning Center for faster LIFE fill
+- Run fundraisers when health is high
+- Build to 40% grid utilization
+- Save for Tier 2 upgrade (₱150,000)
+- Run fundraisers often: they are the main source of LIFE
 
 ❌ **Don't:**
 - Let reputation decay below 60%
 - Accept disasters if overcapacity
 - Skip maintenance payments
-- Neglect resident happiness
+- Neglect resident health
 
 ---
 
@@ -789,25 +837,25 @@ If you're heading toward bankruptcy:
 ### Gameplay Questions
 
 **Q: Why are my residents leaving?**
-A: Happiness has been below 20% for too long. Watch for the 😰 emoji and red pulsing status bars. Improve food quality, build social rooms, and ensure needs are met.
+A: Health has been below 20% for too long. Watch for the 😰 emoji and red pulsing status bars. Improve food quality, build social rooms, and ensure needs are met.
 
 **Q: How do I increase LIFE meter faster?**
-A: Build Learning Centers and Vocational Rooms (Tier 2+), use higher food portions, optimize room adjacencies, and keep happiness high.
+A: Run fundraisers: every participant gains LIFE (+15 on success, +5 on failure). Keep residents rested and healthy so more of them can take part, and use higher food deliveries for a faster passive fill.
 
 **Q: Why did my fundraiser fail?**
-A: Success rate is based on average happiness. If average happiness was below 60%, there's a significant chance of failure. Boost happiness before starting!
+A: Success rate is based on average health. If average health was below 60%, there's a significant chance of failure. Boost health before starting!
 
 **Q: What happens when I go bankrupt?**
-A: Money below -$500 starts an 18-minute countdown. Get above $0 to cancel. If time runs out, game over.
+A: Money below -₱25,000 starts an 18-minute countdown. Get above ₱0 to cancel. If time runs out, game over.
 
 **Q: How do I unlock more room types?**
-A: Upgrade your shelter tier. Tier 2 unlocks Learning Center and Admin Office. Tier 3 unlocks Vocational Room.
+A: Upgrade your shelter tier. Tier 2 unlocks the Admin Office.
 
 **Q: Should I accept every disaster?**
 A: Not necessarily. Consider your capacity, finances, and current stability. It's okay to decline if you're struggling.
 
 **Q: Why is my reputation dropping?**
-A: Reputation decays naturally over time. Higher reputation = faster decay. Mitigate with graduations, high happiness, and active residents.
+A: Reputation decays naturally over time. Higher reputation = faster decay. Mitigate with graduations, high health, and active residents.
 
 ---
 
@@ -820,7 +868,7 @@ A: Click Pause (⏸️) and select "Save Game". Auto-saves also occur periodical
 A: Yes! Use speed controls (1, 2, 3 keys) or pause to plan.
 
 **Q: What do the colored bars above residents mean?**
-A: Blue = LIFE progress, Colored = Happiness. Press B to toggle visibility.
+A: Blue = LIFE progress, Colored = Health. Press B to toggle visibility.
 
 **Q: Can I undo building a room?**
 A: There's no undo, but you can demolish rooms through the management panel.
@@ -853,7 +901,7 @@ Track your progress with these goals:
 - [ ] Reach Tier 4 (Campus)
 - [ ] Graduate 100 residents
 - [ ] Maintain 95%+ reputation for 10 days
-- [ ] Never let a resident leave unhappy
+- [ ] Never let a resident leave unhealthy
 
 ---
 

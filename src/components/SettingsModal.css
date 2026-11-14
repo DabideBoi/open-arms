@@ -56,7 +56,7 @@
 }
 
 .settings-section h3 {
-  color: #4a9eff;
+  color: #8cc152;
   margin: 0 0 16px 0;
   font-size: 18px;
 }
@@ -101,7 +101,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #4a9eff;
+  background: #8cc152;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -117,7 +117,7 @@
 }
 
 .slider-value {
-  color: #4a9eff;
+  color: #8cc152;
   font-weight: 600;
   min-width: 45px;
   text-align: right;
@@ -144,13 +144,13 @@
 
 .speed-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(74, 158, 255, 0.5);
+  border-color: rgba(140,193,82,0.5);
 }
 
 .speed-btn.active {
-  background: rgba(74, 158, 255, 0.3);
-  border-color: #4a9eff;
-  box-shadow: 0 0 12px rgba(74, 158, 255, 0.4);
+  background: rgba(140,193,82,0.3);
+  border-color: #8cc152;
+  box-shadow: 0 0 12px rgba(140,193,82,0.4);
 }
 
 .setting-description {
@@ -181,7 +181,7 @@
   padding: 4px 12px;
   font-family: monospace;
   font-size: 14px;
-  color: #4a9eff;
+  color: #8cc152;
   min-width: 60px;
   text-align: center;
 }
@@ -269,7 +269,7 @@
 }
 
 .credits strong {
-  color: #4a9eff;
+  color: #8cc152;
   font-size: 16px;
 }
 
@@ -290,12 +290,12 @@
 }
 
 .settings-content::-webkit-scrollbar-thumb {
-  background: rgba(74, 158, 255, 0.5);
+  background: rgba(140,193,82,0.5);
   border-radius: 4px;
 }
 
 .settings-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(74, 158, 255, 0.7);
+  background: rgba(140,193,82,0.7);
 }
 
 /* Responsive design */

@@ -4,12 +4,15 @@ import { RoomSpec, RoomType, ResidentProfileSpec, ResidentProfile, AdjacencyBonu
 // Grid Configuration
 // ============================================================================
 
+// Save format version. New games start at this so load-time migrations never re-apply.
+export const SAVE_VERSION = "1.3.0";
+
 export const GRID_CONFIG = {
   TOTAL_WIDTH: 40,
   TOTAL_HEIGHT: 30,
-  STARTER_SIZE: 10,           // Starting with 10x10 for Tier 1 (changed from 20)
+  STARTER_SIZE: 12,           // Starting with 12x12 for Tier 1
   TILE_SIZE: 32,              // Pixels per tile
-  EXPANSION_COST_PER_TILE: 100,
+  EXPANSION_COST_PER_TILE: 5000,
   MIN_EXPANSION: 5,
   MAX_EXPANSION: 10
 } as const;
@@ -23,55 +26,41 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "dormitory",
     width: 3,
     height: 3,
-    buildCost: 300,              // Down from 500 - easier early game
-    maintenanceCost: 25,         // Up from 20
+    buildCost: 15000,
+    maintenanceCost: 1250,
     capacity: 4,
     closesAtNight: false,
     needsSatisfied: ["sleep"],
-    image: "rooms/dormitory"
   },
   
   cafeteria: {
     type: "cafeteria",
     width: 5,
     height: 3,
-    buildCost: 500,              // Down from 800 - essential building
-    maintenanceCost: 50,         // Up from 40
-    capacity: 10,
+    buildCost: 25000,
+    maintenanceCost: 2500,
+    capacity: 5,                 // one per chair (see ROOM_LOOKS.cafeteria.seats)
     closesAtNight: true,
     needsSatisfied: ["food"],
-    image: "rooms/cafeteria"
   },
   
-  learning_center: {
-    type: "learning_center",
-    width: 4,
+  clinic: {
+    type: "clinic",
+    width: 3,
     height: 3,
-    buildCost: 450,              // Down from 1000
-    maintenanceCost: 40,         // Down from 50
-    capacity: 6,
-    closesAtNight: true,
-    needsSatisfied: ["learning"],
-    image: "rooms/learning_center"
-  },
-  
-  vocational_room: {
-    type: "vocational_room",
-    width: 4,
-    height: 3,
-    buildCost: 550,              // Down from 1200
-    maintenanceCost: 45,         // Down from 60
-    capacity: 6,
-    closesAtNight: true,
-    needsSatisfied: ["learning"]
+    buildCost: 20000,
+    maintenanceCost: 1750,
+    capacity: 4,
+    closesAtNight: false,
+    needsSatisfied: ["health"]
   },
   
   bathroom: {
     type: "bathroom",
     width: 2,
     height: 2,
-    buildCost: 200,              // Down from 300
-    maintenanceCost: 20,         // Up from 15
+    buildCost: 10000,
+    maintenanceCost: 1000,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["bathroom"]
@@ -81,8 +70,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "common_room",
     width: 3,
     height: 3,
-    buildCost: 350,              // Down from 600
-    maintenanceCost: 30,         // Up from 25
+    buildCost: 17500,
+    maintenanceCost: 1500,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["social"]
@@ -92,8 +81,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "admin_office",
     width: 2,
     height: 2,
-    buildCost: 700,              // Up from 400 - luxury building
-    maintenanceCost: 60,         // Up from 20
+    buildCost: 35000,
+    maintenanceCost: 3000,
     capacity: 0,
     closesAtNight: true,
     needsSatisfied: []
@@ -103,14 +92,110 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "fundraiser_station",
     width: 3,
     height: 2,
-    buildCost: 400,              // Down from 700
-    maintenanceCost: 35,         // Up from 30
-    capacity: 4,
+    buildCost: 20000,
+    maintenanceCost: 1750,
+    capacity: 3,
     closesAtNight: true,
     needsSatisfied: [],
-    image: "rooms/fundraser_station"
+  },
+
+  // --- Decorations ---------------------------------------------------------
+  potted_plant: {
+    type: "potted_plant",
+    width: 1,
+    height: 1,
+    buildCost: 3000,
+    maintenanceCost: 150,
+    capacity: 0,
+    closesAtNight: false,
+    needsSatisfied: [],
+    isDecoration: true,
+    aura: { health: 2, lifeFillModifier: 0 },
+  },
+
+  fountain: {
+    type: "fountain",
+    width: 1,
+    height: 1,
+    buildCost: 12500,
+    maintenanceCost: 500,
+    capacity: 0,
+    closesAtNight: false,
+    needsSatisfied: [],
+    isDecoration: true,
+    aura: { health: 3, lifeFillModifier: 0.05 },
+  },
+
+  // --- Upgraded rooms --------------------------------------------------------
+  large_dormitory: {
+    type: "large_dormitory",
+    width: 4,
+    height: 3,
+    buildCost: 27500,
+    maintenanceCost: 2000,
+    capacity: 6,                 // one per bed (see ROOM_LOOKS.large_dormitory.seats)
+    closesAtNight: false,
+    needsSatisfied: ["sleep"],
+    baseType: "dormitory",
+  },
+
+  medical_center: {
+    type: "medical_center",
+    width: 4,
+    height: 3,
+    buildCost: 40000,
+    maintenanceCost: 3000,
+    capacity: 6,
+    closesAtNight: false,
+    needsSatisfied: ["health"],
+    baseType: "clinic",
+    bonus: { health: 5, lifeFillModifier: 0 },
+  },
+
+  dining_hall: {
+    type: "dining_hall",
+    width: 6,
+    height: 3,
+    buildCost: 45000,
+    maintenanceCost: 3750,
+    capacity: 8,                 // one per chair (see ROOM_LOOKS.dining_hall.seats)
+    closesAtNight: true,
+    needsSatisfied: ["food"],
+    baseType: "cafeteria",
+  },
+
+  // --- Service rooms ---------------------------------------------------------
+  library: {
+    type: "library",
+    width: 3,
+    height: 3,
+    buildCost: 25000,
+    maintenanceCost: 1750,
+    capacity: 0,
+    closesAtNight: false,
+    needsSatisfied: ["social"],
+    baseType: "common_room",
+    bonus: { health: 0, lifeFillModifier: 0.15 },
+  },
+
+  garden: {
+    type: "garden",
+    width: 3,
+    height: 3,
+    buildCost: 30000,
+    maintenanceCost: 1500,
+    capacity: 0,
+    closesAtNight: false,
+    needsSatisfied: ["social"],
+    baseType: "common_room",
+    bonus: { health: 3, lifeFillModifier: 0.05 },
   }
 };
+
+/** What a room behaves as: upgrades and service rooms act like their base room. */
+export function roomKind(type: RoomType): RoomType {
+  return ROOM_SPECS[type]?.baseType ?? type;
+}
 
 // ============================================================================
 // Resident Profile Specifications
@@ -119,28 +204,28 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
 export const PROFILE_SPECS: Record<ResidentProfile, ResidentProfileSpec> = {
   young_adult: {
     profile: "young_adult",
-    lifeFillRate: 60 / 3600,           // 60% per hour = 4% per day (in 4-min day phase)
-    happinessDecayRate: 12,            // 12 per day (up from 10) - needs decay faster
+    lifeFillRate: 15 / 3600,           // slow passive fill; fundraisers are the main LIFE source
+    healthDecayRate: 12,            // 12 per day (up from 10) - needs decay faster
     fundraiserEfficiency: 1.2,         // 20% bonus
     graduationBonus: 0,
     displayName: "Young Adult",
     icon: "🧑"
   },
   
-  veteran: {
-    profile: "veteran",
-    lifeFillRate: 60 / 3600,           // 60% per hour = 4% per day (in 4-min day phase)
-    happinessDecayRate: 7,             // 7 per day (up from 5) - needs decay faster
+  adult: {
+    profile: "adult",
+    lifeFillRate: 15 / 3600,           // slow passive fill; fundraisers are the main LIFE source
+    healthDecayRate: 7,             // 7 per day (up from 5) - needs decay faster
     fundraiserEfficiency: 1.0,         // Normal
-    graduationBonus: 2,                // +2 reputation on graduation
-    displayName: "Veteran",
-    icon: "🎖️"
+    graduationBonus: 0,
+    displayName: "Adult",
+    icon: "🧔"
   },
   
   elderly: {
     profile: "elderly",
-    lifeFillRate: 60 / 3600,           // 60% per hour = 4% per day (in 4-min day phase)
-    happinessDecayRate: 20,            // 20 per day (up from 15) - needs decay faster
+    lifeFillRate: 15 / 3600,           // slow passive fill; fundraisers are the main LIFE source
+    healthDecayRate: 20,            // 20 per day (up from 15) - needs decay faster
     fundraiserEfficiency: 0.8,         // 20% penalty
     graduationBonus: 0,
     displayName: "Elderly",
@@ -153,7 +238,7 @@ export const PROFILE_SPECS: Record<ResidentProfile, ResidentProfileSpec> = {
 // ============================================================================
 
 export const GAME_STATE_CONFIG = {
-  STARTING_MONEY: 5000,              // Down from 5000 - less cushion
+  STARTING_MONEY: 250000,
   STARTING_REPUTATION: 60,           // Down from 50 - harder start
   STARTING_DAY: 1,
   STARTING_RESIDENTS: 3,
@@ -178,26 +263,22 @@ export const LIFE_METER_CONFIG = {
 // ============================================================================
 // These multipliers are applied to the base LIFE fill rate depending on
 // what activity the resident is currently doing.
-// Learning (in learning_center/vocational_room) is the primary growth activity.
+// LIFE now comes mainly from fundraisers; these rates only scale the small passive fill.
 
 export const LIFE_ACTIVITY_RATES = {
-  // Learning is the primary activity - full growth rate (100%)
-  // This is the baseline rate defined in PROFILE_SPECS.lifeFillRate
-  LEARNING: 1.0,
-  
-  // Eating provides moderate LIFE growth (50% of learning rate)
+  // Eating provides moderate LIFE growth (50% of base rate)
   // Good nutrition contributes to personal development
   EATING: 0.5,
   
-  // Sleeping provides passive LIFE growth (25% of learning rate)
+  // Sleeping provides passive LIFE growth (25% of base rate)
   // Rest and recovery support progress
   SLEEPING: 0.25,
   
-  // Idle/other activities provide minimal growth (10% of learning rate)
+  // Idle/other activities provide minimal growth (10% of base rate)
   // Just being in the shelter environment provides some benefit
   IDLE: 0.1,
   
-  // Social activities (common room) provide small growth (15% of learning rate)
+  // Social activities (common room) provide small growth (15% of base rate)
   // Building social connections supports personal development
   SOCIAL: 0.15,
   
@@ -206,16 +287,18 @@ export const LIFE_ACTIVITY_RATES = {
 } as const;
 
 // ============================================================================
-// Happiness Configuration
+// Health Configuration
 // ============================================================================
 
-export const HAPPINESS_CONFIG = {
+export const HEALTH_CONFIG = {
   MIN: 0,
   MAX: 100,
   STARTING: 70,
   UPDATE_INTERVAL: 10000,
   SLEEP_RESTORE_RATE: 15,
-  COMMON_ROOM_BOOST_RATE: 10
+  COMMON_ROOM_BOOST_RATE: 10,
+  CLINIC_SEEK_THRESHOLD: 35,   // residents below this Health look for a clinic
+  CLINIC_RECOVERY_RATE: 2      // Health restored per second while in a clinic
 };
 
 // ============================================================================
@@ -242,7 +325,7 @@ export interface DecayThreshold {
 
 export const REPUTATION_DECAY = {
   // Decay rate per in-game day (6 minutes real-time)
-  BASE_DECAY_RATE: 1, // Lose 1% per day baseline
+  BASE_DECAY_RATE: 1.5, // Lose 1% per day baseline
   
   // Scaling based on current reputation
   DECAY_THRESHOLDS: [
@@ -260,15 +343,15 @@ export const REPUTATION_DECAY = {
   MITIGATION: {
     perActiveResident: 0.1,      // -10% decay per resident
     perGraduationThisWeek: 0.2,  // -20% decay per recent graduation
-    highHappinessBonus: 0.3,     // -30% decay if avg happiness > 70
+    highHealthBonus: 0.3,     // -30% decay if avg health > 70
     fullCapacityBonus: 0.2,      // -20% decay if at tier capacity
   },
   
   // Recent graduation tracking window (7 in-game days)
   GRADUATION_TRACKING_DAYS: 7,
   
-  // High happiness threshold for mitigation bonus
-  HIGH_HAPPINESS_THRESHOLD: 70
+  // High health threshold for mitigation bonus
+  HIGH_HEALTH_THRESHOLD: 70
 } as const;
 
 // ============================================================================
@@ -276,11 +359,11 @@ export const REPUTATION_DECAY = {
 // ============================================================================
 
 export const BANKRUPTCY_CONFIG = {
-  THRESHOLD: -500,                         // Money below this triggers bankruptcy
+  THRESHOLD: -25000,                         // Money below this triggers bankruptcy
   COUNTDOWN_DURATION: 18 * 60 * 1000,      // 18 minutes (3 in-game days at 6min/day)
-  WARNING_MONEY_LOW: 200,                  // Warn when money drops below this
+  WARNING_MONEY_LOW: 10000,                  // Warn when money drops below this
   WARNING_MONEY_DEBT: 0,                   // Warn when money goes negative
-  RECOVERY_THRESHOLD: 0                    // Must get above $0 to cancel bankruptcy
+  RECOVERY_THRESHOLD: 0                    // Must get above ₱0 to cancel bankruptcy
 } as const;
 
 // ============================================================================
@@ -290,13 +373,12 @@ export const BANKRUPTCY_CONFIG = {
 export const REPUTATION_CHANGES = {
   // Positive changes
   RESIDENT_GRADUATED: 5,
-  RESIDENT_GRADUATED_VETERAN: 7,
   FUNDRAISER_COMPLETED: 2,
   FOOD_LARGE_PORTION: 1,
   DISASTER_ACCEPTED: 3,
   
   // Negative changes
-  RESIDENT_LEFT_UNHAPPY: -3,
+  RESIDENT_LEFT_UNHEALTHY: -3,
   RESIDENT_LEFT_HOPELESS: -5,
   FOOD_SMALL_PORTION: -1,
   FOOD_NONE: -5,
@@ -313,10 +395,10 @@ export const REPUTATION_CHANGES = {
 // ============================================================================
 
 export const DEPARTURE_CONFIG = {
-  UNHAPPY_THRESHOLD: 20,       // Happiness below this = at risk
+  UNHEALTHY_THRESHOLD: 20,       // Health below this = at risk
   WARNING_DURATION: 720000,    // 12 minutes real-time (1 in-game day) = warning
   DEPARTURE_DURATION: 1440000, // 24 minutes real-time (2 in-game days) = leave
-  REPUTATION_PENALTY_UNHAPPY: 3,
+  REPUTATION_PENALTY_UNHEALTHY: 3,
   REPUTATION_PENALTY_HOPELESS: 5,
   EXIT_TIMEOUT: 30000,         // 30 seconds to reach exit before teleport
 } as const;
@@ -327,8 +409,8 @@ export const DEPARTURE_CONFIG = {
 
 export const DONATION_CONFIG = {
   CHECK_INTERVAL: 90 * 1000,            // 90 seconds (down from 5 minutes)
-  BASE_AMOUNT_PER_RESIDENT: 25,         // Down from 50 - smaller but more frequent
-  MIN_DONATION: 10,                     // Minimum donation amount
+  BASE_AMOUNT_PER_RESIDENT: 1250,
+  MIN_DONATION: 500,                     // Minimum donation amount
   GRADUATE_MULTIPLIER: 0.1,             // +10% per graduate
   RANDOM_VARIANCE_MIN: 0.8,             // 80% of calculated
   RANDOM_VARIANCE_MAX: 1.2              // 120% of calculated
@@ -341,46 +423,47 @@ export const DONATION_CONFIG = {
 export const FOOD_CONFIG = {
   GENERATION_INTERVAL: 15000,  // 15 seconds - cafeterias generate 1 food per interval
   GENERATION_AMOUNT: 1,         // Amount of food generated per cafeteria per interval
+  FOOD_PER_MEAL: 3,             // Food taken from stock each time a hungry resident enters a cafeteria
   
   // Legacy cost mapping (for backward compatibility)
   COST_PER_RESIDENT: {
-    premium: 50,
-    large: 30,                  // Maps to generous
-    generous: 30,
-    standard: 18,
-    small: 10,
-    minimal: 5,
+    premium: 3500,
+    large: 2200,                  // Maps to generous
+    generous: 2200,
+    standard: 1400,
+    small: 800,
+    minimal: 400,
     none: 0
   },
   
   // Legacy effects mapping (for backward compatibility)
   EFFECTS: {
     premium: {
-      happinessChange: 20,
-      reputationChange: 5
+      healthChange: 20,
+      reputationChange: 2
     },
     large: {
-      happinessChange: 10,
-      reputationChange: 2
+      healthChange: 10,
+      reputationChange: 1
     },
     generous: {
-      happinessChange: 10,
-      reputationChange: 2
+      healthChange: 10,
+      reputationChange: 1
     },
     standard: {
-      happinessChange: 0,
+      healthChange: 0,
       reputationChange: 0
     },
     small: {
-      happinessChange: -5,
+      healthChange: -5,
       reputationChange: -1
     },
     minimal: {
-      happinessChange: -10,
+      healthChange: -10,
       reputationChange: -3
     },
     none: {
-      happinessChange: -15,
+      healthChange: -15,
       reputationChange: -5
     }
   }
@@ -394,47 +477,53 @@ export type FoodPortionTier = 'minimal' | 'small' | 'standard' | 'generous' | 'p
 
 export interface FoodPortionConfig {
   cost: number;
-  happiness: number;
+  health: number;
   reputation: number;
   description: string;
   lifeFillModifier: number;
+  generationMultiplier: number; // cafeteria food production speed (bigger deliveries = faster)
 }
 
 export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
   minimal: {
-    cost: 5,
-    happiness: -10,
+    cost: 400,
+    health: -10,
     reputation: -3,
-    description: "Emergency rations only",
-    lifeFillModifier: 0.5
+    description: "Emergency supplies only",
+    lifeFillModifier: 0.5,
+    generationMultiplier: 0.6
   },
   small: {
-    cost: 10,
-    happiness: -5,
+    cost: 800,
+    health: -5,
     reputation: -1,
     description: "Basic but adequate",
-    lifeFillModifier: 0.8
+    lifeFillModifier: 0.8,
+    generationMultiplier: 0.8
   },
   standard: {
-    cost: 18,
-    happiness: 0,           // CHANGED: Now neutral
+    cost: 1400,
+    health: 0,           // CHANGED: Now neutral
     reputation: 0,
     description: "Balanced nutrition",
-    lifeFillModifier: 1.0
+    lifeFillModifier: 1.0,
+    generationMultiplier: 1
   },
   generous: {
-    cost: 30,
-    happiness: 10,
-    reputation: 2,
+    cost: 2200,
+    health: 10,
+    reputation: 1,
     description: "Quality meals",
-    lifeFillModifier: 1.2
+    lifeFillModifier: 1.2,
+    generationMultiplier: 1.2
   },
   premium: {
-    cost: 50,
-    happiness: 20,
-    reputation: 5,
+    cost: 3500,
+    health: 20,
+    reputation: 2,
     description: "Restaurant-quality dining",
-    lifeFillModifier: 1.5
+    lifeFillModifier: 1.5,
+    generationMultiplier: 1.5
   }
 } as const;
 
@@ -443,7 +532,6 @@ export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
 // ============================================================================
 
 export const MAINTENANCE_CONFIG = {
-  CHECK_INTERVAL: 5 * 60 * 1000,        // 5 minutes (down from 15) - more frequent
   REPUTATION_PENALTY_PER_ROOM: -2,      // Reputation loss per room if can't pay
   WARNING_TIME: 2 * 60 * 1000           // Warn 2 minutes before due (down from 5)
 } as const;
@@ -453,9 +541,9 @@ export const MAINTENANCE_CONFIG = {
 // ============================================================================
 
 export const OPERATING_COSTS_CONFIG = {
-  BASE_DAILY_COST: 100,                 // Base daily cost regardless of size
-  PER_RESIDENT_COST: 5,                 // Additional cost per resident
-  PER_ROOM_COST: 10                     // Additional cost per room built
+  BASE_DAILY_COST: 5000,                 // Base daily cost regardless of size
+  PER_RESIDENT_COST: 250,                 // Additional cost per resident
+  PER_ROOM_COST: 500                     // Additional cost per room built
 } as const;
 
 // ============================================================================
@@ -464,8 +552,8 @@ export const OPERATING_COSTS_CONFIG = {
 
 export const EXPENSE_EVENTS_CONFIG = {
   CHANCE_PER_DONATION_CYCLE: 0.15,      // 15% chance each donation cycle
-  MIN_COST: 50,                         // Minimum emergency expense
-  MAX_COST: 200,                        // Maximum emergency expense
+  MIN_COST: 2500,                         // Minimum emergency expense
+  MAX_COST: 10000,                        // Maximum emergency expense
   EVENT_TYPES: [
     "Plumbing emergency",
     "Electrical issue",
@@ -520,14 +608,15 @@ export function isDevTimersEnabled(): boolean {
 
 export const FUNDRAISER_CONFIG = {
   // Payout settings
-  BASE_PAYOUT_MIN: 150,                    // Down from 200
-  BASE_PAYOUT_MAX: 350,                    // Down from 500
+  BASE_PAYOUT_MIN: 1000,
+  BASE_PAYOUT_MAX: 2500,
   DURATION_MINUTES: 2.5,                   // 2.5 minutes (2:30) - quick fundraiser cycles
-  BASE_REPUTATION_MODIFIER: 0.5,           // Base modifier for payout calculation
+  BASE_REPUTATION_MODIFIER: 0.25,          // Base modifier for payout calculation
   
   // Effects on success
-  LIFE_BOOST: 5,                           // +5 LIFE meter points
-  HAPPINESS_COST: 10,                      // -10 happiness points
+  LIFE_BOOST: 15,                          // +15 LIFE per participant on success
+  LIFE_BOOST_FAILURE: 5,                   // +5 LIFE per participant on failure (taking part is what counts)
+  HEALTH_COST: 10,                      // -10 health points
   REPUTATION_BOOST: 2,                     // +2 reputation on completion
   
   // Cooldown system
@@ -537,21 +626,24 @@ export const FUNDRAISER_CONFIG = {
   FOOD_COST_PER_RESIDENT: 3,               // Food units per participating resident
   
   // Failure consequences
-  FAILURE_HAPPINESS_PENALTY: -5,           // Happiness loss on failure (embarrassment)
+  FAILURE_HEALTH_PENALTY: -5,           // Health loss on failure (embarrassment)
   FAILURE_REPUTATION_PENALTY: -2,          // Reputation loss on failure (public failure)
   
   // Fatigue system
   FATIGUE_DURATION: 300000,                // 5 minutes (in ms) - resident fatigue duration
-  FATIGUE_HAPPINESS_PENALTY: -5,           // Happiness penalty during fatigue
+  FATIGUE_BY_PROFILE: { young_adult: 30 * 1000, adult: 2 * 60 * 1000, elderly: 5 * 60 * 1000 } as Record<ResidentProfile, number>,
+  FATIGUE_HEALTH_PENALTY: -5,           // Health penalty during fatigue
   MIN_NON_FATIGUED_RESIDENTS: 1,           // Minimum non-fatigued residents to start (lowered for early game)
+  MIN_GROUP: 1,                            // Each fundraiser rolls a required group size in [MIN_GROUP, MAX_GROUP]
+  MAX_GROUP: 3,                            // = fundraiser station capacity (one group at a time)
   
-  // Success chance thresholds based on average happiness
+  // Success chance thresholds based on average health
   SUCCESS_CHANCE: {
-    HAPPINESS_80_PLUS: 0.95,               // 95% success if avg happiness >= 80
-    HAPPINESS_60_PLUS: 0.80,               // 80% success if avg happiness >= 60
-    HAPPINESS_40_PLUS: 0.60,               // 60% success if avg happiness >= 40
-    HAPPINESS_20_PLUS: 0.40,               // 40% success if avg happiness >= 20
-    HAPPINESS_BELOW_20: 0.20               // 20% success if avg happiness < 20
+    HEALTH_80_PLUS: 0.95,               // 95% success if avg health >= 80
+    HEALTH_60_PLUS: 0.80,               // 80% success if avg health >= 60
+    HEALTH_40_PLUS: 0.60,               // 60% success if avg health >= 40
+    HEALTH_20_PLUS: 0.40,               // 40% success if avg health >= 20
+    HEALTH_BELOW_20: 0.20               // 20% success if avg health < 20
   }
 } as const;
 
@@ -559,13 +651,93 @@ export const FUNDRAISER_CONFIG = {
 // Resident Spawning Configuration
 // ============================================================================
 
+// Residents only arrive by accepting events; these weights pick the profile when an event doesn't.
+// ============================================================================
+// Warnings
+// ============================================================================
+
+export const WARNING_CONFIG = {
+  // Check interval
+  CHECK_INTERVAL: 5000, // Check every 5 seconds
+  
+  // Cooldown durations (ms)
+  COOLDOWN_DEFAULT: 2 * 60 * 1000,      // 2 minutes - same warning can only appear once per 2 min
+  COOLDOWN_DISMISSED: 5 * 60 * 1000,    // 5 minutes - after dismissing, don't show for 5 min
+  COOLDOWN_CRITICAL: 30 * 1000,         // 30 seconds - critical warnings can reappear sooner
+  
+  // Escalation (ms)
+  ESCALATION_TIME: 3 * 60 * 1000,       // 3 minutes - escalate severity if ignored
+  
+  // Financial thresholds
+  LOW_FUNDS_THRESHOLD: 25000,
+  IN_DEBT_THRESHOLD: 0,
+  NEAR_BANKRUPTCY_THRESHOLD: -15000,
+  MAINTENANCE_WARNING_MINUTES: 2,       // Warn 2 minutes before maintenance
+  
+  // Resident thresholds
+  UNHEALTHY_THRESHOLD: 30,
+  UNHEALTHY_DURATION_WARNING: 60 * 1000,  // 1 minute below health threshold
+  LOW_FOOD_PER_RESIDENT: 2,             // Warn if food < residents * 2
+  
+  // Operational thresholds
+  LOW_REPUTATION_THRESHOLD: 40,
+  
+  // Progression thresholds
+  STALLED_PROGRESS_MINUTES: 5,          // 5 minutes with no graduations
+  LIFE_METER_STALLED_THRESHOLD: 5,      // If LIFE meter hasn't moved by 5 points in 2 min
+};
+
+// ============================================================================
+// Random Events
+// ============================================================================
+
+export const EVENT_CONFIG = {
+  MIN_INTERVAL: 45 * 1000,           // 45 seconds minimum between events
+  MAX_INTERVAL: 2 * 60 * 1000,       // 2 minutes maximum between events
+  MAX_ACTIVE_EVENTS: 3,              // Maximum simultaneous events
+  EVENT_EXPIRY_TIME: 5 * 60 * 1000,  // 5 minutes to respond
+};
+
+// Relative weights (normalised when picking). Arrival events are the only way residents join.
+export const EVENT_WEIGHTS = {
+  donation_drive: 0.15,
+  health_outbreak: 0.10,
+  media_coverage: 0.12,
+  volunteer_day: 0.10,
+  inspection: 0.08,
+  community_support: 0.14,
+  elder_transfer: 0.14,
+  job_referral: 0.14,
+  knock_at_door: 0.14,
+  family_reunification: 0.08,
+  street_outreach: 0.12,
+  hospital_referral: 0.08,
+  pipe_burst: 0.08,
+  LOW_MONEY_DONATION_DRIVE: 0.25,     // used instead when money is low
+  NO_ROOM_ARRIVAL_MULTIPLIER: 0.3,    // arrival events are rarer when the shelter is full
+};
+
+export const EVENT_ECONOMY = {
+  DONATION_DRIVE_BASE: 15000,
+  DONATION_DRIVE_PER_RESIDENT: 5000,
+  OUTBREAK_TREATMENT_MIN: 15000,
+  OUTBREAK_TREATMENT_PER_RESIDENT: 3000,
+  MEDIA_GRANT: 25000,
+  INSPECTION_GRANT: 50000,
+  INSPECTION_FINE: 25000,
+  INSPECTION_PREP_COST: 10000,
+  PIPE_REPAIR_COST: 8000,
+  HOSPITAL_STIPEND: 8000,
+  COMMUNITY_DONATION_MIN: 15000,
+  COMMUNITY_DONATION_MAX: 40000,
+  ELDER_TRANSFER_STIPEND: 12500,
+  LOW_MONEY_THRESHOLD: 25000,
+};
+
 export const SPAWN_CONFIG = {
-  MIN_REPUTATION_FOR_SPAWN: 40,            // 40%+ reputation required (down from 50)
-  SPAWN_RATE_PER_DAY: 1,                   // 1 resident per day at 40%+ reputation
-  SPAWN_CHECK_INTERVAL: 45 * 1000,         // 45 seconds (NEW - faster spawning checks)
   PROFILE_WEIGHTS: {
     young_adult: 0.4,                      // 40%
-    veteran: 0.4,                          // 40%
+    adult: 0.4,                            // 40%
     elderly: 0.2                           // 20%
   }
 } as const;
@@ -575,7 +747,7 @@ export const SPAWN_CONFIG = {
 // ============================================================================
 
 export const EXPANSION_CONFIG = {
-  BASE_COST: 1000,                         // Base cost per expansion
+  BASE_COST: 50000,                         // Base cost per expansion
   EXPANSION_SIZE: 5,                       // Each expansion unlocks 5x5 area
   COST_FORMULA_MULTIPLIER: 0.01            // Cost = Base × (1 + UnlockedTiles/100)
 } as const;
@@ -586,15 +758,22 @@ export const EXPANSION_CONFIG = {
 
 export const AI_CONFIG = {
   NEED_CHECK_INTERVAL: 5000,        // Check needs every 5 seconds
-  MOVE_SPEED: 2,                    // Tiles per second
+  MOVE_SPEED: 0.8,                  // Tiles per second (before profile factor)
   ROOM_USAGE_TIME: 10,              // Seconds to satisfy need
   BATHROOM_CHANCE: 0.1,             // 10% chance per check
   BATHROOM_MIN_INTERVAL: 60000,     // Minimum 1 minute between bathroom needs
-  EATING_INTERVAL_MIN: 30 * 1000,  // Minimum 30 seconds real-time
-  EATING_INTERVAL_MAX: 60 * 1000,  // Maximum 60 seconds real-time (1 minute)
+  EATING_INTERVAL_MIN: 2 * 60 * 1000,  // Minimum real time since last meal (daytime only, paused at night)
+  EATING_INTERVAL_MAX: 3 * 60 * 1000,  // Maximum real time since last meal
   EATING_DURATION: 15,              // Seconds to eat at cafeteria
-  UPDATE_FREQUENCY: 1,              // AI state updates per second
-  MOVEMENT_UPDATE_FREQUENCY: 60     // Movement updates per second (60 FPS)
+  MAX_WAIT_TIME: 10000,             // Maximum time to wait for occupied tile (10 seconds - INCREASED)
+  REPATH_COOLDOWN: 2000,            // Cooldown before attempting to repath (2 seconds)
+  REPOSITION_DURATION: 1.0,         // Duration for gradual repositioning animation (1 second)
+  REPATH_ATTEMPTS: 2,               // Number of repath attempts before repositioning
+  FUNDRAISER_WANDER_INTERVAL: 3000, // Interval between wander position changes at fundraiser (3 seconds)
+  FUNDRAISER_WANDER_SPEED: 1.5,     // Slower movement speed when wandering (tiles per second)
+  STROLL_CHANCE: { young_adult: 0.5, adult: 0.4, elderly: 0.25 } as Record<ResidentProfile, number>, // idle residents going for a walk
+  STROLL_MAX_FRACTION: 0.33,        // cap on idle residents strolling at once, so hallways don't jam
+  STROLL_ROOM_VISIT_CHANCE: 0.85,    // a stroll visits a room rather than a hallway tile
 };
 
 export const PATHFINDING_CONFIG = {
@@ -608,11 +787,13 @@ export const PATHFINDING_CONFIG = {
 // ============================================================================
 
 export const NAME_LISTS = {
-  FIRST_NAMES: [
-    "John", "Maria", "James", "Sarah", "Michael", "Jennifer",
-    "David", "Lisa", "Robert", "Patricia", "William", "Linda",
-    "Richard", "Barbara", "Joseph", "Elizabeth", "Thomas", "Susan",
-    "Charles", "Jessica", "Christopher", "Karen", "Daniel", "Nancy"
+  MALE_FIRST_NAMES: [
+    "John", "James", "Michael", "David", "Robert", "William",
+    "Richard", "Joseph", "Thomas", "Charles", "Christopher", "Daniel"
+  ],
+  FEMALE_FIRST_NAMES: [
+    "Maria", "Sarah", "Jennifer", "Lisa", "Patricia", "Linda",
+    "Barbara", "Elizabeth", "Susan", "Jessica", "Karen", "Nancy"
   ],
   
   LAST_NAMES: [
@@ -654,25 +835,24 @@ export const VISUAL_CONFIG = {
 // ============================================================================
 
 export const COLORS = {
-  GRID_LINE: 0x3d465a,
-  TILE_EMPTY: 0x323a4d,        // buildable land — clearly lighter than locked
-  TILE_LOCKED: 0x161a22,       // not-yet-unlocked land
-  TILE_ENTRANCE: 0x22d3ee,     // welcoming doorway (cyan)
+  GRID_LINE: 0x557a42,
+  TILE_EMPTY: 0x769b5a,        // buildable land (grass), lighter than locked
+  TILE_LOCKED: 0x3a4733,       // not-yet-unlocked land
+  TILE_ENTRANCE: 0xd9c28f,     // welcoming doorway (sandy path)
   ROOM_DORMITORY: 0xb07a4a,
   ROOM_CAFETERIA: 0xf59e0b,
-  ROOM_LEARNING: 0x5b8def,
-  ROOM_VOCATIONAL: 0xa78bfa,
+  ROOM_CLINIC: 0xf472b6,
   ROOM_BATHROOM: 0x67d3e6,
   ROOM_COMMON: 0x4ade80,
   ROOM_ADMIN: 0x94a3b8,
   ROOM_FUNDRAISER: 0xfacc15,
   RESIDENT_YOUNG: 0x4ade80,
-  RESIDENT_VETERAN: 0xf87171,
+  RESIDENT_ADULT: 0xf87171,
   RESIDENT_ELDERLY: 0xfbbf24
 };
 
 // Background beyond the shelter grid (Phaser canvas clear color)
-export const BACKGROUND_COLOR = 0x0d1017;
+export const BACKGROUND_COLOR = 0x1a1f16;
 
 // ============================================================================
 // Adjacency Bonuses Configuration
@@ -685,13 +865,13 @@ export const ADJACENCY_BONUSES: Record<string, AdjacencyBonusConfig> = {
   
   // Dormitory combinations
   bathroom_dormitory: {
-    happiness: 5,
+    health: 5,
     lifeFillModifier: 0,
     maintenanceReduction: 0.1, // 10% cheaper maintenance
     description: "Residents appreciate bathrooms near sleeping areas"
   },
   common_room_dormitory: {
-    happiness: 3,
+    health: 3,
     lifeFillModifier: 0.05, // 5% faster LIFE fill
     maintenanceReduction: 0,
     description: "Easy access to relaxation areas"
@@ -699,41 +879,35 @@ export const ADJACENCY_BONUSES: Record<string, AdjacencyBonusConfig> = {
   
   // Cafeteria combinations
   cafeteria_common_room: {
-    happiness: 5,
+    health: 5,
     lifeFillModifier: 0,
     maintenanceReduction: 0,
     description: "Social dining experience"
   },
   
-  // Learning combinations
-  admin_office_learning_center: {
-    happiness: 0,
-    lifeFillModifier: 0.1, // 10% faster LIFE fill
+  // Clinic combinations
+  bathroom_clinic: {
+    health: 3,
+    lifeFillModifier: 0,
     maintenanceReduction: 0,
-    description: "Better program coordination"
+    description: "Convenient hygiene facilities"
   },
-  learning_center_vocational_room: {
-    happiness: 0,
-    lifeFillModifier: 0.15, // 15% faster LIFE fill
+  cafeteria_clinic: {
+    health: -3,
+    lifeFillModifier: 0,
     maintenanceReduction: 0,
-    description: "Comprehensive education pathway"
-  },
-  admin_office_vocational_room: {
-    happiness: 0,
-    lifeFillModifier: 0.08, // 8% faster LIFE fill
-    maintenanceReduction: 0.05,
-    description: "Efficient program administration"
+    description: "Kitchen noise and smells disturb patients"
   },
   
   // Fundraiser station combinations
   common_room_fundraiser_station: {
-    happiness: 2,
+    health: 2,
     lifeFillModifier: 0,
     maintenanceReduction: 0.05,
     description: "Comfortable preparation area"
   },
   admin_office_fundraiser_station: {
-    happiness: 0,
+    health: 0,
     lifeFillModifier: 0,
     maintenanceReduction: 0.1, // 10% cheaper maintenance
     description: "Streamlined fundraiser coordination"
@@ -743,13 +917,13 @@ export const ADJACENCY_BONUSES: Record<string, AdjacencyBonusConfig> = {
   
   // Dormitory penalties
   cafeteria_dormitory: {
-    happiness: -5,
+    health: -5,
     lifeFillModifier: 0,
     maintenanceReduction: -0.1, // 10% MORE maintenance (noise, smells)
     description: "Kitchen noise disturbs sleep"
   },
   dormitory_fundraiser_station: {
-    happiness: -3,
+    health: -3,
     lifeFillModifier: 0,
     maintenanceReduction: -0.05,
     description: "Fundraiser activities disturb rest"
@@ -757,22 +931,10 @@ export const ADJACENCY_BONUSES: Record<string, AdjacencyBonusConfig> = {
   
   // Bathroom penalties
   bathroom_cafeteria: {
-    happiness: -8,
+    health: -8,
     lifeFillModifier: 0,
     maintenanceReduction: -0.15, // 15% MORE maintenance
     description: "Unpleasant proximity"
-  },
-  bathroom_learning_center: {
-    happiness: -2,
-    lifeFillModifier: -0.05, // 5% slower LIFE fill
-    maintenanceReduction: 0,
-    description: "Distracting location for learning"
-  },
-  bathroom_vocational_room: {
-    happiness: -2,
-    lifeFillModifier: -0.05,
-    maintenanceReduction: 0,
-    description: "Distracting location for training"
   }
 } as const;
 
@@ -792,9 +954,9 @@ export const SHELTER_TIERS: Record<ShelterTier, ShelterTierConfig> = {
   1: {
     name: "Starter Shelter",
     maxResidents: 10,
-    gridSize: 10, // 10x10 playable area
+    gridSize: 12, // 12x12 playable area
     upgradeCost: 0, // Starting tier
-    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'learning_center', 'fundraiser_station'],
+    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'clinic', 'fundraiser_station', 'potted_plant'],
     donationMultiplier: 1.0,
     description: "A small shelter providing basic services",
     graduationsRequired: 0, // Starting tier
@@ -803,30 +965,30 @@ export const SHELTER_TIERS: Record<ShelterTier, ShelterTierConfig> = {
   2: {
     name: "Community Hub",
     maxResidents: 25,
-    gridSize: 15,
-    upgradeCost: 3000,
-    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'learning_center', 'admin_office'],
+    gridSize: 18,
+    upgradeCost: 150000,
+    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'clinic', 'fundraiser_station', 'potted_plant', 'admin_office', 'large_dormitory', 'library'],
     donationMultiplier: 1.2, // 20% more donations
-    description: "Growing community with educational services",
+    description: "Growing community with expanded services",
     graduationsRequired: 5,
     reputationRequired: 60
   },
   3: {
     name: "Opportunity Center",
     maxResidents: 50,
-    gridSize: 20,
-    upgradeCost: 8000,
-    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'learning_center', 'admin_office', 'vocational_room'],
+    gridSize: 22,
+    upgradeCost: 400000,
+    availableRooms: ['dormitory', 'cafeteria', 'bathroom', 'common_room', 'clinic', 'fundraiser_station', 'potted_plant', 'admin_office', 'large_dormitory', 'library', 'fountain', 'medical_center', 'dining_hall', 'garden'],
     donationMultiplier: 1.5, // 50% more donations
-    description: "Comprehensive support with job training",
+    description: "Comprehensive support for residents",
     graduationsRequired: 15,
     reputationRequired: 60
   },
   4: {
     name: "Campus",
     maxResidents: 100,
-    gridSize: 25,
-    upgradeCost: 20000,
+    gridSize: 26,
+    upgradeCost: 1000000,
     availableRooms: 'all', // All room types
     donationMultiplier: 2.0, // Double donations
     description: "Full-service campus changing lives",
@@ -840,7 +1002,7 @@ export const SHELTER_TIERS: Record<ShelterTier, ShelterTierConfig> = {
 // ============================================================================
 
 export const TIER_UPGRADE_CONFIG = {
-  MIN_GRID_UTILIZATION: 0.7, // Must have 70% of grid utilized to upgrade
+  MIN_GRID_UTILIZATION: 0.4, // Must have 40% of grid utilized to upgrade
   CAPACITY_WARNING_THRESHOLD: 0.9 // Show warning when at 90% capacity
 } as const;
 
@@ -859,8 +1021,8 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "immediate",
     reputationGainAccept: 8,
     reputationLossDecline: 5,
-    donationBonus: 200,
-    happinessImpact: -5
+    donationBonus: 10000,
+    healthImpact: -5
   },
   winter_storm: {
     type: "winter_storm",
@@ -870,9 +1032,22 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "24hours",
     reputationGainAccept: 10,
     reputationLossDecline: 8,
-    donationBonus: 350,
-    happinessImpact: -10,
+    donationBonus: 17500,
+    healthImpact: -10,
+    naturalDisaster: true,
     maintenanceSurge: 1.5
+  },
+  earthquake: {
+    type: "earthquake",
+    title: "Earthquake",
+    description: "A strong earthquake has shaken the shelter and damaged buildings.",
+    residentSurge: 0,
+    urgency: "immediate",
+    reputationGainAccept: 0,
+    reputationLossDecline: 0,
+    donationBonus: 0,
+    healthImpact: 0,
+    naturalDisaster: true
   },
   factory_closure: {
     type: "factory_closure",
@@ -882,8 +1057,8 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "week",
     reputationGainAccept: 5,
     reputationLossDecline: 2,
-    donationBonus: 100,
-    happinessImpact: 0,
+    donationBonus: 5000,
+    healthImpact: 0,
     lifeBoost: true
   },
   domestic_violence: {
@@ -894,8 +1069,8 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "immediate",
     reputationGainAccept: 12,
     reputationLossDecline: 10,
-    donationBonus: 150,
-    happinessImpact: -3,
+    donationBonus: 7500,
+    healthImpact: -3,
     securityRequired: true
   },
   hospital_discharge: {
@@ -906,9 +1081,9 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "24hours",
     reputationGainAccept: 6,
     reputationLossDecline: 4,
-    donationBonus: 100,
-    happinessImpact: -2,
-    medicalCosts: 50
+    donationBonus: 5000,
+    healthImpact: -2,
+    medicalCosts: 7500
   },
   eviction_wave: {
     type: "eviction_wave",
@@ -918,8 +1093,8 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     urgency: "immediate",
     reputationGainAccept: 15,
     reputationLossDecline: 12,
-    donationBonus: 500,
-    happinessImpact: -15
+    donationBonus: 25000,
+    healthImpact: -15
   }
 } as const;
 
@@ -939,7 +1114,7 @@ export const DISASTER_CONFIG = {
   
   // Capacity overflow
   OVERFLOW_MULTIPLIER: 1.5,                // Disasters can exceed tier cap by 50%
-  OVERCROWDING_HAPPINESS_PENALTY: -2,      // Per-resident happiness penalty when overcrowded
+  OVERCROWDING_HEALTH_PENALTY: -2,      // Per-resident health penalty when overcrowded
   
   // Urgency timers (time to respond)
   URGENCY_TIMERS: {
@@ -952,10 +1127,14 @@ export const DISASTER_CONFIG = {
   PARTIAL_ACCEPT_THRESHOLD: 4,             // Show partial accept for 4+ residents
   
   // Security costs for domestic violence cases
-  SECURITY_COST_PER_RESIDENT: 30,          // Extra cost per resident
+  SECURITY_COST_PER_RESIDENT: 1500,          // Extra cost per resident
   
   // Life boost for motivated residents (factory closure)
-  LIFE_BOOST_MULTIPLIER: 1.25              // 25% faster LIFE fill
+  LIFE_BOOST_MULTIPLIER: 1.25,             // 25% faster LIFE fill
+
+  // Natural disasters (earthquake, winter storm) damage buildings
+  MAX_DAMAGED_BUILDINGS: 4,                // 1..4 buildings damaged (capped by rooms built)
+  REPAIR_COST_PER_BUILDING: 7500            // Charged immediately per damaged building
 } as const;
 
 // ============================================================================
@@ -966,7 +1145,7 @@ export const STATUS_BAR_CONFIG = {
   // Dimensions
   BAR_WIDTH: 30,
   BAR_HEIGHT: 4,
-  HAPPINESS_BAR_HEIGHT: 3,
+  HEALTH_BAR_HEIGHT: 3,
   GAP_BETWEEN_BARS: 2,
   OFFSET_ABOVE_RESIDENT: 25,
   
@@ -975,23 +1154,23 @@ export const STATUS_BAR_CONFIG = {
   LIFE_COLOR_NEAR_GRADUATION: 0xFFD700,  // Gold (90-100%)
   LIFE_COLOR_STALLED: 0x9E9E9E,     // Grey
   
-  // Happiness Colors
-  HAPPINESS_COLOR_HIGH: 0x4CAF50,   // Green (70-100%)
-  HAPPINESS_COLOR_MEDIUM: 0xFFC107, // Yellow (40-69%)
-  HAPPINESS_COLOR_LOW: 0xFF9800,    // Orange (20-39%)
-  HAPPINESS_COLOR_CRITICAL: 0xF44336, // Red (0-19%)
+  // Health Colors
+  HEALTH_COLOR_HIGH: 0x4CAF50,   // Green (70-100%)
+  HEALTH_COLOR_MEDIUM: 0xFFC107, // Yellow (40-69%)
+  HEALTH_COLOR_LOW: 0xFF9800,    // Orange (20-39%)
+  HEALTH_COLOR_CRITICAL: 0xF44336, // Red (0-19%)
   
   // Thresholds
   NEAR_GRADUATION_THRESHOLD: 90,
-  HAPPINESS_HIGH_THRESHOLD: 70,
-  HAPPINESS_MEDIUM_THRESHOLD: 40,
-  HAPPINESS_LOW_THRESHOLD: 20,
+  HEALTH_HIGH_THRESHOLD: 70,
+  HEALTH_MEDIUM_THRESHOLD: 40,
+  HEALTH_LOW_THRESHOLD: 20,
   
   // Stalled detection (ms since last LIFE change)
   STALLED_DURATION: 60000, // 1 minute
   
   // Animation
-  PULSE_SPEED: 500,  // ms per pulse cycle for critical happiness
+  PULSE_SPEED: 500,  // ms per pulse cycle for critical health
   GLOW_INTENSITY: 0.5,
   
   // Background
@@ -1001,13 +1180,12 @@ export const STATUS_BAR_CONFIG = {
 
 // Status Icons for resident states
 export const STATUS_ICONS = {
-  HAPPY: '😊',       // happiness > 80
-  NEUTRAL: '😐',     // happiness 40-80
-  UNHAPPY: '😟',     // happiness 20-39
-  AT_RISK: '😰',     // happiness < 20 for extended time
+  HEALTHY: '💚',       // health > 80
+  NEUTRAL: '💛',     // health 40-80
+  UNHEALTHY: '🤒',     // health 20-39
+  AT_RISK: '🚑',     // health < 20 for extended time
   SLEEPING: '💤',    // in dormitory sleeping
   EATING: '🍽️',      // in cafeteria
-  LEARNING: '📚',    // in learning center
   WALKING: '🚶',     // pathfinding state
   LEAVING: '🏃'      // departure state
 } as const;

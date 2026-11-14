@@ -1,0 +1,88 @@
+.reports-panel {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: min(720px, 94vw);
+  max-height: calc(100vh - 190px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  color: var(--text-1);
+  border: 3px solid var(--ink);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans);
+}
+
+.reports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 0;
+  border-bottom: 2px solid var(--ink);
+  background: var(--surface-2);
+}
+
+.reports-tabs { display: flex; gap: 4px; }
+
+.reports-tab {
+  padding: 8px 18px;
+  background: var(--surface-1);
+  color: var(--text-3);
+  border: 2px solid var(--ink);
+  border-bottom: 0;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  font: 700 14px var(--font-sans);
+  cursor: pointer;
+}
+.reports-tab:hover { color: var(--text-1); }
+.reports-tab.active { background: var(--surface-1); color: var(--text-1); box-shadow: inset 0 3px 0 var(--accent); }
+
+.reports-close {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 6px;
+  background: transparent;
+  color: var(--text-2);
+  border: 2px solid transparent;
+  border-radius: var(--r-md);
+  font: 700 20px/1 var(--font-sans);
+  cursor: pointer;
+}
+.reports-close:hover { border-color: var(--ink); background: var(--surface-3); }
+
+.reports-body { padding: 12px; overflow-y: auto; }
+
+.reports-empty { margin: 8px 0; color: var(--text-3); text-align: center; }
+
+/* Inline versions of the old floating alert list and statistics modal */
+.reports-body .warning-panel.embedded {
+  position: static;
+  max-width: none;
+}
+.reports-body .warning-panel.embedded .warning-panel-toggle { display: none; }
+.reports-body .warning-panel.embedded .warning-panel-content {
+  position: static;
+  max-height: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.reports-body .statistics-modal.embedded {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.reports-body .statistics-modal.embedded > h2,
+.reports-body .statistics-modal.embedded .statistics-close-button,
+.reports-body .statistics-modal.embedded .statistics-footer { display: none; }

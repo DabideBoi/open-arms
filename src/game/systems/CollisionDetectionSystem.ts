@@ -39,7 +39,7 @@ class SpatialOccupancyMap {
    * Generate key for a tile position
    */
   private getKey(x: number, y: number): string {
-    return `${Math.floor(x)},${Math.floor(y)}`;
+    return `${Math.round(x)},${Math.round(y)}`; // nearest tile centre: gridX is integer at a tile's centre
   }
   
   /**
@@ -95,7 +95,8 @@ class SpatialOccupancyMap {
     
     // Only update if position actually changed
     if (oldKey !== newKey) {
-      this.occupancy.delete(oldKey);
+      // Only release the old tile if we still own it (pass-through can leave two residents on one tile)
+      if (this.occupancy.get(oldKey) === residentId) this.occupancy.delete(oldKey);
       this.occupancy.set(newKey, residentId);
     }
   }
@@ -125,9 +126,7 @@ class SpatialOccupancyMap {
     this.occupancy.clear();
     
     for (const resident of residents) {
-      const x = Math.floor(resident.gridX);
-      const y = Math.floor(resident.gridY);
-      this.setOccupied(x, y, resident.id);
+      this.setOccupied(resident.gridX, resident.gridY, resident.id);
     }
   }
   
@@ -202,7 +201,7 @@ export function isTileOccupiedByOther(
   y: number,
   excludeResidentId: string
 ): boolean {
-  const key = `${Math.floor(x)},${Math.floor(y)}`;
+  const key = `${Math.round(x)},${Math.round(y)}`;
   const residentId = occupancyMap.getResidentAt(x, y);
   
   // Check physical occupancy by another resident
@@ -261,19 +260,14 @@ export function updateResidentPosition(
   oldX: number,
   oldY: number
 ): void {
-  const newX = Math.floor(resident.gridX);
-  const newY = Math.floor(resident.gridY);
-  
-  occupancyMap.updateResidentPosition(oldX, oldY, newX, newY, resident.id);
+  occupancyMap.updateResidentPosition(oldX, oldY, resident.gridX, resident.gridY, resident.id);
 }
 
 /**
  * Register a new resident in the occupancy map
  */
 export function registerResident(resident: Resident): void {
-  const x = Math.floor(resident.gridX);
-  const y = Math.floor(resident.gridY);
-  occupancyMap.setOccupied(x, y, resident.id);
+  occupancyMap.setOccupied(resident.gridX, resident.gridY, resident.id);
 }
 
 /**

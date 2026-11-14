@@ -274,10 +274,10 @@
   -webkit-appearance: none;
   width: 20px;
   height: 20px;
-  background: #4a9eff;
+  background: #8cc152;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(140,193,82,0.4);
 }
 
 .partial-count {

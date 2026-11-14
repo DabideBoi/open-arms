@@ -1,5 +1,5 @@
 import { GameState, Room, Resident, DayPhase } from '../../types';
-import { getActiveTimerConfig, ROOM_SPECS } from '../../constants';
+import { getActiveTimerConfig, ROOM_SPECS, roomKind } from '../../constants';
 import { processDailyFood } from './FoodSystem';
 import { deductDailyOperatingCosts } from './DonationSystem';
 import { applyReputationDecay } from './ReputationSystem';
@@ -35,6 +35,8 @@ export function transitionToDay(gameState: GameState): void {
   // Update resident days in shelter
   for (const resident of gameState.residents) {
     resident.daysInShelter++;
+    // Hunger timer is paused at night; clamp so residents who arrived mid-night start fresh at dawn
+    resident.lastMealTime = Math.min(Date.now(), resident.lastMealTime + TIMER_CONFIG.NIGHT_DURATION);
   }
   
   // Deduct daily operating costs at the start of each day
@@ -150,10 +152,10 @@ export function wakeUpResidents(gameState: GameState): void {
         }
       }
       
-      // Apply +30 happiness increase from sleep (capped at 100)
-      const previousHappiness = resident.happiness;
-      resident.happiness = Math.min(100, resident.happiness + 30);
-      const happinessGain = resident.happiness - previousHappiness;
+      // Apply +30 health increase from sleep (capped at 100)
+      const previousHealth = resident.health;
+      resident.health = Math.min(100, resident.health + 30);
+      const healthGain = resident.health - previousHealth;
       
       // Clear sleep position lock
       resident.sleepX = null;
@@ -164,13 +166,13 @@ export function wakeUpResidents(gameState: GameState): void {
       resident.currentNeed = null;
       resident.targetRoomId = null;
       
-      console.log(`☀️ ${resident.name} woke up from sleep (+${happinessGain} happiness)`);
+      console.log(`☀️ ${resident.name} woke up from sleep (+${healthGain} health)`);
     }
   }
 }
 
 /**
- * Update sleeping resident (restore happiness)
+ * Update sleeping resident (restore health)
  */
 export function updateSleepingResident(
   resident: Resident,
@@ -180,12 +182,12 @@ export function updateSleepingResident(
   if (resident.currentState !== "sleeping") return;
   if (gameState.currentPhase !== "night") return;
   
-  // Restore happiness while sleeping (15 per hour)
-  const HAPPINESS_RESTORE_RATE = 15;
-  const restorePerSecond = HAPPINESS_RESTORE_RATE / 3600;
+  // Restore health while sleeping (15 per hour)
+  const HEALTH_RESTORE_RATE = 15;
+  const restorePerSecond = HEALTH_RESTORE_RATE / 3600;
   const restore = restorePerSecond * deltaTime;
   
-  resident.happiness = Math.min(100, resident.happiness + restore);
+  resident.health = Math.min(100, resident.health + restore);
 }
 
 // ============================================================================
@@ -246,7 +248,7 @@ export function checkDormitoryCapacity(gameState: GameState): {
   sufficient: boolean;
 } {
   const required = getRequiredDormitories(gameState.residents.length);
-  const dormitories = gameState.rooms.filter(r => r.type === "dormitory");
+  const dormitories = gameState.rooms.filter(r => roomKind(r.type) === "dormitory");
   const available = dormitories.length;
   
   return {

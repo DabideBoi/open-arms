@@ -15,7 +15,7 @@ export function createPhaserGame(
     width: 1280,
     height: 720,
     parent,
-    backgroundColor: '#0d1017',
+    backgroundColor: '#1a1f16',
     // Scene is added explicitly (with game state) after boot — see below.
     render: {
       antialias: true,

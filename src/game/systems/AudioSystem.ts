@@ -12,7 +12,6 @@ export type SoundEffect =
   | "error"
   | "notification";
 
-export type MusicTrack = "day" | "night";
 
 export interface AudioSettings {
   masterVolume: number;    // 0-1
@@ -102,8 +101,6 @@ class ToneGenerator {
 export class AudioSystem {
   private settings: AudioSettings;
   private toneGenerator: ToneGenerator;
-  private currentMusicTrack: MusicTrack | null = null;
-  private musicInterval: number | null = null;
   
   constructor() {
     // Load settings from localStorage
@@ -269,54 +266,9 @@ export class AudioSystem {
   }
   
   /**
-   * Start background music
-   */
-  startMusic(track: MusicTrack): void {
-    if (this.currentMusicTrack === track) return;
-    
-    this.stopMusic();
-    this.currentMusicTrack = track;
-    
-    // For now, we'll just play a simple ambient tone periodically
-    // In a real implementation, you'd load and loop audio files
-    const volume = this.getEffectiveVolume('music');
-    if (volume === 0) return;
-    
-    const playAmbient = () => {
-      if (this.currentMusicTrack !== track) return;
-      
-      const baseFreq = track === 'day' ? 220 : 165; // A3 for day, E3 for night
-      this.toneGenerator.playTone(baseFreq, 2.0, volume * 0.1, 'sine');
-    };
-    
-    // Play ambient tone every 3 seconds
-    playAmbient();
-    this.musicInterval = window.setInterval(playAmbient, 3000);
-  }
-  
-  /**
-   * Stop background music
-   */
-  stopMusic(): void {
-    if (this.musicInterval !== null) {
-      clearInterval(this.musicInterval);
-      this.musicInterval = null;
-    }
-    this.currentMusicTrack = null;
-  }
-  
-  /**
-   * Update music based on day/night cycle
-   */
-  updateMusicForPhase(phase: 'day' | 'night'): void {
-    this.startMusic(phase);
-  }
-  
-  /**
    * Cleanup
    */
   destroy(): void {
-    this.stopMusic();
   }
 }
 

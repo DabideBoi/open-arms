@@ -1,8 +1,9 @@
 import { GameState, Room } from '../../types';
-import { MAINTENANCE_CONFIG } from '../../constants';
+import { getActiveTimerConfig, MAINTENANCE_CONFIG } from '../../constants';
 import { handleMaintenanceMissedReputation } from './ReputationSystem';
 import { getEffectiveMaintenanceCost } from './AdjacencySystem';
 import { recordExpense } from './DonationSystem';
+import { formatMoney } from '../../utils/helpers';
 
 /**
  * MaintenanceSystem - Manages recurring facility costs
@@ -25,7 +26,7 @@ export function checkMaintenance(gameState: GameState): void {
   }
   
   // Schedule next check
-  gameState.nextMaintenanceCheck = now + MAINTENANCE_CONFIG.CHECK_INTERVAL;
+  gameState.nextMaintenanceCheck = now + getActiveTimerConfig().MAINTENANCE_CHECK_INTERVAL;
   
   // Process maintenance
   processMaintenance(gameState);
@@ -57,7 +58,7 @@ export function processMaintenance(gameState: GameState): void {
       room.lastMaintenancePaid = now;
     }
     
-    console.log(`🔧 Maintenance paid: $${totalCost} for ${gameState.rooms.length} rooms`);
+    console.log(`🔧 Maintenance paid: ${formatMoney(totalCost)} for ${gameState.rooms.length} rooms`);
     
     emitMaintenancePaid(totalCost, gameState.rooms.length);
   } else {
@@ -73,7 +74,7 @@ export function processMaintenance(gameState: GameState): void {
     // Reputation penalty
     handleMaintenanceMissedReputation(gameState, roomCount);
     
-    console.log(`⚠️ Maintenance missed: $${totalCost} (had $${gameState.money + totalCost})`);
+    console.log(`⚠️ Maintenance missed: ${formatMoney(totalCost)} (had ${formatMoney(gameState.money + totalCost)})`);
     
     emitMaintenanceMissed(totalCost, roomCount);
   }
@@ -216,9 +217,9 @@ export function getMaintenanceWarningMessage(gameState: GameState): string | nul
   const timeMinutes = Math.floor(status.timeRemaining / 60000);
   
   if (status.status === 'critical') {
-    return `⚠️ CRITICAL: Maintenance due in ${timeMinutes} minutes. Need $${status.nextCost}, have $${gameState.money}`;
+    return `⚠️ CRITICAL: Maintenance due in ${timeMinutes} minutes. Need ${formatMoney(status.nextCost)}, have ${formatMoney(gameState.money)}`;
   } else {
-    return `⚠️ WARNING: Cannot afford next maintenance ($${status.nextCost})`;
+    return `⚠️ WARNING: Cannot afford next maintenance (${formatMoney(status.nextCost)})`;
   }
 }
 
@@ -238,7 +239,7 @@ export function calculateOfflineMaintenance(
   reputationLost: number;
 } {
   // Calculate how many maintenance cycles occurred
-  const cyclesOccurred = Math.floor(offlineTime / MAINTENANCE_CONFIG.CHECK_INTERVAL);
+  const cyclesOccurred = Math.floor(offlineTime / getActiveTimerConfig().MAINTENANCE_CHECK_INTERVAL);
   
   if (cyclesOccurred === 0) {
     return { cyclesOccurred: 0, totalCost: 0, reputationLost: 0 };
@@ -290,7 +291,7 @@ export function applyOfflineMaintenance(
       console.log(`Reputation lost from offline maintenance: ${offline.reputationLost}`);
     }
     
-    console.log(`🔧 Offline maintenance: $${offline.totalCost} (${offline.cyclesOccurred} cycles)`);
+    console.log(`🔧 Offline maintenance: ${formatMoney(offline.totalCost)} (${offline.cyclesOccurred} cycles)`);
     
     // Emit notification
     emitOfflineMaintenance(offline.totalCost, offline.cyclesOccurred, offline.reputationLost);

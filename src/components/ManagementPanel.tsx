@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Resident, Fundraiser, FoodPortionSetting, ShelterTier } from '../types';
 import { FUNDRAISER_CONFIG, EXPANSION_CONFIG, FOOD_PORTIONS, SHELTER_TIERS, TIER_UPGRADE_CONFIG } from '../constants';
 import {
   getAllFoodTierOptions,
   getFoodSettingDisplay,
   getNextFoodCostPreview,
-  getLifeFillModifier
+  getLifeFillModifier,
+  getFoodGenerationMultiplier
 } from '../game/systems/FoodSystem';
 import {
   getFundraiserStatus,
-  getFundraiserSuccessChance,
   isResidentFatigued,
   getResidentFatigueRemaining,
-  calculateFundraiserFoodCost,
-  findBestFundraiserStationForGroup
+  calculateFundraiserFoodCost
 } from '../game/systems/FundraiserSystem';
 import {
   getTierConfig,
@@ -27,22 +26,25 @@ import {
   getAvailableRooms,
   getLockedRooms
 } from '../game/systems/TierSystem';
-import { EconomicDashboard } from './EconomicDashboard';
+import { ResidentCard } from './ResidentCard';
 import './ManagementPanel.css';
+import { formatMoney } from '../utils/helpers';
 
 interface ManagementPanelProps {
   gameState: GameState;
-  onStartFundraiser: (stationId: string, residentIds: string[]) => void;
+  onStartFundraiser: () => void;
   onCancelFundraiser: (fundraiserId: string) => void;
-  onExpandGrid: (direction: 'north' | 'south' | 'east' | 'west') => void;
+  onExpandGrid: (direction: 'north' | 'east' | 'west') => void;
   onChangeFoodSetting?: (setting: FoodPortionSetting) => void;
   onUpgradeTier?: () => void;
   // Controlled mode props for single-menu-at-a-time behavior
   isOpen?: boolean;
   onToggle?: () => void;
+  isPaused?: boolean;
 }
 
 export const ManagementPanel: React.FC<ManagementPanelProps> = ({
+  isPaused = false,
   gameState,
   onStartFundraiser,
   onCancelFundraiser,
@@ -53,6 +55,15 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
   onToggle
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  // Ignore a second click within 500 ms so a double click can't upgrade/expand/start twice
+  const lastClick = useRef(0);
+  const once = (fn: () => void) => () => {
+    const now = Date.now();
+    if (now - lastClick.current < 500) return;
+    lastClick.current = now;
+    fn();
+  };
   
   // Support both controlled and uncontrolled modes
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
@@ -63,8 +74,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
       setInternalIsOpen(!internalIsOpen);
     }
   };
-  const [activeTab, setActiveTab] = useState<'food' | 'fundraisers' | 'expansion' | 'residents' | 'upgrade' | 'finances'>('food');
-  const [selectedResidents, setSelectedResidents] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'food' | 'fundraisers' | 'expansion' | 'residents' | 'upgrade'>('food');
   const [fundraiserTimers, setFundraiserTimers] = useState<Map<string, string>>(new Map());
 
   // Update fundraiser timers
@@ -84,20 +94,15 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
     };
     
     updateTimers();
+    if (isPaused) return;
     const interval = setInterval(updateTimers, 1000);
     return () => clearInterval(interval);
-  }, [gameState.activeFundraisers]);
+  }, [gameState.activeFundraisers, isPaused]);
 
   // Get available fundraiser stations
-  const fundraiserStations = gameState.rooms.filter(r => r.type === 'fundraiser_station' && r.isOpen);
+  const fundraiserStations = gameState.rooms.filter(r => r.type === 'fundraiser_station');
+  const isNight = gameState.currentPhase === 'night';
   
-  // Get available residents (not in fundraiser, healthy, not fatigued)
-  const availableResidents = gameState.residents.filter(r => {
-    const inFundraiser = gameState.activeFundraisers?.some(f => f.assignedResidents.includes(r.id));
-    const fatigued = isResidentFatigued(r);
-    return !inFundraiser && !fatigued && r.happiness > 20 && r.lifeMeter < 95;
-  });
-
   // Get fundraiser status
   const fundraiserStatus = getFundraiserStatus(gameState);
 
@@ -109,79 +114,24 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
   };
 
   // Check if expansion is possible in direction
-  const canExpandInDirection = (direction: 'north' | 'south' | 'east' | 'west'): boolean => {
+  const canExpandInDirection = (direction: 'north' | 'east' | 'west'): boolean => {
     const { unlockedArea } = gameState.grid;
     const size = EXPANSION_CONFIG.EXPANSION_SIZE;
     
     switch (direction) {
       case 'north': return unlockedArea.minY - size >= 0;
-      case 'south': return unlockedArea.maxY + size <= gameState.grid.height;
       case 'east': return unlockedArea.maxX + size <= gameState.grid.width;
       case 'west': return unlockedArea.minX - size >= 0;
     }
   };
 
-  const handleToggleResident = (residentId: string) => {
-    const newSelected = new Set(selectedResidents);
-    if (newSelected.has(residentId)) {
-      newSelected.delete(residentId);
-    } else {
-      newSelected.add(residentId);
-    }
-    setSelectedResidents(newSelected);
-  };
-
-  const handleStartFundraiser = () => {
-    if (fundraiserStations.length === 0) {
-      alert('No fundraiser station available!');
-      return;
-    }
-    
-    if (selectedResidents.size === 0) {
-      alert('Please select at least one resident!');
-      return;
-    }
-
-    if (selectedResidents.size < FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS) {
-      alert(`Need at least ${FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS} residents to start a fundraiser!`);
-      return;
-    }
-
-    const foodCost = calculateFundraiserFoodCost(selectedResidents.size);
-    if (gameState.food < foodCost) {
-      alert(`Not enough food! Need ${foodCost} units, have ${gameState.food}`);
-      return;
-    }
-    
-    // Get selected residents for nearest station calculation
-    const selectedResidentsList = gameState.residents.filter(r => selectedResidents.has(r.id));
-    
-    // Find the best (nearest) fundraiser station for this group of residents
-    const bestStation = findBestFundraiserStationForGroup(selectedResidentsList, fundraiserStations);
-    
-    if (!bestStation) {
-      alert('No accessible fundraiser station found!');
-      return;
-    }
-    
-    onStartFundraiser(bestStation.id, Array.from(selectedResidents));
-    setSelectedResidents(new Set());
-  };
-
   const getProfileIcon = (profile: string): string => {
     const icons: Record<string, string> = {
       young_adult: '🧑',
-      veteran: '🎖️',
+      adult: '🧔',
       elderly: '👴'
     };
     return icons[profile] || '👤';
-  };
-
-  // Calculate success chance for selected residents
-  const getSelectedResidentsSuccessChance = (): number => {
-    if (selectedResidents.size === 0) return 0;
-    const selected = gameState.residents.filter(r => selectedResidents.has(r.id));
-    return getFundraiserSuccessChance(selected);
   };
 
   // Food portion options
@@ -189,16 +139,10 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
   const currentFoodDisplay = getFoodSettingDisplay(gameState.foodPortionSetting);
   const foodCostPreview = getNextFoodCostPreview(gameState);
   const currentLifeModifier = getLifeFillModifier(gameState);
+  const currentGenerationMultiplier = getFoodGenerationMultiplier(gameState);
 
   return (
     <div className="management-panel">
-      <button
-        className="management-panel-toggle"
-        onClick={handleToggle}
-      >
-        ⚙️ Management
-      </button>
-      
       {isOpen && (
         <div className="management-panel-content">
           <div className="management-tabs">
@@ -232,12 +176,6 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
             >
               👥 Residents
             </button>
-            <button
-              className={`tab ${activeTab === 'finances' ? 'active' : ''}`}
-              onClick={() => setActiveTab('finances')}
-            >
-              💹 Finances
-            </button>
           </div>
 
           {/* UPGRADE TAB */}
@@ -258,10 +196,6 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                     <span className="benefit-value">{SHELTER_TIERS[gameState.currentTier].maxResidents}</span>
                   </div>
                   <div className="benefit">
-                    <span className="benefit-label">📐 Grid Size:</span>
-                    <span className="benefit-value">{SHELTER_TIERS[gameState.currentTier].gridSize}×{SHELTER_TIERS[gameState.currentTier].gridSize}</span>
-                  </div>
-                  <div className="benefit">
                     <span className="benefit-label">💰 Donation Bonus:</span>
                     <span className="benefit-value">×{SHELTER_TIERS[gameState.currentTier].donationMultiplier.toFixed(1)}</span>
                   </div>
@@ -279,10 +213,6 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                       <div className="improvement">
                         <span>👥</span>
                         <span>{SHELTER_TIERS[gameState.currentTier].maxResidents} → {SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].maxResidents}</span>
-                      </div>
-                      <div className="improvement">
-                        <span>📐</span>
-                        <span>{SHELTER_TIERS[gameState.currentTier].gridSize}×{SHELTER_TIERS[gameState.currentTier].gridSize} → {SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].gridSize}×{SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].gridSize}</span>
                       </div>
                       <div className="improvement">
                         <span>💰</span>
@@ -321,7 +251,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                           <span className="req-icon">{requirements.hasMoney ? '✅' : '❌'}</span>
                           <span className="req-label">💰 Money:</span>
                           <span className="req-value">
-                            ${requirements.currentMoney.toLocaleString()} / ${requirements.moneyNeeded.toLocaleString()}
+                            {formatMoney(requirements.currentMoney)} / {formatMoney(requirements.moneyNeeded)}
                           </span>
                           {!requirements.hasMoney && (
                             <div className="req-progress-bar">
@@ -337,7 +267,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                           <span className="req-icon">{requirements.hasReputation ? '✅' : '❌'}</span>
                           <span className="req-label">⭐ Reputation:</span>
                           <span className="req-value">
-                            {requirements.currentReputation}% / {requirements.reputationNeeded}%
+                            {Math.floor(requirements.currentReputation)}% / {requirements.reputationNeeded}%
                           </span>
                           {!requirements.hasReputation && (
                             <div className="req-progress-bar">
@@ -387,15 +317,15 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   {/* Upgrade Button */}
                   <button
                     className={`upgrade-button ${canUpgrade(gameState) ? 'ready' : 'disabled'}`}
-                    onClick={() => {
+                    onClick={once(() => {
                       if (onUpgradeTier && canUpgrade(gameState)) {
                         onUpgradeTier();
                       }
-                    }}
+                    })}
                     disabled={!canUpgrade(gameState)}
                   >
                     {canUpgrade(gameState)
-                      ? `🏛️ Upgrade to ${SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].name} ($${SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].upgradeCost.toLocaleString()})`
+                      ? `🏛️ Upgrade to ${SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].name} (${formatMoney(SHELTER_TIERS[(gameState.currentTier + 1) as ShelterTier].upgradeCost)})`
                       : '🔒 Requirements Not Met'
                     }
                   </button>
@@ -414,7 +344,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
           {/* FOOD TAB - NEW */}
           {activeTab === 'food' && (
             <div className="tab-content">
-              <h3>Food Portions</h3>
+              <h3>Food Deliveries</h3>
               
               <div className="current-food-setting">
                 <div className="food-setting-header">
@@ -423,8 +353,8 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                 </div>
                 <p className="food-description">{currentFoodDisplay.description}</p>
                 <div className="food-effects">
-                  <span className={`effect ${currentFoodDisplay.happinessChange >= 0 ? 'positive' : 'negative'}`}>
-                    😊 {currentFoodDisplay.happinessChange >= 0 ? '+' : ''}{currentFoodDisplay.happinessChange}
+                  <span className={`effect ${currentFoodDisplay.healthChange >= 0 ? 'positive' : 'negative'}`}>
+                    ❤️ {currentFoodDisplay.healthChange >= 0 ? '+' : ''}{currentFoodDisplay.healthChange}
                   </span>
                   <span className={`effect ${currentFoodDisplay.reputationChange >= 0 ? 'positive' : 'negative'}`}>
                     ⭐ {currentFoodDisplay.reputationChange >= 0 ? '+' : ''}{currentFoodDisplay.reputationChange}
@@ -432,19 +362,22 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   <span className={`effect ${currentLifeModifier >= 1 ? 'positive' : 'negative'}`}>
                     📈 LIFE: {(currentLifeModifier * 100).toFixed(0)}%
                   </span>
+                  <span className={`effect ${currentGenerationMultiplier >= 1 ? 'positive' : 'negative'}`}>
+                    🚚 Food production: {(currentGenerationMultiplier * 100).toFixed(0)}%
+                  </span>
                 </div>
                 <p className="food-cost">
-                  Cost: ${currentFoodDisplay.costPerResident}/resident/day = ${foodCostPreview.current}/day total
+                  Cost: {formatMoney(currentFoodDisplay.costPerResident)}/resident/day = {formatMoney(foodCostPreview.current)}/day total
                 </p>
               </div>
 
               {currentFoodDisplay.isBelowStandard && (
                 <div className="food-warning">
-                  ⚠️ Below-standard food reduces happiness and slows LIFE progression!
+                  ⚠️ Below-standard deliveries reduce health, slow LIFE progression and slow food production!
                 </div>
               )}
 
-              <h4>Change Food Setting</h4>
+              <h4>Change Delivery Level</h4>
               <div className="food-options">
                 {foodTierOptions.map(({ tier, display }) => {
                   const isSelected = tier === gameState.foodPortionSetting;
@@ -467,9 +400,9 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                         {isSelected && <span className="selected-badge">✓</span>}
                       </div>
                       <div className="food-option-details">
-                        <span>${display.costPerResident}/resident</span>
-                        <span className={display.happinessChange >= 0 ? 'positive' : 'negative'}>
-                          😊 {display.happinessChange >= 0 ? '+' : ''}{display.happinessChange}
+                        <span>{formatMoney(display.costPerResident)}/resident</span>
+                        <span className={display.healthChange >= 0 ? 'positive' : 'negative'}>
+                          ❤️ {display.healthChange >= 0 ? '+' : ''}{display.healthChange}
                         </span>
                         <span className={display.lifeFillModifier >= 1 ? 'positive' : 'negative'}>
                           📈 {(display.lifeFillModifier * 100).toFixed(0)}%
@@ -498,7 +431,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   {gameState.activeFundraisers.map(fundraiser => (
                     <div key={fundraiser.id} className="fundraiser-item">
                       <div className="fundraiser-info">
-                        <span>💰 Expected: ${fundraiser.expectedPayout}</span>
+                        <span>💰 Expected: {formatMoney(fundraiser.expectedPayout)}</span>
                         <span>👥 {fundraiser.assignedResidents.length} residents</span>
                         <span>⏱️ {fundraiserTimers.get(fundraiser.id) || '0:00'}</span>
                         <span className={fundraiser.successChance >= 0.6 ? 'success-high' : 'success-low'}>
@@ -507,7 +440,7 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                       </div>
                       <button 
                         className="cancel-button"
-                        onClick={() => onCancelFundraiser(fundraiser.id)}
+                        onClick={once(() => onCancelFundraiser(fundraiser.id))}
                       >
                         ❌ Cancel
                       </button>
@@ -527,61 +460,18 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   <div className="fundraiser-info-box">
                     <p>Duration: {FUNDRAISER_CONFIG.DURATION_MINUTES} minutes</p>
                     <p>Food Cost: {FUNDRAISER_CONFIG.FOOD_COST_PER_RESIDENT} units/resident</p>
-                    <p>On Success: +{FUNDRAISER_CONFIG.LIFE_BOOST} LIFE, -{FUNDRAISER_CONFIG.HAPPINESS_COST} Happiness, +{FUNDRAISER_CONFIG.REPUTATION_BOOST} Rep</p>
-                    <p>On Failure: No money, {FUNDRAISER_CONFIG.FAILURE_HAPPINESS_PENALTY} Happiness, {FUNDRAISER_CONFIG.FAILURE_REPUTATION_PENALTY} Rep</p>
-                    <p>Minimum Residents: {FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS}</p>
+                    <p>On Success: +{FUNDRAISER_CONFIG.LIFE_BOOST} LIFE each, -{FUNDRAISER_CONFIG.HEALTH_COST} Health, +{FUNDRAISER_CONFIG.REPUTATION_BOOST} Rep</p>
+                    <p>On Failure: No money, +{FUNDRAISER_CONFIG.LIFE_BOOST_FAILURE} LIFE each, {FUNDRAISER_CONFIG.FAILURE_HEALTH_PENALTY} Health, {FUNDRAISER_CONFIG.FAILURE_REPUTATION_PENALTY} Rep</p>
+                    <p>Group size: random {FUNDRAISER_CONFIG.MIN_GROUP}-{FUNDRAISER_CONFIG.MAX_GROUP} residents, one group at a time</p>
                   </div>
 
-                  {/* Selected residents preview */}
-                  {selectedResidents.size > 0 && (
-                    <div className="fundraiser-preview">
-                      <p>
-                        <strong>Food Required:</strong> {calculateFundraiserFoodCost(selectedResidents.size)} units 
-                        {gameState.food < calculateFundraiserFoodCost(selectedResidents.size) && 
-                          <span className="warning-inline"> (Not enough! Have {gameState.food})</span>
-                        }
-                      </p>
-                      <p>
-                        <strong>Success Chance:</strong> 
-                        <span className={getSelectedResidentsSuccessChance() >= 0.6 ? 'success-high' : 'success-low'}>
-                          {' '}{Math.round(getSelectedResidentsSuccessChance() * 100)}%
-                        </span>
-                      </p>
-                    </div>
+                  <p className="fundraiser-ready">
+                    👥 {fundraiserStatus.availableResidents} rested resident{fundraiserStatus.availableResidents === 1 ? '' : 's'} ready.
+                    A random group will take part.
+                  </p>
+                  {!isNight && fundraiserStatus.stationBusy && (
+                    <p className="warning">⏳ The station is busy. Wait for the current group to finish.</p>
                   )}
-
-                  <h4>Select Residents ({selectedResidents.size}/{FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS}+ required)</h4>
-                  <div className="resident-selection">
-                    {availableResidents.length === 0 ? (
-                      <p className="empty-message">
-                        No available residents
-                        {gameState.residents.some(r => isResidentFatigued(r)) &&
-                          ' (some are fatigued)'
-                        }
-                      </p>
-                    ) : (
-                      availableResidents.map(resident => {
-                        const fatigued = isResidentFatigued(resident);
-                        const fatigueRemaining = fatigued ? getResidentFatigueRemaining(resident) : 0;
-                        const fatigueMinutes = Math.ceil(fatigueRemaining / 60000);
-                        
-                        return (
-                          <div
-                            key={resident.id}
-                            className={`resident-select-item ${selectedResidents.has(resident.id) ? 'selected' : ''}`}
-                            onClick={() => handleToggleResident(resident.id)}
-                          >
-                            <span>{getProfileIcon(resident.profile)} {resident.name}</span>
-                            <span>
-                              😊 {Math.floor(resident.happiness)}% | 📈 {Math.floor(resident.lifeMeter)}%
-                              {fatigued && <span className="fatigue-badge"> ⏳ {fatigueMinutes}m</span>}
-                              {!fatigued && <span className="ready-badge"> ✓ Ready</span>}
-                            </span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
 
                   {/* Show fatigued residents separately */}
                   {gameState.residents.some(r => isResidentFatigued(r)) && (
@@ -602,14 +492,14 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
 
                   <button
                     className="start-fundraiser-button"
-                    onClick={handleStartFundraiser}
+                    onClick={once(onStartFundraiser)}
                     disabled={
-                      selectedResidents.size < FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS ||
-                      fundraiserStations.length === 0 ||
-                      gameState.food < calculateFundraiserFoodCost(selectedResidents.size)
+                      isNight ||
+                      !fundraiserStatus.canStart ||
+                      gameState.food < calculateFundraiserFoodCost(FUNDRAISER_CONFIG.MIN_NON_FATIGUED_RESIDENTS)
                     }
                   >
-                    🎪 Start Fundraiser ({selectedResidents.size} residents, {calculateFundraiserFoodCost(selectedResidents.size)} food)
+                    {isNight ? 'Cannot Start Fundraiser at Night' : '🎪 Start Fundraiser'}
                   </button>
                 </>
               )}
@@ -623,11 +513,11 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
               <div className="expansion-info">
                 <p>Current Size: {gameState.grid.unlockedArea.maxX - gameState.grid.unlockedArea.minX} × {gameState.grid.unlockedArea.maxY - gameState.grid.unlockedArea.minY}</p>
                 <p>Expansion Size: {EXPANSION_CONFIG.EXPANSION_SIZE} tiles per direction</p>
-                <p>Cost: ${calculateExpansionCost()}</p>
+                <p>Cost: {formatMoney(calculateExpansionCost())}</p>
               </div>
 
               <div className="expansion-buttons">
-                {(['north', 'south', 'east', 'west'] as const).map(direction => {
+                {(['north', 'east', 'west'] as const).map(direction => {
                   const canExpand = canExpandInDirection(direction);
                   const cost = calculateExpansionCost();
                   const canAfford = gameState.money >= cost;
@@ -636,12 +526,11 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                     <button
                       key={direction}
                       className={`expansion-button ${direction}`}
-                      onClick={() => onExpandGrid(direction)}
+                      onClick={once(() => onExpandGrid(direction))}
                       disabled={!canExpand || !canAfford}
                       title={!canExpand ? 'Cannot expand beyond grid' : !canAfford ? 'Insufficient funds' : `Expand ${direction}`}
                     >
                       {direction === 'north' && '⬆️'}
-                      {direction === 'south' && '⬇️'}
                       {direction === 'east' && '➡️'}
                       {direction === 'west' && '⬅️'}
                       {' '}
@@ -660,63 +549,13 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
               <h3>All Residents ({gameState.residents.length})</h3>
               
               <div className="resident-list">
-                {gameState.residents.map(resident => {
-                  const inFundraiser = gameState.activeFundraisers?.some(f => 
-                    f.assignedResidents.includes(resident.id)
-                  );
-                  const fatigued = isResidentFatigued(resident);
-                  
-                  return (
-                    <div key={resident.id} className="resident-detail-item">
-                      <div className="resident-header">
-                        <span>{getProfileIcon(resident.profile)} {resident.name}</span>
-                        <span className="resident-profile">{resident.profile.replace('_', ' ')}</span>
-                      </div>
-                      <div className="resident-stats">
-                        <div className="stat">
-                          <span>😊 Happiness:</span>
-                          <div className="stat-bar">
-                            <div 
-                              className="stat-bar-fill happiness"
-                              style={{ width: `${resident.happiness}%` }}
-                            />
-                          </div>
-                          <span>{Math.floor(resident.happiness)}%</span>
-                        </div>
-                        <div className="stat">
-                          <span>📈 LIFE:</span>
-                          <div className="stat-bar">
-                            <div 
-                              className="stat-bar-fill life"
-                              style={{ width: `${resident.lifeMeter}%` }}
-                            />
-                          </div>
-                          <span>{Math.floor(resident.lifeMeter)}%</span>
-                        </div>
-                      </div>
-                      <div className="resident-status">
-                        <span>Status: {resident.currentState}</span>
-                        {inFundraiser && <span className="status-badge">🎪 In Fundraiser</span>}
-                        {fatigued && (
-                          <span className="status-badge fatigue">
-                            ⏳ Fatigued ({Math.ceil(getResidentFatigueRemaining(resident) / 60000)}m)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {gameState.residents.map(resident => (
+                  <ResidentCard key={resident.id} resident={resident} gameState={gameState} />
+                ))}
               </div>
             </div>
           )}
 
-          {/* FINANCES TAB */}
-          {activeTab === 'finances' && (
-            <div className="tab-content">
-              <h3>💹 Financial Overview</h3>
-              <EconomicDashboard gameState={gameState} />
-            </div>
-          )}
         </div>
       )}
     </div>

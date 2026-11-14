@@ -205,13 +205,13 @@
 }
 
 .btn-restart {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6fa13a 0%, #567f2c 100%);
   color: white;
 }
 
 .btn-restart:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(111,161,58,0.4);
 }
 
 .btn-continue {

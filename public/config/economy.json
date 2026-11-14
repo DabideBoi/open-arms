@@ -1,0 +1,171 @@
+{
+  "_readme": "Money amounts in Philippine pesos. Only listed keys can be changed; reload the page to apply.",
+  "GAME_STATE_CONFIG": {
+    "STARTING_MONEY": 250000
+  },
+  "ROOM_SPECS": {
+    "dormitory": {
+      "buildCost": 15000,
+      "maintenanceCost": 1250
+    },
+    "cafeteria": {
+      "buildCost": 25000,
+      "maintenanceCost": 2500
+    },
+    "clinic": {
+      "buildCost": 20000,
+      "maintenanceCost": 1750
+    },
+    "bathroom": {
+      "buildCost": 10000,
+      "maintenanceCost": 1000
+    },
+    "common_room": {
+      "buildCost": 17500,
+      "maintenanceCost": 1500
+    },
+    "admin_office": {
+      "buildCost": 35000,
+      "maintenanceCost": 3000
+    },
+    "fundraiser_station": {
+      "buildCost": 20000,
+      "maintenanceCost": 1750
+    },
+    "potted_plant": {
+      "buildCost": 3000,
+      "maintenanceCost": 150
+    },
+    "fountain": {
+      "buildCost": 12500,
+      "maintenanceCost": 500
+    },
+    "large_dormitory": {
+      "buildCost": 27500,
+      "maintenanceCost": 2000
+    },
+    "medical_center": {
+      "buildCost": 40000,
+      "maintenanceCost": 3000
+    },
+    "dining_hall": {
+      "buildCost": 45000,
+      "maintenanceCost": 3750
+    },
+    "library": {
+      "buildCost": 25000,
+      "maintenanceCost": 1750
+    },
+    "garden": {
+      "buildCost": 30000,
+      "maintenanceCost": 1500
+    }
+  },
+  "DONATION_CONFIG": {
+    "BASE_AMOUNT_PER_RESIDENT": 1250,
+    "MIN_DONATION": 500,
+    "GRADUATE_MULTIPLIER": 0.1
+  },
+  "FOOD_PORTIONS": {
+    "minimal": {
+      "cost": 250
+    },
+    "small": {
+      "cost": 500
+    },
+    "standard": {
+      "cost": 900
+    },
+    "generous": {
+      "cost": 1500
+    },
+    "premium": {
+      "cost": 2500
+    }
+  },
+  "OPERATING_COSTS_CONFIG": {
+    "BASE_DAILY_COST": 5000,
+    "PER_RESIDENT_COST": 250,
+    "PER_ROOM_COST": 500
+  },
+  "EXPENSE_EVENTS_CONFIG": {
+    "MIN_COST": 2500,
+    "MAX_COST": 10000
+  },
+  "FUNDRAISER_CONFIG": {
+    "BASE_PAYOUT_MIN": 4500,
+    "BASE_PAYOUT_MAX": 7500,
+    "BASE_REPUTATION_MODIFIER": 0.3
+  },
+  "EXPANSION_CONFIG": {
+    "BASE_COST": 50000,
+    "COST_FORMULA_MULTIPLIER": 0.01
+  },
+  "SHELTER_TIERS": {
+    "1": {
+      "upgradeCost": 0,
+      "donationMultiplier": 1
+    },
+    "2": {
+      "upgradeCost": 150000,
+      "donationMultiplier": 1.2
+    },
+    "3": {
+      "upgradeCost": 400000,
+      "donationMultiplier": 1.5
+    },
+    "4": {
+      "upgradeCost": 1000000,
+      "donationMultiplier": 2
+    }
+  },
+  "BANKRUPTCY_CONFIG": {
+    "THRESHOLD": -25000,
+    "WARNING_MONEY_LOW": 10000
+  },
+  "WARNING_CONFIG": {
+    "LOW_FUNDS_THRESHOLD": 25000,
+    "NEAR_BANKRUPTCY_THRESHOLD": -15000
+  },
+  "DISASTER_EVENTS": {
+    "house_fire": {
+      "donationBonus": 10000
+    },
+    "winter_storm": {
+      "donationBonus": 17500
+    },
+    "earthquake": {
+      "donationBonus": 0
+    },
+    "factory_closure": {
+      "donationBonus": 5000
+    },
+    "domestic_violence": {
+      "donationBonus": 7500
+    },
+    "hospital_discharge": {
+      "donationBonus": 5000,
+      "medicalCosts": 2500
+    },
+    "eviction_wave": {
+      "donationBonus": 25000
+    }
+  },
+  "DISASTER_CONFIG": {
+    "SECURITY_COST_PER_RESIDENT": 1500,
+    "REPAIR_COST_PER_BUILDING": 7500
+  },
+  "EVENT_ECONOMY": {
+    "DONATION_DRIVE_BASE": 15000,
+    "DONATION_DRIVE_PER_RESIDENT": 5000,
+    "OUTBREAK_TREATMENT_MIN": 5000,
+    "OUTBREAK_TREATMENT_PER_RESIDENT": 1000,
+    "MEDIA_GRANT": 25000,
+    "INSPECTION_GRANT": 50000,
+    "INSPECTION_FINE": 25000,
+    "COMMUNITY_DONATION_MIN": 15000,
+    "COMMUNITY_DONATION_MAX": 40000,
+    "ELDER_TRANSFER_STIPEND": 12500,
+    "LOW_MONEY_THRESHOLD": 25000
+  }
+}

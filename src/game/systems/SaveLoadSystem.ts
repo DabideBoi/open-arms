@@ -1,5 +1,7 @@
 import { GameState } from '../../types';
+import { ROOM_SPECS, SAVE_VERSION } from '../../constants';
 import { createInitialGameState } from './GameStateManager';
+import { demolishRoom, placeSouthGate } from './GridSystem';
 
 /**
  * SaveLoadSystem - Enhanced with compression, versioning, and multiple backups
@@ -19,7 +21,7 @@ const STORAGE_KEYS = {
   SAVE_METADATA: "openArmsSaveMetadata"
 };
 
-const CURRENT_VERSION = "1.0.0";
+const CURRENT_VERSION = SAVE_VERSION;
 
 // ============================================================================
 // Save Metadata
@@ -321,7 +323,7 @@ function isValidGameState(obj: any): obj is GameState {
 /**
  * Migrate game state to current version
  */
-function migrateGameState(state: any): GameState {
+export function migrateGameState(state: any): GameState {
   let currentVersion = state.version || "0.9.0";
   
   // Apply migrations if needed
@@ -333,6 +335,21 @@ function migrateGameState(state: any): GameState {
       // Migrate from 0.9.0 to 1.0.0
       state = migrateFrom_0_9_0(state);
       currentVersion = "1.0.0";
+    }
+
+    if (currentVersion === "1.0.0") {
+      state = migrateFrom_1_0_0(state);
+      currentVersion = "1.1.0";
+    }
+
+    if (currentVersion === "1.1.0") {
+      state = migrateFrom_1_1_0(state);
+      currentVersion = "1.2.0";
+    }
+
+    if (currentVersion === "1.2.0") {
+      state = migrateFrom_1_2_0(state);
+      currentVersion = "1.3.0";
     }
     
     state.version = CURRENT_VERSION;
@@ -355,7 +372,104 @@ function migrateFrom_0_9_0(state: any): any {
   if (!state.notifications) {
     state.notifications = [];
   }
-  
+
+  return state;
+}
+
+/**
+ * Migrate 1.2.0 -> 1.3.0
+ * - currency is now the Philippine peso: every money amount ×50
+ * - the veteran profile became "adult"
+ */
+const PESO_SCALE = 50;
+function migrateFrom_1_2_0(state: any): any {
+  const scale = (n: unknown) => (typeof n === 'number' ? Math.round(n * PESO_SCALE) : n);
+  state.money = scale(state.money);
+  state.totalMoneyEarned = scale(state.totalMoneyEarned);
+  const fh = state.financialHistory;
+  if (fh) {
+    for (const d of fh.donations ?? []) d.amount = scale(d.amount);
+    for (const e of fh.expenses ?? []) e.amount = scale(e.amount);
+    fh.lastDayNetIncome = scale(fh.lastDayNetIncome);
+  }
+  for (const f of state.activeFundraisers ?? []) f.expectedPayout = scale(f.expectedPayout);
+  for (const room of state.rooms ?? []) {
+    const spec = ROOM_SPECS[room.type as keyof typeof ROOM_SPECS];
+    room.buildCost = spec ? spec.buildCost : scale(room.buildCost);
+    room.maintenanceCost = spec ? spec.maintenanceCost : scale(room.maintenanceCost);
+  }
+  for (const r of state.residents ?? []) {
+    if (r.profile === 'veteran') r.profile = 'adult';
+  }
+  return state;
+}
+
+/**
+ * Migrate 1.1.0 -> 1.2.0
+ * - entrance is now the south gate (bottom edge of the unlocked area)
+ * - residents gained a gender; dormitories default to 'any' (gender missing = any)
+ */
+function migrateFrom_1_1_0(state: any): any {
+  if (state.grid) placeSouthGate(state.grid);
+  for (const r of state.residents ?? []) {
+    if (!r.gender) r.gender = Math.random() < 0.5 ? 'male' : 'female';
+  }
+  return state;
+}
+
+/**
+ * Migrate 1.0.0 -> 1.1.0
+ * - happiness became health (residents, room adjacency bonuses, stored disaster config)
+ * - learning centers and vocational rooms were removed
+ */
+function migrateFrom_1_0_0(state: any): any {
+  // Rename resident fields
+  for (const r of state.residents ?? []) {
+    if (r.health === undefined) r.health = r.happiness ?? 70;
+    if (r.lastHealthUpdate === undefined) r.lastHealthUpdate = r.lastHappinessUpdate ?? Date.now();
+    if (r.unhealthyDuration === undefined) r.unhealthyDuration = r.unhappyDuration ?? 0;
+    delete r.happiness;
+    delete r.lastHappinessUpdate;
+    delete r.unhappyDuration;
+    if (r.departureReason === 'unhappy') r.departureReason = 'unhealthy';
+  }
+
+  // Rename adjacency bonus field on rooms
+  for (const room of state.rooms ?? []) {
+    const bonuses = room.adjacencyBonuses;
+    if (bonuses && bonuses.health === undefined) {
+      bonuses.health = bonuses.happiness ?? 0;
+    }
+    if (bonuses) delete bonuses.happiness;
+  }
+
+  // Active disaster keeps a copy of its config
+  const disasterConfig = state.activeDisasterEvent?.config;
+  if (disasterConfig && disasterConfig.healthImpact === undefined) {
+    disasterConfig.healthImpact = disasterConfig.happinessImpact ?? 0;
+    delete disasterConfig.happinessImpact;
+  }
+
+  // Remove learning centers / vocational rooms (no refund) and free their tiles
+  const removedRoomIds = new Set<string>();
+  for (const room of [...(state.rooms ?? [])]) {
+    if (room.type === 'learning_center' || room.type === 'vocational_room') {
+      removedRoomIds.add(room.id);
+      demolishRoom(state.grid, state.rooms, room.id);
+    }
+  }
+
+  // Anyone heading to a removed room, or with the removed "learning" need, goes back to idle
+  for (const r of state.residents ?? []) {
+    if (removedRoomIds.has(r.targetRoomId) || r.currentNeed === 'learning') {
+      r.currentState = 'idle';
+      r.currentNeed = null;
+      r.targetRoomId = null;
+      r.path = null;
+      r.pathIndex = 0;
+    }
+  }
+
   return state;
 }
 

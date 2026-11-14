@@ -4,7 +4,7 @@
 }
 
 .tutorial-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6fa13a 0%, #567f2c 100%);
   padding: 24px;
   border-radius: 10px 10px 0 0;
   display: flex;
@@ -51,7 +51,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(90deg, #6fa13a 0%, #567f2c 100%);
   transition: width 0.3s ease;
   border-radius: 4px;
 }
@@ -96,14 +96,14 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6fa13a 0%, #567f2c 100%);
   color: white;
   flex: 1;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(111,161,58,0.4);
 }
 
 .btn-secondary {

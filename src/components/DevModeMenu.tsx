@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GameState, Resident } from '../types';
 import { EventSystem, EventType } from '../game/systems/EventSystem';
 import './DevModeMenu.css';
+import { formatMoney } from '../utils/helpers';
 
 interface DevModeMenuProps {
   isOpen: boolean;
@@ -36,9 +37,9 @@ export function DevModeMenu({
   const [donationTimer, setDonationTimer] = useState<string>('0:00');
   const [maintenanceTimer, setMaintenanceTimer] = useState<string>('0:00');
   const [selectedResident, setSelectedResident] = useState<string>('');
-  const [moneyAmount, setMoneyAmount] = useState<number>(1000);
+  const [moneyAmount, setMoneyAmount] = useState<number>(50000);
   const [reputationValue, setReputationValue] = useState<number>(50);
-  const [happinessValue, setHappinessValue] = useState<number>(50);
+  const [healthValue, setHealthValue] = useState<number>(50);
   const [lifeMeterValue, setLifeMeterValue] = useState<number>(50);
   
   // Update timer displays
@@ -81,7 +82,14 @@ export function DevModeMenu({
     'media_coverage',
     'volunteer_day',
     'inspection',
-    'community_support'
+    'community_support',
+    'elder_transfer',
+    'job_referral',
+    'knock_at_door',
+    'family_reunification',
+    'street_outreach',
+    'hospital_referral',
+    'pipe_burst'
   ];
   
   const formatTime = (ms: number) => {
@@ -200,7 +208,7 @@ export function DevModeMenu({
                   className="dev-button"
                   onClick={() => onTriggerEvent(eventType)}
                 >
-                  {eventType.replace('_', ' ')}
+                  {eventType.replace(/_/g, ' ')}
                 </button>
               ))}
             </div>
@@ -223,7 +231,7 @@ export function DevModeMenu({
                 className="dev-input"
                 value={moneyAmount}
                 onChange={(e) => setMoneyAmount(Number(e.target.value))}
-                step={100}
+                step={5000}
               />
             </div>
             <div className="dev-stat-item">
@@ -231,7 +239,7 @@ export function DevModeMenu({
                 className="dev-button success"
                 onClick={() => onAddMoney(moneyAmount)}
               >
-                Add ${moneyAmount}
+                Add {formatMoney(moneyAmount)}
               </button>
             </div>
             
@@ -257,9 +265,9 @@ export function DevModeMenu({
           </div>
           
           <div className="dev-info">
-            Current Money: <strong>${gameState.money}</strong>
+            Current Money: <strong>{formatMoney(gameState.money)}</strong>
             <br />
-            Current Reputation: <strong>{gameState.reputation}/100</strong>
+            Current Reputation: <strong>{Math.floor(gameState.reputation)}/100</strong>
           </div>
         </div>
         
@@ -295,7 +303,7 @@ export function DevModeMenu({
                     <br />
                     State: {selectedResidentData.currentState}
                     <br />
-                    Current Happiness: {Math.round(selectedResidentData.happiness)}/100
+                    Current Health: {Math.round(selectedResidentData.health)}/100
                     <br />
                     Current LIFE Meter: {Math.round(selectedResidentData.lifeMeter)}/100
                     <br />
@@ -304,12 +312,12 @@ export function DevModeMenu({
                   
                   <div className="dev-stat-grid">
                     <div className="dev-stat-item">
-                      <label>Happiness:</label>
+                      <label>Health:</label>
                       <input
                         type="number"
                         className="dev-input"
-                        value={happinessValue}
-                        onChange={(e) => setHappinessValue(Number(e.target.value))}
+                        value={healthValue}
+                        onChange={(e) => setHealthValue(Number(e.target.value))}
                         min={0}
                         max={100}
                       />
@@ -317,9 +325,9 @@ export function DevModeMenu({
                     <div className="dev-stat-item">
                       <button
                         className="dev-button"
-                        onClick={() => onModifyResident(selectedResident, 'happiness', happinessValue)}
+                        onClick={() => onModifyResident(selectedResident, 'health', healthValue)}
                       >
-                        Set Happiness
+                        Set Health
                       </button>
                     </div>
                     
@@ -347,9 +355,9 @@ export function DevModeMenu({
                   <div className="dev-controls" style={{ marginTop: '12px' }}>
                     <button
                       className="dev-button success"
-                      onClick={() => onModifyResident(selectedResident, 'happiness', 100)}
+                      onClick={() => onModifyResident(selectedResident, 'health', 100)}
                     >
-                      Max Happiness
+                      Max Health
                     </button>
                     <button
                       className="dev-button success"
@@ -360,7 +368,7 @@ export function DevModeMenu({
                     <button
                       className="dev-button danger"
                       onClick={() => {
-                        onModifyResident(selectedResident, 'happiness', 0);
+                        onModifyResident(selectedResident, 'health', 0);
                         onModifyResident(selectedResident, 'lifeMeter', 0);
                       }}
                     >
@@ -390,12 +398,12 @@ export function DevModeMenu({
               className="dev-button"
               onClick={() => {
                 gameState.residents.forEach(resident => {
-                  onModifyResident(resident.id, 'happiness', 100);
+                  onModifyResident(resident.id, 'health', 100);
                   onModifyResident(resident.id, 'lifeMeter', 100);
                 });
               }}
             >
-              😊 Max All Residents
+              ❤️ Max All Residents
             </button>
             <button
               className="dev-button danger"

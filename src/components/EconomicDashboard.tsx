@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { GameState, FinancialHealthStatus } from '../types';
-import { getActiveTimerConfig, MAINTENANCE_CONFIG, OPERATING_COSTS_CONFIG } from '../constants';
+import { getActiveTimerConfig, MAINTENANCE_CONFIG, OPERATING_COSTS_CONFIG, BANKRUPTCY_CONFIG, EXPENSE_EVENTS_CONFIG } from '../constants';
 import { getExpectedDonationAmount, getOperatingCostsBreakdown, getDonationChance } from '../game/systems/DonationSystem';
 import { getTotalMaintenanceCost, getMaintenanceStatus } from '../game/systems/MaintenanceSystem';
 import { calculateFoodCost, getFoodSettingDisplay } from '../game/systems/FoodSystem';
 import { getDonationMultiplier } from '../game/systems/TierSystem';
 import './EconomicDashboard.css';
+import { formatMoney } from '../utils/helpers';
 
 interface EconomicDashboardProps {
   gameState: GameState;
@@ -26,7 +27,7 @@ function calculateAverageDonationsPerDay(gameState: GameState): number {
     const expected = getExpectedDonationAmount(gameState);
     const donationChance = getDonationChance(gameState.reputation);
     const TIMER_CONFIG = getActiveTimerConfig();
-    const checksPerDay = (8 * 60 * 1000) / TIMER_CONFIG.DONATION_CHECK_INTERVAL; // Day phase only
+    const checksPerDay = TIMER_CONFIG.DAY_DURATION / TIMER_CONFIG.DONATION_CHECK_INTERVAL; // Day phase only
     return Math.floor(expected.average * donationChance * checksPerDay);
   }
   
@@ -38,7 +39,7 @@ function calculateAverageDonationsPerDay(gameState: GameState): number {
     const expected = getExpectedDonationAmount(gameState);
     const donationChance = getDonationChance(gameState.reputation);
     const TIMER_CONFIG = getActiveTimerConfig();
-    const checksPerDay = (8 * 60 * 1000) / TIMER_CONFIG.DONATION_CHECK_INTERVAL;
+    const checksPerDay = TIMER_CONFIG.DAY_DURATION / TIMER_CONFIG.DONATION_CHECK_INTERVAL;
     return Math.floor(expected.average * donationChance * checksPerDay);
   }
   
@@ -63,16 +64,16 @@ function calculateDailyExpenses(gameState: GameState): {
   // Maintenance costs - convert from per-cycle to per-day
   const maintenanceCostPerCycle = getTotalMaintenanceCost(gameState);
   const TIMER_CONFIG = getActiveTimerConfig();
-  const maintenanceCyclesPerDay = (24 * 60 * 60 * 1000) / TIMER_CONFIG.MAINTENANCE_CHECK_INTERVAL;
+  const maintenanceCyclesPerDay = TIMER_CONFIG.FULL_DAY_CYCLE / TIMER_CONFIG.MAINTENANCE_CHECK_INTERVAL;
   const maintenancePerDay = Math.floor(maintenanceCostPerCycle * maintenanceCyclesPerDay);
   
   // Operating costs (daily)
   const operatingCosts = getOperatingCostsBreakdown(gameState);
   
   // Random expenses (estimated average)
-  const donationChecksPerDay = (8 * 60 * 1000) / TIMER_CONFIG.DONATION_CHECK_INTERVAL;
-  const randomExpenseChance = 0.15; // 15% per check
-  const avgRandomCost = (25 + 100) / 2; // Average of min/max
+  const donationChecksPerDay = TIMER_CONFIG.DAY_DURATION / TIMER_CONFIG.DONATION_CHECK_INTERVAL;
+  const randomExpenseChance = EXPENSE_EVENTS_CONFIG.CHANCE_PER_DONATION_CYCLE;
+  const avgRandomCost = (EXPENSE_EVENTS_CONFIG.MIN_COST + EXPENSE_EVENTS_CONFIG.MAX_COST) / 2;
   const estimatedRandomExpenses = Math.floor(donationChecksPerDay * randomExpenseChance * avgRandomCost);
   
   return {
@@ -88,10 +89,10 @@ function calculateDailyExpenses(gameState: GameState): {
  * Calculate financial health status
  */
 function getFinancialHealthStatus(dailyNet: number, daysUntilBankrupt: number | null): FinancialHealthStatus {
-  if (dailyNet > 50) return 'healthy';
-  if (dailyNet >= -20) return 'stable';
+  if (dailyNet > 2500) return 'healthy';
+  if (dailyNet >= -1000) return 'stable';
   if (daysUntilBankrupt !== null && daysUntilBankrupt <= 5) return 'critical';
-  if (dailyNet < -50) return 'critical';
+  if (dailyNet < -2500) return 'critical';
   return 'warning';
 }
 
@@ -158,10 +159,10 @@ function generateFinancialAlerts(
   // Maintenance warning
   const maintenanceStatus = getMaintenanceStatus(gameState);
   if (maintenanceStatus.status === 'warning') {
-    alerts.push(`⚠️ Cannot afford next maintenance ($${maintenanceStatus.nextCost})`);
+    alerts.push(`⚠️ Cannot afford next maintenance (${formatMoney(maintenanceStatus.nextCost)})`);
   } else if (maintenanceStatus.status === 'critical') {
     const timeMinutes = Math.floor(maintenanceStatus.timeRemaining / 60000);
-    alerts.push(`⚠️ Maintenance due in ${timeMinutes} minutes: $${maintenanceStatus.nextCost}`);
+    alerts.push(`⚠️ Maintenance due in ${timeMinutes} minutes: ${formatMoney(maintenanceStatus.nextCost)}`);
   }
   
   // Bankruptcy warning
@@ -170,7 +171,7 @@ function generateFinancialAlerts(
   }
   
   // Low money warning
-  if (gameState.money < 200 && gameState.money > 0) {
+  if (gameState.money < BANKRUPTCY_CONFIG.WARNING_MONEY_LOW && gameState.money > 0) {
     alerts.push('⚠️ Low funds - consider running a fundraiser');
   }
   
@@ -208,7 +209,7 @@ const IncomeBreakdown: React.FC<IncomeBreakdownProps> = ({ gameState, dailyIncom
       <div className="breakdown-list">
         <div className="breakdown-item">
           <span className="item-label">Donations:</span>
-          <span className="item-value">~${dailyIncome}/day</span>
+          <span className="item-value">~{formatMoney(dailyIncome)}/day</span>
         </div>
         <div className="breakdown-item sub-item">
           <span className="item-label">├ Chance per check:</span>
@@ -216,7 +217,7 @@ const IncomeBreakdown: React.FC<IncomeBreakdownProps> = ({ gameState, dailyIncom
         </div>
         <div className="breakdown-item sub-item">
           <span className="item-label">├ Expected amount:</span>
-          <span className="item-value">${expected.min}-${expected.max}</span>
+          <span className="item-value">{formatMoney(expected.min)}-{formatMoney(expected.max)}</span>
         </div>
         <div className="breakdown-item sub-item">
           <span className="item-label">└ Tier multiplier:</span>
@@ -225,13 +226,13 @@ const IncomeBreakdown: React.FC<IncomeBreakdownProps> = ({ gameState, dailyIncom
         {activeFundraisers > 0 && (
           <div className="breakdown-item">
             <span className="item-label">Fundraisers:</span>
-            <span className="item-value">~${avgFundraiserPayout} (if successful)</span>
+            <span className="item-value">~{formatMoney(avgFundraiserPayout)} (if successful)</span>
           </div>
         )}
       </div>
       <div className="breakdown-total">
         <span>Total:</span>
-        <span className="positive">~${dailyIncome}/day</span>
+        <span className="positive">~{formatMoney(dailyIncome)}/day</span>
       </div>
     </div>
   );
@@ -258,39 +259,39 @@ const ExpenseBreakdown: React.FC<ExpenseBreakdownProps> = ({ expenses, gameState
       <div className="breakdown-list">
         <div className="breakdown-item">
           <span className="item-label">Food ({gameState.foodPortionSetting}):</span>
-          <span className="item-value">${expenses.food}/day</span>
+          <span className="item-value">{formatMoney(expenses.food)}/day</span>
         </div>
         <div className="breakdown-item sub-item">
-          <span className="item-label">└ {gameState.residents.length} residents × ${foodDisplay.costPerResident}</span>
+          <span className="item-label">└ {gameState.residents.length} residents × {formatMoney(foodDisplay.costPerResident)}</span>
         </div>
         <div className="breakdown-item">
           <span className="item-label">Maintenance:</span>
-          <span className="item-value">${expenses.maintenance}/day</span>
+          <span className="item-value">{formatMoney(expenses.maintenance)}/day</span>
         </div>
         <div className="breakdown-item sub-item">
           <span className="item-label">└ {gameState.rooms.length} rooms</span>
         </div>
         <div className="breakdown-item">
           <span className="item-label">Operating:</span>
-          <span className="item-value">${expenses.operating}/day</span>
+          <span className="item-value">{formatMoney(expenses.operating)}/day</span>
         </div>
         <div className="breakdown-item sub-item">
-          <span className="item-label">├ Base: ${operatingBreakdown.base}</span>
+          <span className="item-label">├ Base: {formatMoney(operatingBreakdown.base)}</span>
         </div>
         <div className="breakdown-item sub-item">
-          <span className="item-label">├ Residents: ${operatingBreakdown.residents}</span>
+          <span className="item-label">├ Residents: {formatMoney(operatingBreakdown.residents)}</span>
         </div>
         <div className="breakdown-item sub-item">
-          <span className="item-label">└ Rooms: ${operatingBreakdown.rooms}</span>
+          <span className="item-label">└ Rooms: {formatMoney(operatingBreakdown.rooms)}</span>
         </div>
         <div className="breakdown-item">
           <span className="item-label">Random (avg):</span>
-          <span className="item-value">~${expenses.random}/day</span>
+          <span className="item-value">~{formatMoney(expenses.random)}/day</span>
         </div>
       </div>
       <div className="breakdown-total">
         <span>Total:</span>
-        <span className="negative">~${expenses.total}/day</span>
+        <span className="negative">~{formatMoney(expenses.total)}/day</span>
       </div>
     </div>
   );
@@ -319,7 +320,7 @@ const ProjectionSection: React.FC<ProjectionSectionProps> = ({
       <div className="projection-net">
         <span className="projection-label">Daily Net:</span>
         <span className={`projection-value ${dailyNet >= 0 ? 'positive' : 'negative'}`}>
-          {dailyNet >= 0 ? '+' : ''}${dailyNet}/day
+          {dailyNet >= 0 ? '+' : ''}{formatMoney(dailyNet)}/day
           <span className="trend-arrow">{dailyNet >= 0 ? '↑' : '↓'}</span>
         </span>
       </div>
@@ -342,7 +343,7 @@ const ProjectionSection: React.FC<ProjectionSectionProps> = ({
                   width: `${Math.min(100, Math.abs(p.money) / Math.max(1, currentMoney) * 100)}%`
                 }}
               />
-              <span className="timeline-value">${p.money}</span>
+              <span className="timeline-value">{formatMoney(p.money)}</span>
               <span className="timeline-day">Day +{p.day}</span>
             </div>
           ))}
@@ -374,11 +375,11 @@ const EfficiencyMetrics: React.FC<EfficiencyMetricsProps> = ({ metrics }) => {
       <div className="metric-grid">
         <div className="metric-item">
           <span className="metric-label">Cost/Resident:</span>
-          <span className="metric-value">${metrics.costPerResident}/day</span>
+          <span className="metric-value">{formatMoney(metrics.costPerResident)}/day</span>
         </div>
         <div className="metric-item">
           <span className="metric-label">Revenue/Resident:</span>
-          <span className="metric-value">${metrics.revenuePerResident}/day</span>
+          <span className="metric-value">{formatMoney(metrics.revenuePerResident)}/day</span>
         </div>
         <div className="metric-item full-width">
           <span className="metric-label">Efficiency Score:</span>
@@ -459,13 +460,13 @@ export const EconomicDashboard: React.FC<EconomicDashboardProps> = ({ gameState 
         <div className="summary-item current-money">
           <span className="summary-label">Current Balance</span>
           <span className={`summary-value ${gameState.money < 0 ? 'negative' : ''}`}>
-            ${gameState.money.toLocaleString()}
+            {formatMoney(gameState.money)}
           </span>
         </div>
         <div className="summary-item daily-net">
           <span className="summary-label">Daily Net</span>
           <span className={`summary-value ${dailyNet >= 0 ? 'positive' : 'negative'}`}>
-            {dailyNet >= 0 ? '+' : ''}${dailyNet}
+            {dailyNet >= 0 ? '+' : ''}{formatMoney(dailyNet)}
           </span>
         </div>
         <div className="summary-item health-status">
@@ -529,7 +530,7 @@ export const FinancialIndicator: React.FC<FinancialIndicatorProps> = ({ gameStat
     <div 
       className={`financial-indicator health-${healthStatus}`}
       onClick={onClick}
-      title={`Daily net: ${dailyNet >= 0 ? '+' : ''}$${dailyNet}. Click for details.`}
+      title={`Daily net: ${dailyNet >= 0 ? '+' : ''}${formatMoney(dailyNet)}. Click for details.`}
     >
       <span className="indicator-icon">
         {healthStatus === 'healthy' && '📈'}
@@ -538,7 +539,7 @@ export const FinancialIndicator: React.FC<FinancialIndicatorProps> = ({ gameStat
         {healthStatus === 'critical' && '🚨'}
       </span>
       <span className={`indicator-value ${dailyNet >= 0 ? 'positive' : 'negative'}`}>
-        {dailyNet >= 0 ? '+' : ''}{dailyNet}
+        {formatMoney(dailyNet, true)}
       </span>
     </div>
   );

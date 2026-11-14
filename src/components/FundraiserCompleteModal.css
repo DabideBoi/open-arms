@@ -161,8 +161,8 @@
 }
 
 .participant-name {
-  background: rgba(74, 158, 255, 0.15);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: rgba(140,193,82,0.15);
+  border: 1px solid rgba(140,193,82,0.3);
   padding: 4px 10px;
   border-radius: 16px;
   font-size: 12px;
@@ -232,7 +232,7 @@
 }
 
 .btn-close-modal {
-  background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+  background: linear-gradient(135deg, #8cc152 0%, #357abd 100%);
   color: white;
   border: none;
   padding: 14px 40px;
@@ -241,12 +241,12 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(140,193,82,0.3);
 }
 
 .btn-close-modal:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(74, 158, 255, 0.4);
+  box-shadow: 0 6px 16px rgba(140,193,82,0.4);
 }
 
 .btn-close-modal:active {

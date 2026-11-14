@@ -1,5 +1,5 @@
 import { GameState, GameOverReason } from '../../types';
-import { GAME_STATE_CONFIG, getActiveTimerConfig, BANKRUPTCY_CONFIG, REPUTATION_CONFIG } from '../../constants';
+import { GAME_STATE_CONFIG, getActiveTimerConfig, BANKRUPTCY_CONFIG, REPUTATION_CONFIG, SAVE_VERSION } from '../../constants';
 import { initializeGrid } from './GridSystem';
 import { createTestResidents } from './ResidentSystem';
 
@@ -27,7 +27,7 @@ export function createInitialGameState(): GameState {
   const TIMER_CONFIG = getActiveTimerConfig();
   
   return {
-    version: "1.0.0",
+    version: SAVE_VERSION,
     lastSaved: now,
     lastPlayed: now,
     money: GAME_STATE_CONFIG.STARTING_MONEY,
@@ -228,7 +228,7 @@ export class GameStateManager {
       // Dispatch warning event
       window.dispatchEvent(new CustomEvent('game:show_notification', {
         detail: {
-          message: `⚠️ CRITICAL: Shelter facing bankruptcy! Get above $0 within 3 days or close.`,
+          message: `⚠️ CRITICAL: Shelter facing bankruptcy! Get above ₱0 within 3 days or close.`,
           type: 'error'
         }
       }));
@@ -326,13 +326,13 @@ export class GameStateManager {
     // which runs every 5 seconds with proper deduplication and cooldowns.
     // See src/game/systems/WarningSystem.ts - checkFinancialWarnings()
     
-    // Start bankruptcy countdown at -$500
+    // Start bankruptcy countdown below BANKRUPTCY_CONFIG.THRESHOLD
     if (money < BANKRUPTCY_CONFIG.THRESHOLD) {
       if (!this.state.isBankrupt) {
         this.startBankruptcy();
       }
     } else if (this.state.isBankrupt && money >= BANKRUPTCY_CONFIG.RECOVERY_THRESHOLD) {
-      // Recovered - money above $0
+      // Recovered - money above ₱0
       this.cancelBankruptcy();
     }
   }

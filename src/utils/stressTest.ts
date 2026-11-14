@@ -1,13 +1,13 @@
 import { GameState, Resident, Room, RoomAdjacencyBonuses } from '../types';
-import { PROFILE_SPECS, ROOM_SPECS, NAME_LISTS } from '../constants';
-import { generateRandomName } from './helpers';
+import { PROFILE_SPECS, ROOM_SPECS } from '../constants';
+import { randomGenderedName } from '../game/systems/ResidentSystem';
 
 /**
  * Create default adjacency bonuses for stress test rooms
  */
 function createDefaultAdjacencyBonuses(): RoomAdjacencyBonuses {
   return {
-    happiness: 0,
+    health: 0,
     lifeFillModifier: 0,
     maintenanceReduction: 0,
     adjacentRoomIds: [],
@@ -32,7 +32,7 @@ export function spawnStressTestResidents(
 ): void {
   console.log(`🧪 Spawning ${count} residents for stress test...`);
   
-  const profiles: Array<'young_adult' | 'veteran' | 'elderly'> = ['young_adult', 'veteran', 'elderly'];
+  const profiles: Array<'young_adult' | 'adult' | 'elderly'> = ['young_adult', 'adult', 'elderly'];
   
   for (let i = 0; i < count; i++) {
     const profile = profiles[Math.floor(Math.random() * profiles.length)];
@@ -40,12 +40,12 @@ export function spawnStressTestResidents(
     
     const resident: Resident = {
       id: `stress_test_${Date.now()}_${i}`,
-      name: generateRandomName(NAME_LISTS.FIRST_NAMES, NAME_LISTS.LAST_NAMES),
+      ...randomGenderedName(),
       profile,
       arrivalReason: 'arrived for stress testing',
       arrivalDay: gameState.currentDay,
       daysInShelter: 0,
-      happiness: 50 + Math.random() * 30,
+      health: 50 + Math.random() * 30,
       lifeMeter: Math.random() * 50,
       currentState: 'idle',
       currentNeed: null,
@@ -57,11 +57,11 @@ export function spawnStressTestResidents(
       path: null,
       pathIndex: 0,
       lastNeedCheck: Date.now(),
-      lastHappinessUpdate: Date.now(),
+      lastHealthUpdate: Date.now(),
       lastLifeUpdate: Date.now(),
       lastMealTime: Date.now(),
       // Departure tracking
-      unhappyDuration: 0,
+      unhealthyDuration: 0,
       isAtRisk: false,
       departureReason: undefined,
       // Fundraiser fatigue tracking
@@ -208,7 +208,7 @@ export function runPerformanceTest(
       spawnStressTestResidents(gameState, 30);
       buildStressTestRooms(gameState, 'dormitory', 4);
       buildStressTestRooms(gameState, 'cafeteria', 2);
-      buildStressTestRooms(gameState, 'learning_center', 3);
+      buildStressTestRooms(gameState, 'clinic', 3);
       buildStressTestRooms(gameState, 'common_room', 3);
       buildStressTestRooms(gameState, 'bathroom', 3);
       break;
@@ -218,8 +218,7 @@ export function runPerformanceTest(
       spawnStressTestResidents(gameState, 50);
       buildStressTestRooms(gameState, 'dormitory', 6);
       buildStressTestRooms(gameState, 'cafeteria', 3);
-      buildStressTestRooms(gameState, 'learning_center', 5);
-      buildStressTestRooms(gameState, 'vocational_room', 3);
+      buildStressTestRooms(gameState, 'clinic', 5);
       buildStressTestRooms(gameState, 'common_room', 4);
       buildStressTestRooms(gameState, 'bathroom', 4);
       break;
@@ -229,8 +228,7 @@ export function runPerformanceTest(
       spawnStressTestResidents(gameState, 100);
       buildStressTestRooms(gameState, 'dormitory', 10);
       buildStressTestRooms(gameState, 'cafeteria', 5);
-      buildStressTestRooms(gameState, 'learning_center', 8);
-      buildStressTestRooms(gameState, 'vocational_room', 5);
+      buildStressTestRooms(gameState, 'clinic', 8);
       buildStressTestRooms(gameState, 'common_room', 6);
       buildStressTestRooms(gameState, 'bathroom', 6);
       break;

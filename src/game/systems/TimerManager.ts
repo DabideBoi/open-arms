@@ -270,7 +270,7 @@ export class PauseManager {
   private pauseStartTime: number = 0;
   private totalPausedTime: number = 0;
   private pauseCallbacks: Set<() => void> = new Set();
-  private resumeCallbacks: Set<() => void> = new Set();
+  private resumeCallbacks: Set<(pausedMs: number) => void> = new Set();
   
   /**
    * Pause the game
@@ -297,7 +297,7 @@ export class PauseManager {
     this.paused = false;
     
     // Notify listeners
-    this.resumeCallbacks.forEach(cb => cb());
+    this.resumeCallbacks.forEach(cb => cb(pauseDuration));
   }
   
   /**
@@ -328,15 +328,17 @@ export class PauseManager {
   /**
    * Register callback for pause event
    */
-  onPause(callback: () => void): void {
+  onPause(callback: () => void): () => void {
     this.pauseCallbacks.add(callback);
+    return () => { this.pauseCallbacks.delete(callback); };
   }
   
   /**
    * Register callback for resume event
    */
-  onResume(callback: () => void): void {
+  onResume(callback: (pausedMs: number) => void): () => void {
     this.resumeCallbacks.add(callback);
+    return () => { this.resumeCallbacks.delete(callback); };
   }
   
   /**
@@ -349,4 +351,40 @@ export class PauseManager {
     }
     return timestamp;
   }
+}
+
+// ============================================================================
+// Pause catch-up prevention
+// ============================================================================
+
+const STATE_TIMESTAMPS = [
+  'nextDonationCheck', 'nextMaintenanceCheck', 'nextDayNightTransition', 'nextResidentSpawn',
+  'lastFundraiserEndTime', 'bankruptcyStartTime', 'lastDisasterTime', 'lastDecayTime',
+  'lastWarningCheck', 'lastGraduationTime',
+] as const;
+const RESIDENT_TIMESTAMPS = [
+  'lastHealthUpdate', 'lastNeedCheck', 'lastLifeUpdate', 'lastMealTime',
+  'fundraiserFatigueUntil', 'lastWanderTime', 'repositionStartTime',
+] as const;
+
+const shift = (obj: Record<string, unknown>, keys: readonly string[], ms: number) => {
+  for (const k of keys) if (typeof obj[k] === 'number') (obj[k] as number) += ms;
+};
+
+/**
+ * Every deadline in the game is a wall-clock timestamp, so a pause would make them all
+ * fire at once on resume. Push them forward by the time spent paused instead.
+ */
+export function shiftGameStateTimestamps(state: GameState, ms: number): void {
+  if (ms <= 0) return;
+  shift(state as unknown as Record<string, unknown>, STATE_TIMESTAMPS, ms);
+  for (const r of state.residents) shift(r as unknown as Record<string, unknown>, RESIDENT_TIMESTAMPS, ms);
+  for (const room of state.rooms) room.lastMaintenancePaid += ms;
+  for (const f of state.activeFundraisers) { f.startedAt += ms; f.completesAt += ms; }
+  if (state.activeDisasterEvent) {
+    state.activeDisasterEvent.triggeredAt += ms;
+    state.activeDisasterEvent.expiresAt += ms;
+  }
+  for (const w of state.activeWarnings) w.timestamp += ms;
+  for (const c of state.warningCooldowns) c.cooldownUntil += ms;
 }

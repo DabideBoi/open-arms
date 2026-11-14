@@ -1,5 +1,5 @@
 import { Room, RoomType, RoomAdjacencyBonuses, Grid } from '../../types';
-import { ADJACENCY_BONUSES, getAdjacencyBonusKey } from '../../constants';
+import { ADJACENCY_BONUSES, getAdjacencyBonusKey, ROOM_SPECS, roomKind } from '../../constants';
 
 /**
  * AdjacencySystem - Manages room adjacency bonuses
@@ -15,7 +15,7 @@ import { ADJACENCY_BONUSES, getAdjacencyBonusKey } from '../../constants';
  */
 export function createDefaultAdjacencyBonuses(): RoomAdjacencyBonuses {
   return {
-    happiness: 0,
+    health: 0,
     lifeFillModifier: 0,
     maintenanceReduction: 0,
     adjacentRoomIds: [],
@@ -85,23 +85,47 @@ export function calculateRoomBonuses(room: Room, allRooms: Room[]): RoomAdjacenc
   const adjacentRooms = getAdjacentRooms(room, allRooms);
   
   const bonuses: RoomAdjacencyBonuses = {
-    happiness: 0,
+    health: 0,
     lifeFillModifier: 0,
     maintenanceReduction: 0,
     adjacentRoomIds: [],
     bonusDescriptions: []
   };
   
+  const label = (t: RoomType) => t.replace(/_/g, ' ');
+  const effectText = (e: { health: number; lifeFillModifier: number }) =>
+    [e.health ? `${e.health > 0 ? '+' : ''}${e.health} health` : '',
+     e.lifeFillModifier ? `${e.lifeFillModifier > 0 ? '+' : ''}${Math.round(e.lifeFillModifier * 100)}% LIFE` : '']
+      .filter(Boolean).join(', ');
+  
+  // The room's own perk (medical center, library, garden, ...)
+  const own = ROOM_SPECS[room.type]?.bonus;
+  if (own) {
+    bonuses.health += own.health;
+    bonuses.lifeFillModifier += own.lifeFillModifier;
+    bonuses.bonusDescriptions.push(`${label(room.type)}: ${effectText(own)}`);
+  }
+  
   for (const adjacent of adjacentRooms) {
-    const bonusKey = getAdjacencyBonusKey(room.type, adjacent.type);
+    // Upgrades and service rooms share their base room's pairings
+    const bonusKey = getAdjacencyBonusKey(roomKind(room.type), roomKind(adjacent.type));
     const bonus = ADJACENCY_BONUSES[bonusKey];
     
     if (bonus) {
-      bonuses.happiness += bonus.happiness;
+      bonuses.health += bonus.health;
       bonuses.lifeFillModifier += bonus.lifeFillModifier;
       bonuses.maintenanceReduction += bonus.maintenanceReduction;
       bonuses.adjacentRoomIds.push(adjacent.id);
       bonuses.bonusDescriptions.push(bonus.description);
+    }
+    
+    // Decorations boost the rooms they touch (but not other decorations)
+    const aura = ROOM_SPECS[adjacent.type]?.aura;
+    if (aura && !ROOM_SPECS[room.type]?.isDecoration) {
+      bonuses.health += aura.health;
+      bonuses.lifeFillModifier += aura.lifeFillModifier;
+      if (!bonuses.adjacentRoomIds.includes(adjacent.id)) bonuses.adjacentRoomIds.push(adjacent.id);
+      bonuses.bonusDescriptions.push(`${label(adjacent.type)} nearby: ${effectText(aura)}`);
     }
   }
   
@@ -119,7 +143,7 @@ export function recalculateAllAdjacencies(rooms: Room[]): void {
   
   // Log summary
   const bonusCount = rooms.filter(r => 
-    r.adjacencyBonuses.happiness !== 0 || 
+    r.adjacencyBonuses.health !== 0 || 
     r.adjacencyBonuses.lifeFillModifier !== 0 || 
     r.adjacencyBonuses.maintenanceReduction !== 0
   ).length;
@@ -139,7 +163,7 @@ export interface PlacementPreview {
     roomId: string;
     roomType: RoomType;
     bonusChange: {
-      happiness: number;
+      health: number;
       lifeFillModifier: number;
       maintenanceReduction: number;
       description: string;
@@ -184,16 +208,20 @@ export function getPlacementPreview(
   const adjacentRooms = getAdjacentRooms(tempRoom, existingRooms);
   const affectedRooms: PlacementPreview['affectedRooms'] = [];
   
+  const placedAura = ROOM_SPECS[roomType]?.aura;
   for (const adjacent of adjacentRooms) {
-    const bonusKey = getAdjacencyBonusKey(roomType, adjacent.type);
-    const bonus = ADJACENCY_BONUSES[bonusKey];
+    const bonusKey = getAdjacencyBonusKey(roomKind(roomType), roomKind(adjacent.type));
+    const bonus = ADJACENCY_BONUSES[bonusKey]
+      ?? (placedAura && !ROOM_SPECS[adjacent.type]?.isDecoration
+        ? { ...placedAura, maintenanceReduction: 0, description: `${roomType.replace(/_/g, ' ')} nearby` }
+        : undefined);
     
     if (bonus) {
       affectedRooms.push({
         roomId: adjacent.id,
         roomType: adjacent.type,
         bonusChange: {
-          happiness: bonus.happiness,
+          health: bonus.health,
           lifeFillModifier: bonus.lifeFillModifier,
           maintenanceReduction: bonus.maintenanceReduction,
           description: bonus.description
@@ -203,13 +231,13 @@ export function getPlacementPreview(
   }
   
   // Determine if overall positive or negative
-  const isPositive = bonuses.happiness > 0 || bonuses.lifeFillModifier > 0 || bonuses.maintenanceReduction > 0;
-  const isNegative = bonuses.happiness < 0 || bonuses.lifeFillModifier < 0 || bonuses.maintenanceReduction < 0;
+  const isPositive = bonuses.health > 0 || bonuses.lifeFillModifier > 0 || bonuses.maintenanceReduction > 0;
+  const isNegative = bonuses.health < 0 || bonuses.lifeFillModifier < 0 || bonuses.maintenanceReduction < 0;
   
   // Generate summary
   const summaryParts: string[] = [];
-  if (bonuses.happiness !== 0) {
-    summaryParts.push(`${bonuses.happiness > 0 ? '+' : ''}${bonuses.happiness} happiness`);
+  if (bonuses.health !== 0) {
+    summaryParts.push(`${bonuses.health > 0 ? '+' : ''}${bonuses.health} health`);
   }
   if (bonuses.lifeFillModifier !== 0) {
     const percent = Math.round(bonuses.lifeFillModifier * 100);
@@ -288,7 +316,7 @@ export function getAffectedTilesForPlacement(
 export function getRoomAdjacencyInfo(room: Room, allRooms: Room[]): {
   hasBonus: boolean;
   hasPenalty: boolean;
-  totalHappiness: number;
+  totalHealth: number;
   totalLifeFillModifier: number;
   totalMaintenanceReduction: number;
   descriptions: string[];
@@ -305,9 +333,9 @@ export function getRoomAdjacencyInfo(room: Room, allRooms: Room[]): {
   }
   
   return {
-    hasBonus: bonuses.happiness > 0 || bonuses.lifeFillModifier > 0 || bonuses.maintenanceReduction > 0,
-    hasPenalty: bonuses.happiness < 0 || bonuses.lifeFillModifier < 0 || bonuses.maintenanceReduction < 0,
-    totalHappiness: bonuses.happiness,
+    hasBonus: bonuses.health > 0 || bonuses.lifeFillModifier > 0 || bonuses.maintenanceReduction > 0,
+    hasPenalty: bonuses.health < 0 || bonuses.lifeFillModifier < 0 || bonuses.maintenanceReduction < 0,
+    totalHealth: bonuses.health,
     totalLifeFillModifier: bonuses.lifeFillModifier,
     totalMaintenanceReduction: bonuses.maintenanceReduction,
     descriptions: bonuses.bonusDescriptions,
@@ -334,7 +362,7 @@ export function getEffectiveMaintenanceCost(room: Room): number {
 }
 
 /**
- * Get effective LIFE fill modifier for a room (for educational rooms)
+ * Get effective LIFE fill modifier for a room (no room currently provides one)
  */
 export function getEffectiveLifeFillModifier(room: Room): number {
   // Base modifier is 1.0 (100%)
@@ -346,8 +374,8 @@ export function getEffectiveLifeFillModifier(room: Room): number {
 }
 
 /**
- * Get happiness bonus for residents in a room
+ * Get health bonus for residents in a room
  */
-export function getRoomHappinessBonus(room: Room): number {
-  return room.adjacencyBonuses.happiness;
+export function getRoomHealthBonus(room: Room): number {
+  return room.adjacencyBonuses.health;
 }

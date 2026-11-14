@@ -42,7 +42,7 @@ export function modifyReputation(
  */
 function checkReputationThresholds(gameState: GameState): void {
   // Game over at 0
-  if (gameState.reputation === REPUTATION_CONFIG.GAME_OVER_THRESHOLD) {
+  if (gameState.reputation <= REPUTATION_CONFIG.GAME_OVER_THRESHOLD) {
     console.log('⚠️ GAME OVER: Reputation reached 0');
     // Trigger game over (will be implemented in MainScene)
     emitGameEvent('game_over', { reason: 'reputation_zero' });
@@ -55,7 +55,7 @@ function checkReputationThresholds(gameState: GameState): void {
   }
   
   // Milestone notifications
-  if (gameState.reputation === REPUTATION_CONFIG.MAX) {
+  if (gameState.reputation >= REPUTATION_CONFIG.MAX) {
     emitGameEvent('reputation_perfect', {});
   }
 }
@@ -90,25 +90,21 @@ export function handleGraduationReputation(
   residentProfile: string,
   residentName: string
 ): void {
-  // Veterans give extra reputation
-  const repBoost = residentProfile === 'veteran'
-    ? REPUTATION_CHANGES.RESIDENT_GRADUATED_VETERAN
-    : REPUTATION_CHANGES.RESIDENT_GRADUATED;
-  
-  modifyReputation(gameState, repBoost, `${residentName} graduated`);
+  void residentProfile; // every profile now earns the same graduation reputation
+  modifyReputation(gameState, REPUTATION_CHANGES.RESIDENT_GRADUATED, `${residentName} graduated`);
 }
 
 /**
- * Handle unhappy resident departure
+ * Handle unhealthy resident departure
  */
-export function handleUnhappyDepartureReputation(
+export function handleUnhealthyDepartureReputation(
   gameState: GameState,
   residentName: string
 ): void {
   modifyReputation(
     gameState,
-    REPUTATION_CHANGES.RESIDENT_LEFT_UNHAPPY,
-    `${residentName} left unhappy`
+    REPUTATION_CHANGES.RESIDENT_LEFT_UNHEALTHY,
+    `${residentName} left unhealthy`
   );
 }
 
@@ -181,13 +177,13 @@ export function recordGraduation(gameState: GameState): void {
 }
 
 /**
- * Get average happiness of all residents
+ * Get average health of all residents
  */
-export function getAverageHappiness(gameState: GameState): number {
+export function getAverageHealth(gameState: GameState): number {
   if (gameState.residents.length === 0) return 0;
   
-  const totalHappiness = gameState.residents.reduce((sum, r) => sum + r.happiness, 0);
-  return totalHappiness / gameState.residents.length;
+  const totalHealth = gameState.residents.reduce((sum, r) => sum + r.health, 0);
+  return totalHealth / gameState.residents.length;
 }
 
 /**
@@ -204,7 +200,7 @@ export function isAtCapacity(gameState: GameState): boolean {
 export interface DecayMitigationDetails {
   residentMitigation: number;
   graduationMitigation: number;
-  happinessMitigation: number;
+  healthMitigation: number;
   capacityMitigation: number;
   totalMitigation: number;
   descriptions: string[];
@@ -213,18 +209,18 @@ export interface DecayMitigationDetails {
 export function calculateDecayMitigations(gameState: GameState): DecayMitigationDetails {
   const residentCount = gameState.residents.length;
   const recentGraduations = getRecentGraduationsCount(gameState);
-  const avgHappiness = getAverageHappiness(gameState);
+  const avgHealth = getAverageHealth(gameState);
   const atCapacity = isAtCapacity(gameState);
   
   const residentMitigation = residentCount * REPUTATION_DECAY.MITIGATION.perActiveResident;
   const graduationMitigation = recentGraduations * REPUTATION_DECAY.MITIGATION.perGraduationThisWeek;
-  const happinessMitigation = avgHappiness > REPUTATION_DECAY.HIGH_HAPPINESS_THRESHOLD
-    ? REPUTATION_DECAY.MITIGATION.highHappinessBonus
+  const healthMitigation = avgHealth > REPUTATION_DECAY.HIGH_HEALTH_THRESHOLD
+    ? REPUTATION_DECAY.MITIGATION.highHealthBonus
     : 0;
   const capacityMitigation = atCapacity ? REPUTATION_DECAY.MITIGATION.fullCapacityBonus : 0;
   
   const totalMitigation = Math.min(0.9,
-    residentMitigation + graduationMitigation + happinessMitigation + capacityMitigation
+    residentMitigation + graduationMitigation + healthMitigation + capacityMitigation
   );
   
   const descriptions: string[] = [];
@@ -234,8 +230,8 @@ export function calculateDecayMitigations(gameState: GameState): DecayMitigation
   if (graduationMitigation > 0) {
     descriptions.push(`${recentGraduations} recent graduations (-${Math.round(graduationMitigation * 100)}%)`);
   }
-  if (happinessMitigation > 0) {
-    descriptions.push(`High happiness (-${Math.round(happinessMitigation * 100)}%)`);
+  if (healthMitigation > 0) {
+    descriptions.push(`High health (-${Math.round(healthMitigation * 100)}%)`);
   }
   if (capacityMitigation > 0) {
     descriptions.push(`At capacity (-${Math.round(capacityMitigation * 100)}%)`);
@@ -244,7 +240,7 @@ export function calculateDecayMitigations(gameState: GameState): DecayMitigation
   return {
     residentMitigation,
     graduationMitigation,
-    happinessMitigation,
+    healthMitigation,
     capacityMitigation,
     totalMitigation,
     descriptions
@@ -255,9 +251,10 @@ export function calculateDecayMitigations(gameState: GameState): DecayMitigation
  * Calculate the base decay rate before mitigations
  */
 export function getBaseDecayRate(reputation: number): number {
-  const threshold = REPUTATION_DECAY.DECAY_THRESHOLDS.find(t =>
-    reputation >= t.min && reputation <= t.max
-  );
+  // Match on the lower bound only: bands have integer gaps (89-90), so 89.5 would otherwise miss
+  const threshold = [...REPUTATION_DECAY.DECAY_THRESHOLDS]
+    .sort((a, b) => b.min - a.min)
+    .find(t => reputation >= t.min);
   
   if (!threshold) {
     return 0;

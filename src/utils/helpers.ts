@@ -75,3 +75,10 @@ export function getInitials(name: string): string {
     return singleName.toUpperCase();
   }
 }
+
+/** Format a peso amount for display, e.g. ₱12,500 or (signed) +₱12,500 / -₱500. */
+export function formatMoney(amount: number, signed = false): string {
+  const n = Math.round(amount);
+  const sign = n < 0 ? '-' : signed && n > 0 ? '+' : '';
+  return `${sign}₱${Math.abs(n).toLocaleString('en-PH')}`;
+}

@@ -1,87 +1,9 @@
-import { GameState, ResidentProfile, DisasterEventType } from '../../types';
-import { SPAWN_CONFIG, ROOM_SPECS, TIMER_CONFIG, DISASTER_CONFIG } from '../../constants';
+import { GameState, Resident, ResidentProfile, DisasterEventType, Gender } from '../../types';
+import { SPAWN_CONFIG, ROOM_SPECS, DISASTER_CONFIG, roomKind } from '../../constants';
 import { createResident } from './ResidentSystem';
 import { getEntranceTile, isWalkable } from './GridSystem';
 import { isTileOccupiedByResident } from './CollisionDetectionSystem';
-import { getResidentCap, isAtResidentCap, isApproachingCapacity } from './TierSystem';
-
-/**
- * Initialize the next resident spawn time
- */
-export function initializeResidentSpawning(gameState: GameState): void {
-  // Set next spawn to 1 day from now
-  gameState.nextResidentSpawn = Date.now() + TIMER_CONFIG.FULL_DAY_CYCLE;
-}
-
-/**
- * Check if a new resident should spawn and spawn them
- */
-export function checkResidentSpawning(gameState: GameState): void {
-  const now = Date.now();
-  
-  // Check if it's time to spawn
-  if (now < gameState.nextResidentSpawn) {
-    return;
-  }
-  
-  // Check reputation requirement
-  if (gameState.reputation < SPAWN_CONFIG.MIN_REPUTATION_FOR_SPAWN) {
-    console.log(`Reputation too low (${gameState.reputation}%) for new residents`);
-    // Schedule next check
-    gameState.nextResidentSpawn = now + TIMER_CONFIG.FULL_DAY_CYCLE;
-    return;
-  }
-  
-  // Check tier-based resident cap (primary cap)
-  const tierCap = getResidentCap(gameState);
-  if (gameState.residents.length >= tierCap) {
-    console.log(`Shelter at tier capacity (${gameState.residents.length}/${tierCap}) - upgrade tier to increase!`);
-    // Schedule next check
-    gameState.nextResidentSpawn = now + TIMER_CONFIG.FULL_DAY_CYCLE;
-    
-    // Emit capacity warning
-    window.dispatchEvent(new CustomEvent('game:show_notification', {
-      detail: {
-        message: `⚠️ At maximum capacity (${gameState.residents.length}/${tierCap}). Upgrade your shelter tier to accept more residents!`,
-        type: 'warning'
-      }
-    }));
-    return;
-  }
-  
-  // Also check dormitory capacity (secondary cap - need beds)
-  const dormitoryCap = getDormitoryCapacity(gameState);
-  if (dormitoryCap > 0 && gameState.residents.length >= dormitoryCap) {
-    console.log(`Not enough beds (${gameState.residents.length}/${dormitoryCap})`);
-    // Schedule next check
-    gameState.nextResidentSpawn = now + TIMER_CONFIG.FULL_DAY_CYCLE;
-    
-    // Emit notification
-    window.dispatchEvent(new CustomEvent('game:show_notification', {
-      detail: {
-        message: `⚠️ Not enough dormitory beds. Build more dormitories to house new residents!`,
-        type: 'warning'
-      }
-    }));
-    return;
-  }
-  
-  // Check if approaching capacity
-  if (isApproachingCapacity(gameState)) {
-    window.dispatchEvent(new CustomEvent('game:show_notification', {
-      detail: {
-        message: `📈 Approaching capacity (${gameState.residents.length}/${tierCap}). Consider upgrading your shelter tier!`,
-        type: 'info'
-      }
-    }));
-  }
-  
-  // Spawn a new resident
-  spawnNewResident(gameState);
-  
-  // Schedule next spawn
-  gameState.nextResidentSpawn = now + TIMER_CONFIG.FULL_DAY_CYCLE;
-}
+import { getResidentCap, isAtResidentCap } from './TierSystem';
 
 /**
  * Find an unoccupied spawn position near entrance
@@ -116,32 +38,71 @@ function findSpawnPosition(gameState: GameState, entranceX: number, entranceY: n
 }
 
 /**
- * Spawn a new resident at the entrance
+ * Spawn a new resident at the entrance. Residents only arrive by accepting an event.
  */
-function spawnNewResident(gameState: GameState): void {
+export function spawnNewResident(gameState: GameState, profile: ResidentProfile = selectRandomProfile()): Resident | null {
   const entrance = getEntranceTile(gameState.grid);
   if (!entrance) {
     console.error("No entrance tile found for resident spawn");
-    return;
+    return null;
   }
+
+  // Only a gender with a free bed may arrive (no bed for either = nobody arrives)
+  const beds = getFreeBeds(gameState);
+  const options: Gender[] = [];
+  if (beds.male > 0) options.push('male');
+  if (beds.female > 0) options.push('female');
+  if (options.length === 0) return null;
+  const gender = options[Math.floor(Math.random() * options.length)];
   
   // Find unoccupied spawn position
   const spawnPos = findSpawnPosition(gameState, entrance.x, entrance.y);
-  
-  // Select random profile based on weights
-  const profile = selectRandomProfile();
   
   // Create new resident
   const newResident = createResident(
     profile,
     gameState.currentDay,
     spawnPos.x,
-    spawnPos.y
+    spawnPos.y,
+    gender
   );
   
   gameState.residents.push(newResident);
+  gameState.totalResidentsHelped++;
   
   console.log(`🚪 New resident arrived: ${newResident.name} (${profile}) at (${Math.floor(spawnPos.x)}, ${Math.floor(spawnPos.y)})`);
+  return newResident;
+}
+
+/**
+ * Free beds by gender. Residents fill dorms of their own gender first and spill into
+ * 'any' dorms; old data without a gender on room or resident counts as 'any'.
+ * male/female = how many more of that gender could be housed; total = all free beds.
+ */
+export function getFreeBeds(gameState: GameState): { male: number; female: number; total: number } {
+  let capM = 0, capF = 0, capAny = 0;
+  for (const r of gameState.rooms) {
+    if (roomKind(r.type) !== "dormitory") continue;
+    const beds = ROOM_SPECS[r.type].capacity;
+    if (r.gender === 'male') capM += beds;
+    else if (r.gender === 'female') capF += beds;
+    else capAny += beds;
+  }
+  const men = gameState.residents.filter(r => r.gender === 'male').length;
+  const women = gameState.residents.filter(r => r.gender === 'female').length;
+  const unknown = gameState.residents.length - men - women;
+
+  const freeM = Math.max(0, capM - men);
+  const freeF = Math.max(0, capF - women);
+  const overflow = Math.max(0, men - capM) + Math.max(0, women - capF) + unknown;
+  const freeAny = Math.max(0, capAny - overflow);
+  return { male: freeM + freeAny, female: freeF + freeAny, total: freeM + freeF + freeAny };
+}
+
+/** How many more residents fit right now (tier cap and beds). */
+export function getFreeResidentSlots(gameState: GameState): number {
+  const tierSlots = Math.max(0, getResidentCap(gameState) - gameState.residents.length);
+  return Math.min(tierSlots, getFreeBeds(gameState).total);
 }
 
 /**
@@ -151,7 +112,7 @@ function selectRandomProfile(): ResidentProfile {
   const roll = Math.random();
   let cumulative = 0;
   
-  const profiles: ResidentProfile[] = ["young_adult", "veteran", "elderly"];
+  const profiles: ResidentProfile[] = ["young_adult", "adult", "elderly"];
   
   for (const profile of profiles) {
     cumulative += SPAWN_CONFIG.PROFILE_WEIGHTS[profile];
@@ -168,10 +129,9 @@ function selectRandomProfile(): ResidentProfile {
  * Calculate dormitory bed capacity
  */
 export function getDormitoryCapacity(gameState: GameState): number {
-  const dormitories = gameState.rooms.filter(r => r.type === "dormitory");
-  const dormitoryCapacity = ROOM_SPECS.dormitory.capacity;
-  
-  return dormitories.length * dormitoryCapacity;
+  return gameState.rooms
+    .filter(r => roomKind(r.type) === "dormitory")
+    .reduce((beds, r) => beds + ROOM_SPECS[r.type].capacity, 0);
 }
 
 /**
@@ -238,13 +198,19 @@ export function spawnDisasterResidents(
     
     // Select random profile
     const profile = selectRandomProfile();
+
+    // Prefer a gender that still has a free bed; disasters may overflow, so fall back to random
+    const beds = getFreeBeds(gameState);
+    const disasterGender: Gender | undefined =
+      beds.male > 0 && beds.female === 0 ? 'male' : beds.female > 0 && beds.male === 0 ? 'female' : undefined;
     
     // Create new resident with disaster-specific arrival reason
     const newResident = createResident(
       profile,
       gameState.currentDay,
       spawnPos.x,
-      spawnPos.y
+      spawnPos.y,
+      disasterGender
     );
     
     // Override arrival reason based on disaster type
@@ -281,6 +247,7 @@ function getDisasterArrivalReason(disasterType: DisasterEventType): string {
   const reasons: Record<DisasterEventType, string> = {
     house_fire: "arrived after a devastating house fire",
     winter_storm: "arrived seeking refuge from the winter storm",
+    earthquake: "arrived after the earthquake",
     factory_closure: "arrived after sudden factory closure",
     domestic_violence: "arrived seeking safe refuge",
     hospital_discharge: "arrived after hospital discharge",

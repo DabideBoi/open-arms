@@ -1,5 +1,6 @@
 import { GameState, ShelterTier, RoomType, TierUpgradeRequirements, ShelterTierConfig } from '../../types';
 import { SHELTER_TIERS, TIER_UPGRADE_CONFIG, ROOM_SPECS } from '../../constants';
+import { formatMoney } from '../../utils/helpers';
 
 /**
  * TierSystem - Manages shelter tier progression
@@ -241,7 +242,7 @@ export function performUpgrade(gameState: GameState): { success: boolean; error?
   
   if (!requirements.canUpgrade) {
     const errors: string[] = [];
-    if (!requirements.hasMoney) errors.push(`Need $${requirements.moneyNeeded}`);
+    if (!requirements.hasMoney) errors.push(`Need ${formatMoney(requirements.moneyNeeded)}`);
     if (!requirements.hasReputation) errors.push(`Need ${requirements.reputationNeeded}% reputation`);
     if (!requirements.hasGraduations) errors.push(`Need ${requirements.graduationsNeeded} graduations`);
     if (!requirements.hasGridUtilization) errors.push(`Need ${requirements.utilizationNeeded}% grid utilization`);
@@ -266,9 +267,6 @@ export function performUpgrade(gameState: GameState): { success: boolean; error?
   // Reset graduation progress for next tier
   gameState.tierUnlockProgress.graduationsTowardNext = 0;
   
-  // Expand grid
-  expandGridForTier(gameState, nextTier);
-  
   // Find newly unlocked rooms
   const previousRooms = currentTierConfig.availableRooms === 'all' 
     ? Object.keys(ROOM_SPECS) as RoomType[]
@@ -286,55 +284,11 @@ export function performUpgrade(gameState: GameState): { success: boolean; error?
       newTier: gameState.currentTier,
       tierName: nextTierConfig.name,
       newRooms: unlockedRooms,
-      newCapacity: nextTierConfig.maxResidents,
-      newGridSize: nextTierConfig.gridSize
+      newCapacity: nextTierConfig.maxResidents
     }
   }));
   
   return { success: true, newRooms: unlockedRooms };
-}
-
-/**
- * Expand the grid to accommodate the new tier size
- */
-function expandGridForTier(gameState: GameState, tier: ShelterTier): void {
-  const tierConfig = getTierConfig(tier);
-  const targetSize = tierConfig.gridSize;
-  const { grid } = gameState;
-  
-  // Calculate center of the grid
-  const centerX = Math.floor(grid.width / 2);
-  const centerY = Math.floor(grid.height / 2);
-  
-  // Calculate new unlocked area centered on grid
-  const halfSize = Math.floor(targetSize / 2);
-  const newMinX = Math.max(0, centerX - halfSize);
-  const newMinY = Math.max(0, centerY - halfSize);
-  const newMaxX = Math.min(grid.width, centerX + halfSize + (targetSize % 2));
-  const newMaxY = Math.min(grid.height, centerY + halfSize + (targetSize % 2));
-  
-  // Update unlocked area
-  grid.unlockedArea = {
-    minX: Math.min(grid.unlockedArea.minX, newMinX),
-    minY: Math.min(grid.unlockedArea.minY, newMinY),
-    maxX: Math.max(grid.unlockedArea.maxX, newMaxX),
-    maxY: Math.max(grid.unlockedArea.maxY, newMaxY)
-  };
-  
-  // Unlock tiles in the new area
-  for (let y = grid.unlockedArea.minY; y < grid.unlockedArea.maxY; y++) {
-    for (let x = grid.unlockedArea.minX; x < grid.unlockedArea.maxX; x++) {
-      if (grid.tiles[y] && grid.tiles[y][x]) {
-        const tile = grid.tiles[y][x];
-        if (tile.type === 'locked') {
-          tile.type = 'empty';
-          tile.walkable = true;
-        }
-      }
-    }
-  }
-  
-  console.log(`🏗️ Grid expanded to ${targetSize}x${targetSize} for Tier ${tier}`);
 }
 
 // ============================================================================

@@ -71,6 +71,7 @@
 ## Assets & Resources
 
 ### Graphics
+- Room floors, furniture and resident sprites: [Kenney](https://kenney.nl) "Roguelike Indoors" and "Roguelike Characters" (CC0)
 - Grid and tile system: Custom implementation
 - UI elements: Custom CSS design
 - Color palette: Carefully selected for accessibility

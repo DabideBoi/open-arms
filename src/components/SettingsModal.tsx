@@ -77,22 +77,6 @@ export function SettingsModal({
             </div>
             
             <div className="setting-item">
-              <label htmlFor="music-volume">Music Volume</label>
-              <div className="slider-container">
-                <input
-                  id="music-volume"
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={audioSettings.musicVolume * 100}
-                  onChange={(e) => onAudioSettingsChange({ musicVolume: parseInt(e.target.value) / 100 })}
-                  disabled={audioSettings.muted}
-                />
-                <span className="slider-value">{Math.round(audioSettings.musicVolume * 100)}%</span>
-              </div>
-            </div>
-            
-            <div className="setting-item">
               <label htmlFor="sfx-volume">Sound Effects Volume</label>
               <div className="slider-container">
                 <input
@@ -162,7 +146,7 @@ export function SettingsModal({
             </div>
             
             <p className="setting-description">
-              Status bars show LIFE meter (blue) and happiness (color-coded).
+              Status bars show LIFE meter (blue) and health (color-coded).
               Press <kbd>B</kbd> to toggle quickly.
             </p>
           </section>
