@@ -414,7 +414,7 @@ HUD now displays additional information:
 
 ### Fundraiser Testing
 1. Build a Fundraiser Station
-2. Assign 1-4 residents with different profiles
+2. Assign 1-3 residents with different profiles
 3. Observe payout differences
 4. Verify LIFE and happiness changes
 5. Test cancellation functionality

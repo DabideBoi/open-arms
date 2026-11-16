@@ -405,6 +405,11 @@ export function migrateGameState(state: any): GameState {
       state = migrateFrom_1_2_0(state);
       currentVersion = "1.3.0";
     }
+
+    if (currentVersion === "1.3.0") {
+      state = migrateFrom_1_3_0(state);
+      currentVersion = "1.4.0";
+    }
     
     state.version = CURRENT_VERSION;
   }
@@ -463,6 +468,15 @@ function migrateFrom_1_2_0(state: any): any {
  * - entrance is now the south gate (bottom edge of the unlocked area)
  * - residents gained a gender; dormitories default to 'any' (gender missing = any)
  */
+// 1.4.0 rebalanced upkeep: rooms store their own maintenanceCost, so refresh it from the specs.
+function migrateFrom_1_3_0(state: any): any {
+  for (const room of state.rooms ?? []) {
+    const spec = ROOM_SPECS[room.type as keyof typeof ROOM_SPECS];
+    if (spec) room.maintenanceCost = spec.maintenanceCost;
+  }
+  return state;
+}
+
 function migrateFrom_1_1_0(state: any): any {
   if (state.grid) placeSouthGate(state.grid);
   for (const r of state.residents ?? []) {

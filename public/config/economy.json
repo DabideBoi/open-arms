@@ -5,60 +5,60 @@
   },
   "ROOM_SPECS": {
     "dormitory": {
-      "buildCost": 15000,
-      "maintenanceCost": 1250
+      "buildCost": 19000,
+      "maintenanceCost": 1400
     },
     "cafeteria": {
-      "buildCost": 25000,
-      "maintenanceCost": 2500
+      "buildCost": 31500,
+      "maintenanceCost": 2750
     },
     "clinic": {
-      "buildCost": 20000,
-      "maintenanceCost": 1750
+      "buildCost": 25000,
+      "maintenanceCost": 1950
     },
     "bathroom": {
-      "buildCost": 10000,
-      "maintenanceCost": 1000
+      "buildCost": 12500,
+      "maintenanceCost": 1100
     },
     "common_room": {
-      "buildCost": 17500,
-      "maintenanceCost": 1500
+      "buildCost": 22000,
+      "maintenanceCost": 1650
     },
     "admin_office": {
-      "buildCost": 35000,
-      "maintenanceCost": 3000
+      "buildCost": 44000,
+      "maintenanceCost": 3300
     },
     "fundraiser_station": {
-      "buildCost": 20000,
-      "maintenanceCost": 1750
+      "buildCost": 25000,
+      "maintenanceCost": 1950
     },
     "potted_plant": {
-      "buildCost": 3000,
+      "buildCost": 4000,
       "maintenanceCost": 150
     },
     "fountain": {
-      "buildCost": 12500,
-      "maintenanceCost": 500
+      "buildCost": 15500,
+      "maintenanceCost": 550
     },
     "large_dormitory": {
-      "buildCost": 27500,
-      "maintenanceCost": 2000
+      "buildCost": 34500,
+      "maintenanceCost": 2200
     },
     "medical_center": {
-      "buildCost": 40000,
-      "maintenanceCost": 3000
+      "buildCost": 50000,
+      "maintenanceCost": 3300
     },
     "dining_hall": {
-      "buildCost": 45000,
-      "maintenanceCost": 3750
+      "buildCost": 56500,
+      "maintenanceCost": 4150
     },
     "library": {
-      "buildCost": 25000,
-      "maintenanceCost": 1750
+      "buildCost": 31500,
+      "maintenanceCost": 1950
     },
     "garden": {
-      "buildCost": 30000,
-      "maintenanceCost": 1500
+      "buildCost": 37500,
+      "maintenanceCost": 1650
     }
   },
   "DONATION_CONFIG": {
@@ -68,29 +68,29 @@
   },
   "FOOD_PORTIONS": {
     "minimal": {
-      "cost": 250
+      "cost": 700
     },
     "small": {
-      "cost": 500
+      "cost": 1400
     },
     "standard": {
-      "cost": 900
+      "cost": 2450
     },
     "generous": {
-      "cost": 1500
+      "cost": 3850
     },
     "premium": {
-      "cost": 2500
+      "cost": 6100
     }
   },
   "OPERATING_COSTS_CONFIG": {
-    "BASE_DAILY_COST": 5000,
-    "PER_RESIDENT_COST": 250,
-    "PER_ROOM_COST": 500
+    "BASE_DAILY_COST": 1500,
+    "PER_RESIDENT_COST": 100,
+    "PER_ROOM_COST": 100
   },
   "EXPENSE_EVENTS_CONFIG": {
-    "MIN_COST": 2500,
-    "MAX_COST": 10000
+    "MIN_COST": 1500,
+    "MAX_COST": 5000
   },
   "FUNDRAISER_CONFIG": {
     "BASE_PAYOUT_MIN": 4500,
@@ -145,7 +145,7 @@
     },
     "hospital_discharge": {
       "donationBonus": 5000,
-      "medicalCosts": 2500
+      "medicalCosts": 10000
     },
     "eviction_wave": {
       "donationBonus": 25000
@@ -158,8 +158,8 @@
   "EVENT_ECONOMY": {
     "DONATION_DRIVE_BASE": 15000,
     "DONATION_DRIVE_PER_RESIDENT": 5000,
-    "OUTBREAK_TREATMENT_MIN": 5000,
-    "OUTBREAK_TREATMENT_PER_RESIDENT": 1000,
+    "OUTBREAK_TREATMENT_MIN": 20000,
+    "OUTBREAK_TREATMENT_PER_RESIDENT": 3750,
     "MEDIA_GRANT": 25000,
     "INSPECTION_GRANT": 50000,
     "INSPECTION_FINE": 25000,

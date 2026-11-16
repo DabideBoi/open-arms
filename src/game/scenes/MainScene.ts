@@ -1139,23 +1139,6 @@ export class MainScene extends Phaser.Scene {
         this.roomGraphics.lineStyle(3, 0xffd700, 0.75);
         this.roomGraphics.strokeRect(pixelX, pixelY, pixelWidth, pixelHeight);
       }
-
-      // Show capacity indicator for rooms with capacity limits
-      const spec = ROOM_SPECS[room.type];
-      if (spec.capacity > 0 && room.currentOccupancy > 0) {
-        const occupancyPercent = room.currentOccupancy / spec.capacity;
-        const barWidth = pixelWidth * 0.8;
-        const barHeight = 4;
-        const barX = pixelX + (pixelWidth - barWidth) / 2;
-        const barY = pixelY + pixelHeight - 8;
-        
-        this.roomGraphics.fillStyle(0x000000, 0.5);
-        this.roomGraphics.fillRect(barX, barY, barWidth, barHeight);
-        
-        const fillColor = occupancyPercent >= 1 ? 0xff0000 : 0x00ff00;
-        this.roomGraphics.fillStyle(fillColor, 0.8);
-        this.roomGraphics.fillRect(barX, barY, barWidth * Math.min(occupancyPercent, 1), barHeight);
-      }
     }
 
     // Detect freshly-placed rooms and give them a satisfying "stamp".

@@ -155,7 +155,7 @@ Located at the top of the screen:
 ---
 
 ### Fundraiser Station (Unlocks at Tier 1)
-**Size**: 3×2 tiles | **Cost**: ₱20,000 | **Capacity**: 4 residents | **Maintenance**: ₱1,750/cycle
+**Size**: 3×2 tiles | **Cost**: ₱20,000 | **Capacity**: 3 residents | **Maintenance**: ₱1,750/cycle
 
 **Purpose**: Location for running fundraiser events.
 

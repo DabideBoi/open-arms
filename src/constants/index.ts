@@ -5,7 +5,7 @@ import { RoomSpec, RoomType, ResidentProfileSpec, ResidentProfile, AdjacencyBonu
 // ============================================================================
 
 // Save format version. New games start at this so load-time migrations never re-apply.
-export const SAVE_VERSION = "1.3.0";
+export const SAVE_VERSION = "1.4.0";
 
 export const GRID_CONFIG = {
   TOTAL_WIDTH: 40,
@@ -26,8 +26,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "dormitory",
     width: 3,
     height: 3,
-    buildCost: 15000,
-    maintenanceCost: 1250,
+    buildCost: 19000,
+    maintenanceCost: 1400,
     capacity: 4,
     closesAtNight: false,
     needsSatisfied: ["sleep"],
@@ -37,8 +37,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "cafeteria",
     width: 5,
     height: 3,
-    buildCost: 25000,
-    maintenanceCost: 2500,
+    buildCost: 31500,
+    maintenanceCost: 2750,
     capacity: 5,                 // one per chair (see ROOM_LOOKS.cafeteria.seats)
     closesAtNight: true,
     needsSatisfied: ["food"],
@@ -48,8 +48,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "clinic",
     width: 3,
     height: 3,
-    buildCost: 20000,
-    maintenanceCost: 1750,
+    buildCost: 25000,
+    maintenanceCost: 1950,
     capacity: 4,
     closesAtNight: false,
     needsSatisfied: ["health"]
@@ -59,8 +59,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "bathroom",
     width: 2,
     height: 2,
-    buildCost: 10000,
-    maintenanceCost: 1000,
+    buildCost: 12500,
+    maintenanceCost: 1100,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["bathroom"]
@@ -70,8 +70,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "common_room",
     width: 3,
     height: 3,
-    buildCost: 17500,
-    maintenanceCost: 1500,
+    buildCost: 22000,
+    maintenanceCost: 1650,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["social"]
@@ -81,8 +81,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "admin_office",
     width: 2,
     height: 2,
-    buildCost: 35000,
-    maintenanceCost: 3000,
+    buildCost: 44000,
+    maintenanceCost: 3300,
     capacity: 0,
     closesAtNight: true,
     needsSatisfied: []
@@ -92,8 +92,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "fundraiser_station",
     width: 3,
     height: 2,
-    buildCost: 20000,
-    maintenanceCost: 1750,
+    buildCost: 25000,
+    maintenanceCost: 1950,
     capacity: 3,
     closesAtNight: true,
     needsSatisfied: [],
@@ -104,7 +104,7 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "potted_plant",
     width: 1,
     height: 1,
-    buildCost: 3000,
+    buildCost: 4000,
     maintenanceCost: 150,
     capacity: 0,
     closesAtNight: false,
@@ -117,8 +117,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "fountain",
     width: 1,
     height: 1,
-    buildCost: 12500,
-    maintenanceCost: 500,
+    buildCost: 15500,
+    maintenanceCost: 550,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: [],
@@ -131,8 +131,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "large_dormitory",
     width: 4,
     height: 3,
-    buildCost: 27500,
-    maintenanceCost: 2000,
+    buildCost: 34500,
+    maintenanceCost: 2200,
     capacity: 6,                 // one per bed (see ROOM_LOOKS.large_dormitory.seats)
     closesAtNight: false,
     needsSatisfied: ["sleep"],
@@ -143,8 +143,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "medical_center",
     width: 4,
     height: 3,
-    buildCost: 40000,
-    maintenanceCost: 3000,
+    buildCost: 50000,
+    maintenanceCost: 3300,
     capacity: 6,
     closesAtNight: false,
     needsSatisfied: ["health"],
@@ -156,8 +156,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "dining_hall",
     width: 6,
     height: 3,
-    buildCost: 45000,
-    maintenanceCost: 3750,
+    buildCost: 56500,
+    maintenanceCost: 4150,
     capacity: 8,                 // one per chair (see ROOM_LOOKS.dining_hall.seats)
     closesAtNight: true,
     needsSatisfied: ["food"],
@@ -169,8 +169,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "library",
     width: 3,
     height: 3,
-    buildCost: 25000,
-    maintenanceCost: 1750,
+    buildCost: 31500,
+    maintenanceCost: 1950,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["social"],
@@ -182,8 +182,8 @@ export const ROOM_SPECS: Record<RoomType, RoomSpec> = {
     type: "garden",
     width: 3,
     height: 3,
-    buildCost: 30000,
-    maintenanceCost: 1500,
+    buildCost: 37500,
+    maintenanceCost: 1650,
     capacity: 0,
     closesAtNight: false,
     needsSatisfied: ["social"],
@@ -486,7 +486,7 @@ export interface FoodPortionConfig {
 
 export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
   minimal: {
-    cost: 400,
+    cost: 700,
     health: -10,
     reputation: -3,
     description: "Emergency supplies only",
@@ -494,7 +494,7 @@ export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
     generationMultiplier: 0.6
   },
   small: {
-    cost: 800,
+    cost: 1400,
     health: -5,
     reputation: -1,
     description: "Basic but adequate",
@@ -502,7 +502,7 @@ export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
     generationMultiplier: 0.8
   },
   standard: {
-    cost: 1400,
+    cost: 2450,
     health: 0,           // CHANGED: Now neutral
     reputation: 0,
     description: "Balanced nutrition",
@@ -510,7 +510,7 @@ export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
     generationMultiplier: 1
   },
   generous: {
-    cost: 2200,
+    cost: 3850,
     health: 10,
     reputation: 1,
     description: "Quality meals",
@@ -518,7 +518,7 @@ export const FOOD_PORTIONS: Record<FoodPortionTier, FoodPortionConfig> = {
     generationMultiplier: 1.2
   },
   premium: {
-    cost: 3500,
+    cost: 6100,
     health: 20,
     reputation: 2,
     description: "Restaurant-quality dining",
@@ -541,9 +541,9 @@ export const MAINTENANCE_CONFIG = {
 // ============================================================================
 
 export const OPERATING_COSTS_CONFIG = {
-  BASE_DAILY_COST: 5000,                 // Base daily cost regardless of size
-  PER_RESIDENT_COST: 250,                 // Additional cost per resident
-  PER_ROOM_COST: 500                     // Additional cost per room built
+  BASE_DAILY_COST: 1500,                 // Base daily cost regardless of size
+  PER_RESIDENT_COST: 100,                 // Additional cost per resident
+  PER_ROOM_COST: 100                     // Additional cost per room built
 } as const;
 
 // ============================================================================
@@ -552,8 +552,8 @@ export const OPERATING_COSTS_CONFIG = {
 
 export const EXPENSE_EVENTS_CONFIG = {
   CHANCE_PER_DONATION_CYCLE: 0.15,      // 15% chance each donation cycle
-  MIN_COST: 2500,                         // Minimum emergency expense
-  MAX_COST: 10000,                        // Maximum emergency expense
+  MIN_COST: 1500,                         // Minimum emergency expense
+  MAX_COST: 5000,                        // Maximum emergency expense
   EVENT_TYPES: [
     "Plumbing emergency",
     "Electrical issue",
@@ -720,13 +720,13 @@ export const EVENT_WEIGHTS = {
 export const EVENT_ECONOMY = {
   DONATION_DRIVE_BASE: 15000,
   DONATION_DRIVE_PER_RESIDENT: 5000,
-  OUTBREAK_TREATMENT_MIN: 15000,
-  OUTBREAK_TREATMENT_PER_RESIDENT: 3000,
+  OUTBREAK_TREATMENT_MIN: 20000,
+  OUTBREAK_TREATMENT_PER_RESIDENT: 3750,
   MEDIA_GRANT: 25000,
   INSPECTION_GRANT: 50000,
   INSPECTION_FINE: 25000,
   INSPECTION_PREP_COST: 10000,
-  PIPE_REPAIR_COST: 8000,
+  PIPE_REPAIR_COST: 5000,
   HOSPITAL_STIPEND: 8000,
   COMMUNITY_DONATION_MIN: 15000,
   COMMUNITY_DONATION_MAX: 40000,
@@ -1083,7 +1083,7 @@ export const DISASTER_EVENTS: Record<DisasterEventType, DisasterEventConfig> = {
     reputationLossDecline: 4,
     donationBonus: 5000,
     healthImpact: -2,
-    medicalCosts: 7500
+    medicalCosts: 10000
   },
   eviction_wave: {
     type: "eviction_wave",

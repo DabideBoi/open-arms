@@ -37,7 +37,7 @@
       "HEALTH_BELOW_20": 0.2
     },
     "MIN_GROUP": 1,
-    "MAX_GROUP": 4
+    "MAX_GROUP": 3
   },
   "DISASTER_CONFIG": {
     "BASE_CHANCE": 0.1,
