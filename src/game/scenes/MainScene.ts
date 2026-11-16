@@ -983,6 +983,26 @@ export class MainScene extends Phaser.Scene {
   markRoomsDirty(): void {
     this.roomsDirty = true;
   }
+
+  /**
+   * Re-sync scene and module-level systems after GameStateManager.loadState().
+   */
+  onStateLoaded(): void {
+    const state = this.gameStateManager.getMutableState();
+    // Saved timers are absolute Date.now() values; shift them so they don't all fire at once
+    const elapsed = Math.max(0, Date.now() - state.lastSaved);
+    shiftGameStateTimestamps(state, elapsed);
+
+    updateSpatialGrid(state.rooms);
+    initializeCollisionDetection(state.residents);
+    state.rooms
+      .filter(room => roomKind(room.type) === 'cafeteria')
+      .forEach(cafeteria => initializeCafeteriaGeneration(cafeteria.id));
+
+    this.markGridDirty();
+    this.markRoomsDirty();
+    this.renderGame(state);
+  }
   
   /**
    * Render the grid

@@ -275,6 +275,60 @@ export function listBackups(): SaveMetadata[] {
 }
 
 // ============================================================================
+// Manual Save Slots (written only on explicit player action, never by autosave)
+// ============================================================================
+
+export type SlotId = 1 | 2 | 3 | 'auto';
+
+export interface SlotInfo {
+  savedAt: number;
+  day: number;
+  residents: number;
+  money: number;
+}
+
+const slotKey = (slot: SlotId) => slot === 'auto' ? STORAGE_KEYS.GAME_STATE : `openArmsSlot${slot}`;
+
+/** Write the state to a manual slot. Returns false on storage failure (e.g. quota). */
+export function saveToSlot(slot: Exclude<SlotId, 'auto'>, gameState: GameState): boolean {
+  try {
+    gameState.lastSaved = Date.now();
+    localStorage.setItem(slotKey(slot), JSON.stringify(gameState));
+    return true;
+  } catch (error) {
+    console.error(`Failed to save slot ${slot}:`, error);
+    return false;
+  }
+}
+
+/** Load one specific slot. Unlike loadGame, a bad slot returns null instead of falling back to a backup. */
+export function loadSlot(slot: SlotId): GameState | null {
+  try {
+    const raw = localStorage.getItem(slotKey(slot));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isValidGameState(parsed) ? migrateGameState(parsed) : null;
+  } catch (error) {
+    console.error(`Failed to load slot ${slot}:`, error);
+    return null;
+  }
+}
+
+/** Summary of each slot (null = empty or unreadable), in order 1, 2, 3, auto. */
+export function listSlots(): (SlotInfo | null)[] {
+  return ([1, 2, 3, 'auto'] as SlotId[]).map(slot => {
+    try {
+      const raw = localStorage.getItem(slotKey(slot));
+      const s = raw && JSON.parse(raw);
+      if (!s || !isValidGameState(s)) return null;
+      return { savedAt: s.lastSaved, day: s.currentDay, residents: s.residents.length, money: s.money };
+    } catch {
+      return null;
+    }
+  });
+}
+
+// ============================================================================
 // Validation
 // ============================================================================
 

@@ -6,7 +6,7 @@ import { placeRoom, expandGrid, demolishRoom } from './game/systems/GridSystem';
 import { startRandomFundraiser, cancelFundraiser, FundraiserCompletionData } from './game/systems/FundraiserSystem';
 import { EventSystem, GameEvent, EventType } from './game/systems/EventSystem';
 import { getAudioSystem, playSFX } from './game/systems/AudioSystem';
-import { saveGame } from './game/systems/SaveLoadSystem';
+import { saveGame, saveToSlot, loadSlot, listSlots, SlotId } from './game/systems/SaveLoadSystem';
 import { transitionToDay, transitionToNight } from './game/systems/DayNightSystem';
 import { initializeCafeteriaGeneration, removeCafeteriaGeneration, changeFoodSetting } from './game/systems/FoodSystem';
 import { performUpgrade } from './game/systems/TierSystem';
@@ -604,6 +604,33 @@ function App() {
     playSFX('click');
   };
   
+  const handleSaveToSlot = (slot: 1 | 2 | 3) => {
+    if (!gameStateManagerRef.current) return;
+    const ok = saveToSlot(slot, gameStateManagerRef.current.getState() as GameState);
+    addNotification(ok ? `Saved to slot ${slot}` : 'Save failed (storage full?)', ok ? 'success' : 'error');
+    playSFX(ok ? 'click' : 'error');
+  };
+
+  const handleLoadSlot = (slot: SlotId) => {
+    if (!gameStateManagerRef.current) return;
+    const loaded = loadSlot(slot);
+    if (!loaded) {
+      addNotification('Could not load that save', 'error');
+      playSFX('error');
+      return;
+    }
+    gameStateManagerRef.current.loadState(loaded);
+    mainSceneRef.current?.onStateLoaded();
+    endGameHandledRef.current = false;
+    setShowGameOver(false);
+    setIsVictory(false);
+    setGameOverReason(null);
+    setCurrentEvent(null);
+    setShowSettings(false);
+    addNotification('Game loaded', 'success');
+    playSFX('click');
+  };
+
   const handleResolveEvent = (optionIndex: number) => {
     if (!eventSystemRef.current || !currentEvent || !gameStateManagerRef.current) return;
     
@@ -844,6 +871,9 @@ function App() {
           gameSpeed={gameSpeed}
           onGameSpeedChange={setGameSpeed}
           onResetGame={handleRestartGame}
+          listSlots={listSlots}
+          onSaveSlot={handleSaveToSlot}
+          onLoadSlot={handleLoadSlot}
           statusBarSettings={gameState.statusBarSettings}
           onStatusBarSettingsChange={(settings) => {
             const mutableState = gameStateManagerRef.current?.getMutableState();

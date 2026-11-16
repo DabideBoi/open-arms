@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { AudioSettings } from '../game/systems/AudioSystem';
 import { StatusBarSettings, StatusBarVisibilityMode } from '../types';
+import { SlotId, SlotInfo } from '../game/systems/SaveLoadSystem';
 import './SettingsModal.css';
+
+const SLOT_IDS: SlotId[] = [1, 2, 3, 'auto'];
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,6 +14,9 @@ interface SettingsModalProps {
   gameSpeed: number;
   onGameSpeedChange: (speed: number) => void;
   onResetGame: () => void;
+  listSlots: () => (SlotInfo | null)[];
+  onSaveSlot: (slot: 1 | 2 | 3) => void;
+  onLoadSlot: (slot: SlotId) => void;
   statusBarSettings: StatusBarSettings;
   onStatusBarSettingsChange: (settings: Partial<StatusBarSettings>) => void;
 }
@@ -23,11 +29,16 @@ export function SettingsModal({
   gameSpeed,
   onGameSpeedChange,
   onResetGame,
+  listSlots,
+  onSaveSlot,
+  onLoadSlot,
   statusBarSettings,
   onStatusBarSettingsChange
 }: SettingsModalProps) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  
+  const [slots, setSlots] = useState(listSlots);
+  const [pending, setPending] = useState<{ action: 'save' | 'load'; slot: SlotId } | null>(null);
+
   if (!isOpen) return null;
   
   const handleResetConfirm = () => {
@@ -179,6 +190,72 @@ export function SettingsModal({
             </div>
           </section>
           
+          {/* Save & Load */}
+          <section className="settings-section">
+            <h3>💾 Save &amp; Load</h3>
+
+            {SLOT_IDS.map((slot, i) => {
+              const info = slots[i];
+              const isPending = pending?.slot === slot;
+              return (
+                <div key={slot} className="save-slot">
+                  <div className="save-slot-info">
+                    <strong>{slot === 'auto' ? 'Autosave' : `Slot ${slot}`}</strong>
+                    <span>
+                      {info
+                        ? `Day ${info.day} · ${info.residents} residents · ₱${Math.round(info.money).toLocaleString()} · ${new Date(info.savedAt).toLocaleString()}`
+                        : 'Empty'}
+                    </span>
+                  </div>
+                  {isPending ? (
+                    <div className="save-slot-actions">
+                      <span className="warning-text">
+                        {pending.action === 'save' ? 'Overwrite?' : 'Unsaved progress is lost.'}
+                      </span>
+                      <button
+                        className="confirm-yes"
+                        onClick={() => {
+                          if (pending.action === 'save') {
+                            onSaveSlot(slot as 1 | 2 | 3);
+                            setSlots(listSlots());
+                          } else {
+                            onLoadSlot(slot);
+                          }
+                          setPending(null);
+                        }}
+                      >
+                        Yes
+                      </button>
+                      <button className="confirm-no" onClick={() => setPending(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="save-slot-actions">
+                      {slot !== 'auto' && (
+                        <button
+                          className="slot-btn"
+                          onClick={() => {
+                            if (info) return setPending({ action: 'save', slot });
+                            onSaveSlot(slot);
+                            setSlots(listSlots());
+                          }}
+                        >
+                          Save
+                        </button>
+                      )}
+                      <button
+                        className="slot-btn"
+                        disabled={!info}
+                        onClick={() => setPending({ action: 'load', slot })}
+                      >
+                        Load
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+
           {/* Game Management */}
           <section className="settings-section">
             <h3>🎮 Game Management</h3>

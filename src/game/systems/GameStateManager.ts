@@ -377,6 +377,17 @@ export class GameStateManager {
     this.state = createInitialGameState();
     this.notifyListeners();
   }
+
+  /**
+   * Replace the state contents in place, so references captured elsewhere
+   * (e.g. the periodic autosave) keep pointing at the live state.
+   */
+  loadState(loaded: GameState): void {
+    const target = this.state as unknown as Record<string, unknown>;
+    Object.keys(target).forEach(k => delete target[k]);
+    Object.assign(target, loaded);
+    this.notifyListeners();
+  }
   
   /**
    * Check if player can afford to build (prevented during bankruptcy)

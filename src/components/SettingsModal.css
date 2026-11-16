@@ -258,6 +258,64 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+.save-slot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.save-slot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-slot-info span {
+  color: #b0b0b0;
+  font-size: 12px;
+}
+
+.save-slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.save-slot-actions .warning-text {
+  margin: 0;
+  font-size: 12px;
+}
+
+.save-slot-actions .confirm-yes,
+.save-slot-actions .confirm-no {
+  flex: none;
+  padding: 6px 12px;
+}
+
+.slot-btn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.slot-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .credits {
   color: #b0b0b0;
   font-size: 14px;
