@@ -6,28 +6,6 @@ All six game flow charts in one landscape diagram, laid out to fit a document pa
 
 ```mermaid
 flowchart TB
-    %% ========== 1 · SESSION ==========
-    subgraph G1["1 · Session flow"]
-        direction LR
-        a1["Launch game"] --> a2{"First time<br/>playing?"}
-        a2 -- Yes --> a3["Tutorial<br/>10 steps, can skip"]
-        a2 -- No --> a4
-        a3 --> a4["Playing"]
-        a4 -- "Space /<br/>focus lost" --> a5["Paused"]
-        a5 -- Resume --> a4
-        a4 --> a6["Settings<br/>audio, shortcuts"]
-        a6 --> a7["Save / Load<br/>slots 1–3 + Auto"]
-        a7 -- Load --> a4
-        a6 -- "Reset game" --> a8["New shelter<br/>₱250k, 3 residents"]
-        a8 --> a4
-        a4 --> a9{"Victory?"}
-        a9 -- "10+ reintegrated & Rep 80+<br/>or Day 50+ & Rep 70+" --> a10["Victory screen"]
-        a10 -- Continue --> a4
-        a4 --> a11{"Fail condition?"}
-        a11 -- "Bankrupt / Rep 0 /<br/>shelter empty" --> a12["Game Over"]
-        a12 -- Restart --> a8
-    end
-
     %% ========== 2 · DAY / NIGHT ==========
     subgraph G2["2 · Core loop: day & night · ↻ after Dawn a new Day begins"]
         direction LR
@@ -62,6 +40,74 @@ flowchart TB
         b_dawn ~~~ b_bg
     end
 
+    %% ========== 4 · RESIDENT LIFECYCLE ==========
+    subgraph G4["4 · Resident lifecycle"]
+        direction LR
+        d1["Player accepts<br/>arrival event"] --> d2{"Free bed &<br/>under tier cap?"}
+        d2 -- No --> d3["Can't accept"]
+        d2 -- Yes --> d4["Resident arrives<br/>70 health, low LIFE"]
+        d4 --> d5{"Current need?"}
+        d5 -- Night --> d6["Sleep: +health"]
+        d5 -- Hungry --> d7{"Food in<br/>stock?"}
+        d7 -- Yes --> d8["Eat: uses 3 food"]
+        d7 -- No --> d9["Leaves hungry"]
+        d5 -- "Health below 35" --> d10["Clinic: +health"]
+        d5 -- "Health below 60" --> d11["Socialize: +health"]
+        d5 -- Random --> d12["Bathroom"]
+        d5 -- "Nothing urgent" --> d13["Wander"]
+        d6 & d8 & d9 & d10 & d11 & d12 & d13 --> d14["Health decays daily<br/>LIFE grows slowly"]
+        d14 --> d15["Fundraisers<br/>big LIFE boost"]
+        d15 --> d14
+        d14 -- "LIFE reaches 100" --> d16["Reintegration<br/>+5 Rep"]
+        d14 -- "Health below 20 too long<br/>or hits 0" --> d17["Leaves unhealthy<br/>−3 Rep"]
+    end
+
+    %% ========== 6 · PROGRESSION & FAIL ==========
+    subgraph G6["6 · Progression & fail states"]
+        direction TB
+        subgraph f_tiers["Tier ladder · every upgrade also needs Rep 60+ & 40% of land built"]
+            direction LR
+            f1["Tier 1 · Starter Shelter<br/>up to 10 residents"]
+            f2["Tier 2 · Community Hub<br/>25 residents · donations ×1.2<br/>unlocks Admin Office,<br/>Large Dormitory, Library"]
+            f3["Tier 3 · Opportunity Center<br/>50 residents · donations ×1.5<br/>unlocks Medical Center,<br/>Dining Hall, Garden, Fountain"]
+            f4["Tier 4 · Campus<br/>100 residents · donations ×2"]
+            f1 -- "₱150k ·<br/>5 reintegrated" --> f2
+            f2 -- "₱400k ·<br/>15 reintegrated" --> f3
+            f3 -- "₱1M ·<br/>40 reintegrated" --> f4
+        end
+        subgraph f_fail["Ways to lose"]
+            direction LR
+            f5{"Money below<br/>−₱25k?"} -- Yes --> f6["Bankruptcy countdown<br/>18 min · can't build<br/>or fundraise"]
+            f6 -- "Back to ₱0" --> f7["Countdown cancelled"]
+            f6 -- "Time runs out" --> f8["Game Over"]
+            f9{"Rep hits 0?"} -- Yes --> f8
+            f10{"Every resident<br/>left?"} -- Yes --> f8
+        end
+        f_tiers ~~~ f_fail
+    end
+
+    %% ========== 1 · SESSION ==========
+    subgraph G1["1 · Session flow"]
+        direction LR
+        a1["Launch game"] --> a2{"First time<br/>playing?"}
+        a2 -- Yes --> a3["Tutorial<br/>10 steps, can skip"]
+        a2 -- No --> a4
+        a3 --> a4["Playing"]
+        a4 -- "Space /<br/>focus lost" --> a5["Paused"]
+        a5 -- Resume --> a4
+        a4 --> a6["Settings<br/>audio, shortcuts"]
+        a6 --> a7["Save / Load<br/>slots 1–3 + Auto"]
+        a7 -- Load --> a4
+        a6 -- "Reset game" --> a8["New shelter<br/>₱250k, 3 residents"]
+        a8 --> a4
+        a4 --> a9{"Victory?"}
+        a9 -- "10+ reintegrated & Rep 80+<br/>or Day 50+ & Rep 70+" --> a10["Victory screen"]
+        a10 -- Continue --> a4
+        a4 --> a11{"Fail condition?"}
+        a11 -- "Bankrupt / Rep 0 /<br/>shelter empty" --> a12["Game Over"]
+        a12 -- Restart --> a8
+    end
+
     %% ========== 3 · PLAYER ACTIONS ==========
     subgraph G3["3 · Player actions → outcomes"]
         direction TB
@@ -87,28 +133,6 @@ flowchart TB
         c21 --> c22
         c18 --> c23["Cancel<br/>food not refunded"]
         c2 --> c24["Expand land N / E / W<br/>pricier each time"]
-    end
-
-    %% ========== 4 · RESIDENT LIFECYCLE ==========
-    subgraph G4["4 · Resident lifecycle"]
-        direction LR
-        d1["Player accepts<br/>arrival event"] --> d2{"Free bed &<br/>under tier cap?"}
-        d2 -- No --> d3["Can't accept"]
-        d2 -- Yes --> d4["Resident arrives<br/>70 health, low LIFE"]
-        d4 --> d5{"Current need?"}
-        d5 -- Night --> d6["Sleep: +health"]
-        d5 -- Hungry --> d7{"Food in<br/>stock?"}
-        d7 -- Yes --> d8["Eat: uses 3 food"]
-        d7 -- No --> d9["Leaves hungry"]
-        d5 -- "Health below 35" --> d10["Clinic: +health"]
-        d5 -- "Health below 60" --> d11["Socialize: +health"]
-        d5 -- Random --> d12["Bathroom"]
-        d5 -- "Nothing urgent" --> d13["Wander"]
-        d6 & d8 & d9 & d10 & d11 & d12 & d13 --> d14["Health decays daily<br/>LIFE grows slowly"]
-        d14 --> d15["Fundraisers<br/>big LIFE boost"]
-        d15 --> d14
-        d14 -- "LIFE reaches 100" --> d16["Reintegration<br/>+5 Rep"]
-        d14 -- "Health below 20 too long<br/>or hits 0" --> d17["Leaves unhealthy<br/>−3 Rep"]
     end
 
     %% ========== 5 · EVENTS ==========
@@ -184,31 +208,8 @@ flowchart TB
         ev6 ~~~ ev9
     end
 
-    %% ========== 6 · PROGRESSION & FAIL ==========
-    subgraph G6["6 · Progression & fail states"]
-        direction TB
-        subgraph f_tiers["Tier ladder · every upgrade also needs Rep 60+ & 40% of land built"]
-            direction LR
-            f1["Tier 1 · Starter Shelter<br/>up to 10 residents"]
-            f2["Tier 2 · Community Hub<br/>25 residents · donations ×1.2<br/>unlocks Admin Office,<br/>Large Dormitory, Library"]
-            f3["Tier 3 · Opportunity Center<br/>50 residents · donations ×1.5<br/>unlocks Medical Center,<br/>Dining Hall, Garden, Fountain"]
-            f4["Tier 4 · Campus<br/>100 residents · donations ×2"]
-            f1 -- "₱150k ·<br/>5 reintegrated" --> f2
-            f2 -- "₱400k ·<br/>15 reintegrated" --> f3
-            f3 -- "₱1M ·<br/>40 reintegrated" --> f4
-        end
-        subgraph f_fail["Ways to lose"]
-            direction LR
-            f5{"Money below<br/>−₱25k?"} -- Yes --> f6["Bankruptcy countdown<br/>18 min · can't build<br/>or fundraise"]
-            f6 -- "Back to ₱0" --> f7["Countdown cancelled"]
-            f6 -- "Time runs out" --> f8["Game Over"]
-            f9{"Rep hits 0?"} -- Yes --> f8
-            f10{"Every resident<br/>left?"} -- Yes --> f8
-        end
-        f_tiers ~~~ f_fail
-    end
-
     %% ========== PAGE LAYOUT (invisible links): 2 columns × 3 rows ==========
+    %% Charts 2/4/6 are declared before 1/3/5 on purpose: it puts 1, 3, 5 in the left column.
     G1 ~~~ G3
     G3 ~~~ G5
     G2 ~~~ G4
