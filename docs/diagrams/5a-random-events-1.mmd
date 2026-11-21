@@ -1,0 +1,25 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 15
+    rankSpacing: 30
+    wrappingWidth: 480
+---
+flowchart LR
+    e1(("Donation<br/>drive"))
+    e1 -- Accept --> e2["+₱15k<br/>+ ₱5k/resident<br/>+2 Rep"]
+    e1 -- Decline --> e3["Nothing"]
+    e4(("Health<br/>outbreak"))
+    e4 -- "Pay" --> e5["−₱20k or more<br/>+2 Rep"]
+    e4 -- Quarantine --> e6["Health loss<br/>for a while"]
+    e4 -- Ignore --> e7["−3 Rep, bigger<br/>health loss"]
+    e8(("Media<br/>coverage"))
+    e8 -- "Accept,<br/>Rep 60+" --> e9["+10 Rep<br/>+₱25k"]
+    e8 -- "Accept,<br/>Rep below 60" --> e10["−8 Rep"]
+    e8 -- Decline --> e11["−2 Rep"]
+    e12(("Volunteer<br/>day"))
+    e12 -- Accept --> e13["+3 Rep, free<br/>maintenance 1 h"]
+    e12 -- Decline --> e14["Nothing"]

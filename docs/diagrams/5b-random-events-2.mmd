@@ -1,0 +1,24 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 15
+    rankSpacing: 30
+    wrappingWidth: 480
+---
+flowchart LR
+    e15(("Inspection<br/>pay ₱10k"))
+    e15 -- "Rep 50+" --> e16["Pass<br/>+₱50k, +5 Rep"]
+    e15 -- "Rep<br/>below 50" --> e17["Fail<br/>−5 Rep, −₱25k"]
+    e18(("Community<br/>support"))
+    e18 -- "Take 2–4<br/>people" --> e19["New residents<br/>+3 Rep"]
+    e18 -- "Take<br/>money" --> e20["+₱15–40k<br/>+2 Rep"]
+    e18 -- Decline --> e21["Nothing"]
+    e22(("Pipe<br/>burst"))
+    e22 -- Repair --> e23["−₱5k"]
+    e22 -- Ignore --> e24["−3 Rep"]
+    e25(("Someone<br/>needs<br/>a place"))
+    e25 -- "Accept,<br/>needs bed" --> e26["New resident<br/>+ small bonus"]
+    e25 -- "Refer<br/>elsewhere" --> e27["Nothing<br/>family: −1 Rep"]

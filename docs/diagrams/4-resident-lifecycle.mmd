@@ -1,0 +1,21 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 360
+---
+flowchart TB
+    d1["Player accepts arrival event<br/>needs free bed & room under tier cap"] --> d4["Resident arrives<br/>70 health, low LIFE"]
+    d4 --> d5{"Current<br/>need?"}
+    d5 -- Night --> d6["Sleep<br/>+health"]
+    d5 -- Hungry --> d8["Eat, uses 3 food<br/>no food: leaves hungry"]
+    d5 -- "Health<br/>below 35" --> d10["Clinic<br/>+health"]
+    d5 -- "Health<br/>below 60" --> d11["Socialize<br/>+health"]
+    d5 -- "Otherwise" --> d12["Bathroom<br/>or wander"]
+    d6 & d8 & d10 & d11 & d12 --> d14["Health decays daily · LIFE grows slowly<br/>fundraisers give a big LIFE boost · then the next need ↻"]
+    d14 -- "LIFE<br/>reaches 100" --> d16["Reintegration<br/>+5 Rep"]
+    d14 -- "Health below 20<br/>too long, or 0" --> d17["Leaves unhealthy<br/>−3 Rep"]

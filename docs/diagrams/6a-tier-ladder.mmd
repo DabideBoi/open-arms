@@ -1,0 +1,20 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 480
+---
+flowchart TB
+    f0["Every upgrade also needs<br/>Rep 60+ and 40% of land built"]
+    f1["Tier 1 · Starter Shelter<br/>up to 10 residents"]
+    f2["Tier 2 · Community Hub<br/>25 residents · donations ×1.2<br/>unlocks Admin Office, Large Dormitory, Library"]
+    f3["Tier 3 · Opportunity Center<br/>50 residents · donations ×1.5<br/>unlocks Medical Center, Dining Hall,<br/>Garden, Fountain"]
+    f4["Tier 4 · Campus<br/>100 residents · donations ×2"]
+    f0 ~~~ f1
+    f1 -- "₱150k · 5 reintegrated" --> f2
+    f2 -- "₱400k · 15 reintegrated" --> f3
+    f3 -- "₱1M · 40 reintegrated" --> f4

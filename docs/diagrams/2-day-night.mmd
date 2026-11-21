@@ -1,0 +1,44 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 480
+---
+flowchart TB
+    subgraph b_day["☀ Day · 4 min"]
+        direction LR
+        b1["All rooms<br/>open"]
+        b2["Residents meet needs:<br/>eat, clinic,<br/>socialize, bathroom"]
+        b3["Player builds,<br/>fundraises,<br/>answers events"]
+    end
+    subgraph b_night["☾ Night · 2 min"]
+        direction LR
+        b4["Residents sleep<br/>in dorms"]
+        b5["Cafeteria, dining hall,<br/>admin, fundraiser<br/>station closed"]
+        b6["No fundraisers,<br/>no demolishing"]
+    end
+    subgraph b_dawn["Dawn · daily bills & reset · then a new Day ↻"]
+        direction LR
+        b7["Operating costs<br/>₱1,500<br/>+ ₱100/resident<br/>+ ₱100/room"]
+        b8["Food bill<br/>health & Rep<br/>change by<br/>food level"]
+        b9["Rep drifts<br/>down, never<br/>below 30"]
+        b10["Sleepers<br/>wake<br/>+30 health"]
+    end
+    subgraph b_bg["Always running"]
+        direction LR
+        b11["Donation<br/>chance<br/>every 90 s"]
+        b12["Maintenance<br/>bill<br/>every 5 min"]
+        b13["Random<br/>event every<br/>1–3 min"]
+        b14["Warnings:<br/>money, hunger,<br/>health, Rep"]
+    end
+    b1 ~~~ b2 ~~~ b3
+    b4 ~~~ b5 ~~~ b6
+    b7 ~~~ b8 ~~~ b9 ~~~ b10
+    b11 ~~~ b12 ~~~ b13 ~~~ b14
+    b_day -- Dusk --> b_night
+    b_night -- Dawn --> b_dawn
+    b_dawn ~~~ b_bg

@@ -1,0 +1,30 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 312
+---
+flowchart LR
+    c0(("Player"))
+    c0 --> c1["Build"]
+    c0 --> c2["Manage"]
+    c0 --> c3["Reports<br/>alerts, stats, finances"]
+    c0 --> c4["Click resident<br/>view health, LIFE"]
+    c1 --> c5["Place room<br/>pay build cost"]
+    c1 --> c6["Demolish<br/>20% refund"]
+    c5 --> c7["Rooms: dorms, food, health,<br/>social, management, decor"]
+    c5 --> c12["Neighbors give bonuses<br/>or penalties; adds upkeep"]
+    c2 --> c13["Upgrade tier"]
+    c13 --> c14["Higher cap, bigger<br/>donations, new rooms"]
+    c2 --> c15["Food level<br/>5 levels"]
+    c15 --> c16["Cheap: save money,<br/>lose health & Rep"]
+    c15 --> c17["Generous: costs more,<br/>gain health & Rep"]
+    c2 --> c18["Start fundraiser<br/>daytime, costs food<br/>team loses health & rests after"]
+    c18 --> c20["Success<br/>+money, +2 Rep, +15 LIFE"]
+    c18 --> c21["Failure<br/>−2 Rep, +5 LIFE"]
+    c18 --> c23["Cancel<br/>food not refunded"]
+    c2 --> c24["Expand land<br/>pricier each time"]

@@ -1,0 +1,19 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 480
+---
+flowchart TB
+    e30(("Disaster"))
+    e30 --> e31["Natural: earthquake,<br/>winter storm"]
+    e31 --> e32["1–4 buildings<br/>damaged<br/>−₱7.5k each"]
+    e30 --> e33["Crisis: fire, factory,<br/>violence, discharge,<br/>eviction"]
+    e33 -.-> e34{"Take in<br/>displaced?"}
+    e34 -.->|"Accept"| e35["2–8 residents<br/>+5 to +15 Rep<br/>₱5–25k"]
+    e34 -.->|"Decline"| e36["−2 to<br/>−12 Rep"]
+    e33 -- "No<br/>answer" --> e37["Expires<br/>−2 to −12 Rep"]

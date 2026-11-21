@@ -1,0 +1,27 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 312
+---
+flowchart TB
+    a1["Launch game"] --> a2{"First time<br/>playing?"}
+    a2 -- Yes --> a3["Tutorial<br/>10 steps, can skip"]
+    a2 -- No --> a4
+    a3 --> a4["Playing"]
+    a4 -- "Space /<br/>focus lost" --> a5["Paused"]
+    a5 -- Resume --> a4
+    a4 --> a6["Settings<br/>save / load slots 1–3 + Auto<br/>audio, shortcuts"]
+    a6 -- Load --> a4
+    a6 -- "Reset<br/>game" --> a8["New shelter<br/>₱250k, 3 residents"]
+    a8 --> a4
+    a4 --> a9{"Victory?"}
+    a9 -- "10+ reintegrated<br/>& Rep 80+, or<br/>Day 50+ & Rep 70+" --> a10["Victory<br/>screen"]
+    a10 -- Continue --> a4
+    a4 --> a11{"Fail?"}
+    a11 -- "Bankrupt /<br/>Rep 0 /<br/>shelter empty" --> a12["Game Over"]
+    a12 -- Restart --> a8

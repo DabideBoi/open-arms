@@ -1,0 +1,16 @@
+---
+config:
+  theme: default
+  themeVariables:
+    fontSize: 24px
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 40
+    wrappingWidth: 480
+---
+flowchart TB
+    f5{"Money below<br/>−₱25k?"} -- Yes --> f6["Bankruptcy countdown<br/>18 min · no building<br/>or fundraising"]
+    f6 -- "Back to ₱0" --> f7["Countdown<br/>cancelled"]
+    f6 -- "Time runs out" --> f8["Game Over"]
+    f9{"Reputation<br/>hits 0?"} -- Yes --> f8
+    f10{"Every resident<br/>left?"} -- Yes --> f8
