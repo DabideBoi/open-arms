@@ -866,6 +866,10 @@ function handleInUseState(
       resident.lastMealTime = Date.now();
       console.log(`🍽️ ${resident.name} finished eating at cafeteria`);
       emitResidentAteFood(resident.id, resident.name);
+      resident.health = Math.min(HEALTH_CONFIG.MAX, resident.health + HEALTH_CONFIG.MEAL_HEALTH_RESTORE);
+    }
+    if (roomKind(room.type) === "clinic" && resident.currentNeed === "health") {
+      resident.health = Math.min(HEALTH_CONFIG.MAX, resident.health + HEALTH_CONFIG.CLINIC_VISIT_RESTORE);
     }
     
     leaveRoom(room, resident.id);
@@ -1208,7 +1212,7 @@ function emitResidentDeparted(residentId: string, residentName: string, reason: 
       reason,
       message: reason === 'hopeless'
         ? `${residentName} has left the shelter, having lost all hope`
-        : `${residentName} has left the shelter disappointed`
+        : `${residentName} was transferred to another institution due to inadequate treatment`
     }
   }));
 }
@@ -1633,6 +1637,7 @@ function handleResidentLeaving(resident: Resident, gameState: GameState): void {
   
   // Reputation penalty
   handleUnhealthyDepartureReputation(gameState, resident.name);
+  emitResidentDeparted(resident.id, resident.name, 'unhealthy');
   
   // Remove resident
   removeResident(gameState, resident.id);

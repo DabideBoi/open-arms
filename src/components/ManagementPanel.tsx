@@ -474,16 +474,15 @@ export const ManagementPanel: React.FC<ManagementPanelProps> = ({
                   )}
 
                   {/* Show fatigued residents separately */}
-                  {gameState.residents.some(r => isResidentFatigued(r)) && (
+                  {gameState.residents.some(r => isResidentFatigued(r) || r.currentNeed === "health") && (
                     <div className="fatigued-residents">
-                      <h5>⏳ Fatigued Residents</h5>
-                      {gameState.residents.filter(r => isResidentFatigued(r)).map(resident => {
-                        const fatigueRemaining = getResidentFatigueRemaining(resident);
-                        const minutes = Math.ceil(fatigueRemaining / 60000);
+                      <h5>⏳ Unavailable Residents</h5>
+                      {gameState.residents.filter(r => isResidentFatigued(r) || r.currentNeed === "health").map(resident => {
+                        const minutes = Math.ceil(getResidentFatigueRemaining(resident) / 60000);
                         return (
                           <div key={resident.id} className="fatigued-resident-item">
                             <span>{getProfileIcon(resident.profile)} {resident.name}</span>
-                            <span>Ready in {minutes} min</span>
+                            <span>{resident.currentNeed === "health" ? "🏥 In the clinic" : `Ready in ${minutes} min`}</span>
                           </div>
                         );
                       })}

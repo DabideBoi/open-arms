@@ -298,7 +298,9 @@ export const HEALTH_CONFIG = {
   SLEEP_RESTORE_RATE: 15,
   COMMON_ROOM_BOOST_RATE: 10,
   CLINIC_SEEK_THRESHOLD: 35,   // residents below this Health look for a clinic
-  CLINIC_RECOVERY_RATE: 2      // Health restored per second while in a clinic
+  CLINIC_RECOVERY_RATE: 2,     // Health restored per second while in a clinic
+  CLINIC_VISIT_RESTORE: 15,    // flat Health gained when a clinic visit finishes
+  MEAL_HEALTH_RESTORE: 10      // flat Health gained when a cafeteria meal finishes
 };
 
 // ============================================================================
@@ -614,8 +616,8 @@ export const FUNDRAISER_CONFIG = {
   BASE_REPUTATION_MODIFIER: 0.25,          // Base modifier for payout calculation
   
   // Effects on success
-  LIFE_BOOST: 15,                          // +15 LIFE per participant on success
-  LIFE_BOOST_FAILURE: 5,                   // +5 LIFE per participant on failure (taking part is what counts)
+  LIFE_BOOST: 22.5,                        // +22.5 LIFE per participant on success
+  LIFE_BOOST_FAILURE: 7.5,                 // +7.5 LIFE per participant on failure (taking part is what counts)
   HEALTH_COST: 10,                      // -10 health points
   REPUTATION_BOOST: 2,                     // +2 reputation on completion
   

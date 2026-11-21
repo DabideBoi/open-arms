@@ -660,7 +660,10 @@ export function getAvailableResidentsForFundraiser(gameState: GameState): Reside
     // Not in critical state
     const healthy = r.health > 20;
     
-    return !inFundraiser && !fatigued && healthy;
+    // Heading to or using the clinic
+    const atClinic = r.currentNeed === "health";
+    
+    return !inFundraiser && !fatigued && healthy && !atClinic;
   });
 }
 

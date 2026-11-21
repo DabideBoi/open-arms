@@ -49,8 +49,8 @@ flowchart TD
         a_player --> a_expand["Expand land"]
         a_player --> a_tier["Upgrade tier"]
         a_player --> a_answer["Answer events"]
-        a_fund --> a_fwin["Success<br/>+money, +2 Rep, +15 LIFE"]
-        a_fund --> a_ffail["Failure<br/>−2 Rep, +5 LIFE"]
+        a_fund --> a_fwin["Success<br/>+money, +2 Rep, +22.5 LIFE"]
+        a_fund --> a_ffail["Failure<br/>−2 Rep, +7.5 LIFE"]
     end
 
     subgraph RES["4 · Residents"]
@@ -212,8 +212,8 @@ flowchart TD
 
     Manage --> Fund["Start fundraiser<br/>daytime only, costs food"]
     Fund --> Team["1–3 rested residents go out<br/>healthier team = better odds"]
-    Team --> FundWin["Success<br/>+money, +2 Rep, +15 LIFE"]
-    Team --> FundFail["Failure<br/>−2 Rep, +5 LIFE"]
+    Team --> FundWin["Success<br/>+money, +2 Rep, +22.5 LIFE"]
+    Team --> FundFail["Failure<br/>−2 Rep, +7.5 LIFE"]
     FundWin --> Tired["Team loses health<br/>and must rest"]
     FundFail --> Tired
     Fund --> Cancel["Cancel: food is not refunded"]

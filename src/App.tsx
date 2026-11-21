@@ -330,7 +330,17 @@ function App() {
       }
     };
     
+    const handleResidentGraduated = (event: CustomEvent) => {
+      addNotification(`🎓 ${event.detail.name} reached 100% LIFE and graduated!`, 'success');
+    };
+
+    const handleResidentDeparted = (event: CustomEvent) => {
+      addNotification(`👋 ${event.detail.message}`, 'warning');
+    };
+    
     window.addEventListener('game:event_triggered' as any, handleEventTriggered);
+    window.addEventListener('resident_graduated' as any, handleResidentGraduated);
+    window.addEventListener('resident_departed' as any, handleResidentDeparted);
     window.addEventListener('game:game_over' as any, handleGameOver);
     window.addEventListener('game:warning_critical' as any, handleCriticalWarning);
     window.addEventListener('game:warning_escalated' as any, handleWarningEscalated);
@@ -344,6 +354,8 @@ function App() {
       window.removeEventListener('game:warning_critical' as any, handleCriticalWarning);
       window.removeEventListener('game:warning_escalated' as any, handleWarningEscalated);
       window.removeEventListener('fundraiser_completed' as any, handleFundraiserCompleted);
+      window.removeEventListener('resident_graduated' as any, handleResidentGraduated);
+      window.removeEventListener('resident_departed' as any, handleResidentDeparted);
       
       if (pendingReactUpdateRef.current !== null) {
         clearTimeout(pendingReactUpdateRef.current);

@@ -127,8 +127,8 @@ flowchart TB
         c15 --> c17["Generous: costs more,<br/>gain health & Rep daily"]
         c2 --> c18["Start fundraiser<br/>daytime only, costs food"]
         c18 --> c19["1–3 rested residents<br/>healthier = better odds"]
-        c19 --> c20["Success<br/>+money, +2 Rep, +15 LIFE"]
-        c19 --> c21["Failure<br/>−2 Rep, +5 LIFE"]
+        c19 --> c20["Success<br/>+money, +2 Rep, +22.5 LIFE"]
+        c19 --> c21["Failure<br/>−2 Rep, +7.5 LIFE"]
         c20 --> c22["Team loses health,<br/>must rest"]
         c21 --> c22
         c18 --> c23["Cancel<br/>food not refunded"]
