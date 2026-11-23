@@ -417,7 +417,8 @@ export class MainScene extends Phaser.Scene {
   private gameClock!: GameClock;
   private lastFundraiserTick = 0; // wall-clock ms of the previous frame, for the night freeze
   private throttledUpdater!: ThrottledUpdater;
-  private pauseManager!: PauseManager;
+  // Created eagerly so App can subscribe before preload/create() finish.
+  private pauseManager = new PauseManager();
   private autoSaveManager!: AutoSaveManager;
 
   // Visual effects — lighting is interpolated for smooth day/night transitions
@@ -493,7 +494,6 @@ export class MainScene extends Phaser.Scene {
     // Initialize systems
     this.gameClock = new GameClock();
     this.throttledUpdater = new ThrottledUpdater();
-    this.pauseManager = new PauseManager();
     this.autoSaveManager = new AutoSaveManager();
     
     // Create graphics objects
@@ -546,6 +546,8 @@ export class MainScene extends Phaser.Scene {
     this.pauseManager.onResume((pausedMs) => {
       shiftGameStateTimestamps(this.gameStateManager.getMutableState(), pausedMs);
       shiftCafeteriaTimers(pausedMs);
+      this.lastFundraiserTick = 0; // else the night freeze re-adds the paused gap to fundraisers
+      this.gameStateManager.forceUpdate(); // push shifted deadlines to React now
       this.gameClock.resume();
       console.log("Game resumed");
     });

@@ -33,7 +33,7 @@ export function createInitialGameState(): GameState {
     money: GAME_STATE_CONFIG.STARTING_MONEY,
     reputation: GAME_STATE_CONFIG.STARTING_REPUTATION,
     currentDay: GAME_STATE_CONFIG.STARTING_DAY,
-    food: 0,
+    food: GAME_STATE_CONFIG.STARTING_FOOD,
     
     // Shelter Tier Progression (start at Tier 1)
     currentTier: 1,

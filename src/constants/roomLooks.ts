@@ -146,7 +146,7 @@ export const ROOM_LOOKS: Record<RoomType, RoomLook> = {
 
 // Ready-made walkers from the Kenney "Roguelike Characters" sheet
 // (public/assets/kenney/chars.png, 16px tiles, 1px gap, 54 columns).
-export const FEMALE_FRAMES = [270, 271, 379, 486, 540];
+export const FEMALE_FRAMES = [270, 271, 379, 486];
 export const MALE_FRAMES = [324, 325, 378, 432, 433, 487, 541, 594];
 export const RESIDENT_FRAMES = [...FEMALE_FRAMES, ...MALE_FRAMES]; // gender unknown (old saves)
 export const CHARS_SHEET_COLUMNS = 54;

@@ -241,6 +241,7 @@ export const GAME_STATE_CONFIG = {
   STARTING_MONEY: 250000,
   STARTING_REPUTATION: 60,           // Down from 50 - harder start
   STARTING_DAY: 1,
+  STARTING_FOOD: 50,
   STARTING_RESIDENTS: 3,
   STARTING_PHASE: "day" as const
 };
