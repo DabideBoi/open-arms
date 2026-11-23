@@ -443,11 +443,10 @@ function tryStroll(resident: Resident, gameState: GameState): void {
   }
 }
 
-/** Most strolls visit a room (lounges favoured over clinics, least crowded favoured; never cafeterias, only hungry residents eat), otherwise a random hallway tile. */
+/** Most strolls visit a common room (least crowded favoured; never cafeterias, only hungry residents eat; never clinics, only residents who need care go there), otherwise a random hallway tile. */
 function pickStrollDestination(gameState: GameState): { x: number; y: number } | null {
   const { grid, rooms } = gameState;
-  // Common rooms listed 3x so they get picked 3x as often as clinics
-  const visitable = rooms.flatMap(r => !r.isOpen ? [] : roomKind(r.type) === "common_room" ? [r, r, r] : roomKind(r.type) === "clinic" ? [r] : []);
+  const visitable = rooms.filter(r => r.isOpen && roomKind(r.type) === "common_room");
   if (visitable.length > 0 && Math.random() < AI_CONFIG.STROLL_ROOM_VISIT_CHANCE) {
     const load = (r: Room) => gameState.residents.filter(o => Math.floor(o.gridX) >= r.gridX && Math.floor(o.gridX) < r.gridX + r.width && Math.floor(o.gridY) >= r.gridY && Math.floor(o.gridY) < r.gridY + r.height).length;
     // Two random picks, keep the emptier one: cheap spreading without sorting every room
@@ -1342,7 +1341,8 @@ function shouldPushThrough(
   if (before < rerouteAt && resident.blockedFor >= rerouteAt) {
     const goal = resident.path![resident.path!.length - 1];
     const detour = findPath(gameState.grid, oldX, oldY, goal.x, goal.y, resident.id, true);
-    if (detour) {
+    // A detour whose next step is the same blocked tile (e.g. the goal itself) just yanks them back to the tile centre
+    if (detour && !(detour[1]?.x === tileX && detour[1]?.y === tileY)) {
       resident.path = detour;
       resident.pathIndex = 0;
       resident.blockedFor = 0;

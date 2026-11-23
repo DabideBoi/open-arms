@@ -4,21 +4,95 @@ import { roomKind } from '../../constants';
 import { isTileOccupiedByOther, isTileOccupiedByResident } from './CollisionDetectionSystem';
 
 /**
- * PathfindingSystem - Optimized A* pathfinding with spatial partitioning
+ * PathfindingSystem - "CareRoute": A* with shelter-specific step costs, plus a single-search room choice.
+ *
+ * findPath          A* on a binary heap and typed arrays. Step cost 1, +0.3 per turn, +2 for tiles of a room
+ *                   that is neither start nor goal room, +4 for a tile another resident holds.
+ * findNearestRoom   "CareRoute Match": one multi-goal A* toward every open room of a type.
+ *
+ * Benchmark and method: docs/PATHFINDING_BENCHMARK.md (npm run bench:path).
  */
 
 // ============================================================================
 // A* Algorithm Core
 // ============================================================================
 
-interface AStarNode {
-  x: number;
-  y: number;
-  g: number;        // Cost from start
-  h: number;        // Heuristic to goal
-  f: number;        // g + h
-  parent: AStarNode | null;
-  dir: number;      // direction index we arrived by (-1 at start)
+const DIRS_X = [1, -1, 0, 0];
+const DIRS_Y = [0, 0, 1, -1];
+
+// Scratch buffers shared by every search. A stamp marks which entries belong to the current search, so
+// nothing is cleared per call. shortcut: not re-entrant, and the stamp wraps after 2^32 searches; fine for a game loop.
+let scratchSize = 0;
+let G = new Float64Array(0);    // cost from start
+let PARENT = new Int32Array(0); // previous tile index (-1 at start)
+let DIR = new Int8Array(0);     // direction index we arrived by (-1 at start)
+let SEEN = new Uint32Array(0);  // stamp: tile has a cost in this search
+let CLOSED = new Uint32Array(0); // stamp: tile was expanded in this search
+let stamp = 0;
+
+function ensureScratch(tileCount: number): void {
+  if (tileCount <= scratchSize) return;
+  scratchSize = tileCount;
+  G = new Float64Array(tileCount);
+  PARENT = new Int32Array(tileCount);
+  DIR = new Int8Array(tileCount);
+  SEEN = new Uint32Array(tileCount);
+  CLOSED = new Uint32Array(tileCount); // fresh arrays are all 0, which never equals a stamp (they start at 1)
+}
+
+/** Binary min-heap of (key, value). Stale entries are skipped by the caller (lazy deletion). */
+class MinHeap {
+  private keys = new Float64Array(1024);
+  private vals = new Int32Array(1024);
+  size = 0;
+
+  reset(capacity: number): void {
+    if (capacity > this.keys.length) {
+      this.keys = new Float64Array(capacity);
+      this.vals = new Int32Array(capacity);
+    }
+    this.size = 0;
+  }
+
+  push(key: number, val: number): void {
+    const keys = this.keys, vals = this.vals;
+    let i = this.size++;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (keys[p] <= key) break;
+      keys[i] = keys[p]; vals[i] = vals[p];
+      i = p;
+    }
+    keys[i] = key; vals[i] = val;
+  }
+
+  pop(): number {
+    const keys = this.keys, vals = this.vals;
+    const top = vals[0], n = --this.size;
+    if (n > 0) {
+      const key = keys[n], val = vals[n];
+      let i = 0;
+      for (;;) {
+        let c = 2 * i + 1;
+        if (c >= n) break;
+        if (c + 1 < n && keys[c + 1] < keys[c]) c++;
+        if (keys[c] >= key) break;
+        keys[i] = keys[c]; vals[i] = vals[c];
+        i = c;
+      }
+      keys[i] = key; vals[i] = val;
+    }
+    return top;
+  }
+}
+
+const heap = new MinHeap();
+
+/** Walk PARENT links back from tile index s to the start. */
+function buildPath(s: number, width: number): PathNode[] {
+  const path: PathNode[] = [];
+  for (; s !== -1; s = PARENT[s]) path.push({ x: s % width, y: (s / width) | 0 });
+  return path.reverse();
 }
 
 // ============================================================================
@@ -148,31 +222,10 @@ export function removeRoomFromSpatialGrid(room: Room): void {
 }
 
 /**
- * Manhattan distance heuristic (4-directional movement)
- */
-function heuristic(x1: number, y1: number, x2: number, y2: number): number {
-  return Math.abs(x2 - x1) + Math.abs(y2 - y1);
-}
-
-/**
- * Reconstruct path from goal node back to start
- */
-function reconstructPath(node: AStarNode): PathNode[] {
-  const path: PathNode[] = [];
-  let current: AStarNode | null = node;
-  
-  while (current !== null) {
-    path.unshift({ x: current.x, y: current.y });
-    current = current.parent;
-  }
-  
-  return path;
-}
-
-/**
- * Find path using A* (4-directional). Straight runs are preferred over staircases (small turn
- * penalty). With residentId, tiles held by other residents cost extra so routes bend around
- * crowds; hardBlock makes them impassable (used to re-route after getting stuck behind someone).
+ * Find a path with A* (4-directional). Straight runs are preferred over staircases (small turn penalty),
+ * tiles of rooms that are neither the start nor goal room cost extra (prefer open floor), and with
+ * residentId, tiles held by other residents cost extra so routes bend around crowds; hardBlock makes them
+ * impassable (used to re-route after getting stuck behind someone).
  */
 export function findPath(
   grid: Grid,
@@ -186,61 +239,46 @@ export function findPath(
   if (!isWalkable(grid, startX, startY) || !isWalkable(grid, goalX, goalY)) return null;
   if (startX === goalX && startY === goalY) return [{ x: startX, y: startY }];
 
-  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const startRoom = grid.tiles[startY][startX].occupiedBy;
-  const goalRoom = grid.tiles[goalY][goalX].occupiedBy;
-  const open: AStarNode[] = [{ x: startX, y: startY, g: 0, h: heuristic(startX, startY, goalX, goalY), f: 0, parent: null, dir: -1 }];
-  open[0].f = open[0].h;
-  const seen = new Map<number, AStarNode>(); // key -> best node so far
-  const closed = new Set<number>();
-  const keyOf = (x: number, y: number) => y * grid.width + x;
-  seen.set(keyOf(startX, startY), open[0]);
+  const W = grid.width, N = W * grid.height, tiles = grid.tiles;
+  const startRoom = tiles[startY][startX].occupiedBy;
+  const goalRoom = tiles[goalY][goalX].occupiedBy;
+  const goalT = goalY * W + goalX, s0 = startY * W + startX;
+  const search = ++stamp;
+  ensureScratch(N);
+  heap.reset(4 * N + 64); // each directed edge improves a tile at most once
+  G[s0] = 0; PARENT[s0] = -1; DIR[s0] = -1; SEEN[s0] = search;
+  heap.push(Math.abs(goalX - startX) + Math.abs(goalY - startY), s0);
 
-  for (let iterations = 0; open.length > 0 && iterations < grid.width * grid.height * 2; iterations++) {
-    // Pop lowest f (linear scan: open set stays small on a 40x30 grid)
-    let best = 0;
-    for (let i = 1; i < open.length; i++) if (open[i].f < open[best].f) best = i;
-    const current = open[best];
-    open[best] = open[open.length - 1];
-    open.pop();
+  while (heap.size > 0) {
+    const s = heap.pop();
+    if (CLOSED[s] === search) continue; // stale duplicate from a later improvement
+    CLOSED[s] = search;
+    if (s === goalT) return buildPath(s, W);
+    const cx = s % W, cy = (s / W) | 0, cd = DIR[s];
 
-    if (current.x === goalX && current.y === goalY) return reconstructPath(current);
-    closed.add(keyOf(current.x, current.y));
+    for (let d = 0; d < 4; d++) {
+      const nx = cx + DIRS_X[d], ny = cy + DIRS_Y[d];
+      if (!isWalkable(grid, nx, ny)) continue;
+      const n = ny * W + nx;
+      if (CLOSED[n] === search) continue;
 
-    for (let d = 0; d < DIRS.length; d++) {
-      const nx = current.x + DIRS[d][0];
-      const ny = current.y + DIRS[d][1];
-      if (!isWalkable(grid, nx, ny) || closed.has(keyOf(nx, ny))) continue;
-
-      let step = 1 + (current.dir !== -1 && current.dir !== d ? 0.3 : 0);
-      const isGoal = nx === goalX && ny === goalY;
-      // Prefer open floor: tiles inside a room cost extra unless it's the start/goal room
-      const roomId = grid.tiles[ny][nx].occupiedBy;
+      let step = 1 + (cd !== -1 && cd !== d ? 0.3 : 0);
+      const roomId = tiles[ny][nx].occupiedBy;
       if (roomId && roomId !== startRoom && roomId !== goalRoom) step += 2;
-      if (residentId && !isGoal && isTileOccupiedByOther(nx, ny, residentId)) {
+      if (residentId && n !== goalT && isTileOccupiedByOther(nx, ny, residentId)) {
         if (hardBlock) continue;
         step += 4;
       }
 
-      const g = current.g + step;
-      const existing = seen.get(keyOf(nx, ny));
-      if (existing) {
-        if (g < existing.g) {
-          existing.g = g;
-          existing.f = g + existing.h;
-          existing.parent = current;
-          existing.dir = d;
-        }
-      } else {
-        const h = heuristic(nx, ny, goalX, goalY);
-        const node: AStarNode = { x: nx, y: ny, g, h, f: g + h, parent: current, dir: d };
-        seen.set(keyOf(nx, ny), node);
-        open.push(node);
-      }
+      const g = G[s] + step;
+      if (SEEN[n] === search) { if (g >= G[n]) continue; } else SEEN[n] = search;
+      G[n] = g; PARENT[n] = s; DIR[n] = d;
+      heap.push(g + Math.abs(goalX - nx) + Math.abs(goalY - ny) - g * 1e-6, n); // -g*1e-6: ties go to the deeper node
     }
   }
   return null;
 }
+
 
 // ============================================================================
 // Path Caching (Enhanced)
@@ -436,9 +474,85 @@ function findRandomUnoccupiedTileInRoom(grid: Grid, room: Room): { x: number; y:
   };
 }
 
+/** Random 0-4 added to each room's price so residents spread over rooms instead of all choosing the same one. */
+const ROOM_CHOICE_JITTER = 4;
+
 /**
- * Pick a room of the given type. Scored by path length plus how busy the room is plus a little
- * jitter, so residents spread over all rooms instead of everyone piling into the closest one.
+ * CareRoute Match: pick the best room of a type in ONE multi-goal A* search instead of one search per room.
+ * The search runs toward every candidate room (heuristic = distance to the nearest one). The first time it
+ * expands a tile of a candidate room, that room gets a "finish" entry priced at (path cost to it) + 2 x
+ * occupancy + jitter; the first finish entry popped is the winner.
+ * shortcut: refunding the entry surcharges (up to 6) makes the heuristic overestimate on that one tile, so
+ * the pick can be marginally off; the benchmark measures it (docs/PATHFINDING_BENCHMARK.md), upgrade if it matters.
+ */
+function chooseRoom(
+  grid: Grid,
+  rooms: Room[],
+  startX: number,
+  startY: number,
+  residentId: string | undefined,
+  jitter: number
+): Room | null {
+  const K = rooms.length;
+  if (K === 0 || !isWalkable(grid, startX, startY)) return null;
+  const W = grid.width, N = W * grid.height, tiles = grid.tiles;
+  const index = new Map(rooms.map((r, k) => [r.id, k]));
+  const price = rooms.map(r => 2 * r.currentOccupancy + Math.random() * jitter);
+  const entered = new Uint8Array(K);
+  const nearest = (x: number, y: number) => {
+    let best = Infinity;
+    for (const r of rooms) {
+      const d = Math.max(r.gridX - x, 0, x - (r.gridX + r.width - 1)) + Math.max(r.gridY - y, 0, y - (r.gridY + r.height - 1));
+      if (d < best) best = d;
+    }
+    return best;
+  };
+
+  const startRoom = tiles[startY][startX].occupiedBy;
+  const s0 = startY * W + startX;
+  const search = ++stamp;
+  ensureScratch(N);
+  heap.reset(4 * N + K + 64);
+  G[s0] = 0; DIR[s0] = -1; SEEN[s0] = search;
+  heap.push(nearest(startX, startY), s0);
+
+  while (heap.size > 0) {
+    const s = heap.pop();
+    if (s >= N) return rooms[s - N]; // finish entry: best room
+    if (CLOSED[s] === search) continue;
+    CLOSED[s] = search;
+    const cx = s % W, cy = (s / W) | 0, cd = DIR[s];
+
+    const roomId = tiles[cy][cx].occupiedBy;
+    const k = roomId ? index.get(roomId) : undefined;
+    if (k !== undefined && !entered[k]) {
+      entered[k] = 1;
+      // Heading for a room isn't a detour through it: give back the surcharges this entry tile paid
+      const refund = (roomId !== startRoom ? 2 : 0) + (residentId && s !== s0 && isTileOccupiedByOther(cx, cy, residentId) ? 4 : 0);
+      heap.push(G[s] - refund + price[k] - G[s] * 1e-6, N + k);
+    }
+
+    for (let d = 0; d < 4; d++) {
+      const nx = cx + DIRS_X[d], ny = cy + DIRS_Y[d];
+      if (!isWalkable(grid, nx, ny)) continue;
+      const n = ny * W + nx;
+      if (CLOSED[n] === search) continue;
+      let step = 1 + (cd !== -1 && cd !== d ? 0.3 : 0);
+      const nr = tiles[ny][nx].occupiedBy;
+      if (nr && nr !== startRoom) step += 2;
+      if (residentId && isTileOccupiedByOther(nx, ny, residentId)) step += 4;
+      const g = G[s] + step;
+      if (SEEN[n] === search) { if (g >= G[n]) continue; } else SEEN[n] = search;
+      G[n] = g; DIR[n] = d;
+      heap.push(g + nearest(nx, ny) - g * 1e-6, n);
+    }
+  }
+  return null;
+}
+
+/**
+ * Pick the best open room of the given type (path cost + how busy it is + a little jitter) and the
+ * path to a free tile inside it. Spreads residents over rooms instead of everyone piling into the closest.
  */
 export function findNearestRoom(
   grid: Grid,
@@ -447,19 +561,13 @@ export function findNearestRoom(
   startY: number,
   roomType: RoomType,
   phase: DayPhase,
-  residentId?: string
+  residentId?: string,
+  jitter: number = ROOM_CHOICE_JITTER
 ): { room: Room; path: PathNode[] } | null {
-  let pick: { room: Room; path: PathNode[]; score: number } | null = null;
-
-  for (const room of getAvailableRooms(rooms, roomType, phase)) {
-    const tile = findRandomUnoccupiedTileInRoom(grid, room);
-    if (!tile) continue;
-    const path = findPath(grid, startX, startY, tile.x, tile.y, residentId);
-    if (!path) continue;
-    const score = path.length + room.currentOccupancy * 2 + Math.random() * 4;
-    if (!pick || score < pick.score) pick = { room, path, score };
-  }
-  return pick;
+  const room = chooseRoom(grid, getAvailableRooms(rooms, roomType, phase), startX, startY, residentId, jitter);
+  const tile = room && findRandomUnoccupiedTileInRoom(grid, room);
+  const path = tile && findPath(grid, startX, startY, tile.x, tile.y, residentId);
+  return room && path ? { room, path } : null;
 }
 
 /**

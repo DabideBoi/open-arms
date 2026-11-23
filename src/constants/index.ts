@@ -576,8 +576,8 @@ export const TIMER_CONFIG = {
   DONATION_CHECK_INTERVAL: 90 * 1000,          // 90 seconds (down from 5 min)
   MAINTENANCE_CHECK_INTERVAL: 5 * 60 * 1000,   // 5 minutes (down from 15)
   DAY_DURATION: 4 * 60 * 1000,                 // 4 minutes (down from 8)
-  NIGHT_DURATION: 2 * 60 * 1000,               // 2 minutes (down from 4)
-  FULL_DAY_CYCLE: 6 * 60 * 1000                // 6 minutes (down from 12)
+  NIGHT_DURATION: 45 * 1000,                   // 45 seconds
+  FULL_DAY_CYCLE: 4.75 * 60 * 1000             // 4 min 45 s (day + night)
 };
 
 // Dev mode timers (faster for testing)

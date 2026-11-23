@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bench:path": "esbuild scripts/pathfinding-bench.ts --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/pathfinding-bench.mjs && node --expose-gc node_modules/.cache/pathfinding-bench.mjs"
   },
   "repository": {
     "type": "git",
