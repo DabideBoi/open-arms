@@ -1,0 +1,31 @@
+find_path(start, goal):
+    open = priority queue, ordered by (cost so far + straight-line distance to goal)
+    add start to open
+
+    while open is not empty:
+        tile = take the cheapest tile from open
+        if tile is the goal: return the path back to start
+
+        for each neighbor (up, down, left, right):
+            if neighbor is a wall: skip
+            cost = 1
+            if this is a turn:                  cost += 0.3
+            if neighbor is in a room we are
+               not starting from or going to:   cost += 2
+            if another resident is on it:       cost += 4
+            add neighbor to open (if this is cheaper than any earlier way there)
+
+    return no path
+
+choose_room(start, rooms):
+    run the same search, but toward ALL rooms of the needed type at once
+
+    the first time the search reaches a room:
+        room's score = cost to get there + 2 × people inside + small random number
+
+    return the room with the best score
+
+find_nearest_room(start, room_type):
+    room = choose_room(start, open rooms of room_type)
+    spot = random free tile in that room
+    return room, find_path(start, spot)
